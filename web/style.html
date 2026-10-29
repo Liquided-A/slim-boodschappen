@@ -279,6 +279,15 @@ tr:last-child td{border-bottom:0}
 .foot p{font-size:.85rem;color:var(--muted);max-width:68ch}
 .fresh-table td,.fresh-table th{padding:5px 8px;font-size:.82rem}
 
+/* maaltijdideeën */
+.mealrow{grid-auto-columns:minmax(140px,160px)}
+.meal{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:14px;padding:12px;min-height:130px;color:var(--ink);scroll-snap-align:start}
+.meal .me{font-size:2rem;line-height:1}
+.meal .mt{font-weight:800;line-height:1.25}
+.mealing{display:flex;flex-direction:column;gap:2px}
+.check.big{font-size:1rem;padding:8px 0;border-bottom:1px solid var(--line)}
+.check.big input{width:22px;height:22px}
+
 /* productpagina */
 .pic[data-act],.cname[data-act]{cursor:pointer}
 .dtop{display:grid;grid-template-columns:120px minmax(0,1fr);gap:16px;align-items:start}
@@ -350,6 +359,7 @@ details.quick[open] summary::after{content:"Sluiten"}
   .basket .col:first-child{display:contents}
   .basket .col:first-child>section:nth-of-type(1){order:1}
   .basket .col:first-child>section:nth-of-type(2){order:3}
+  .basket .col:first-child>section:nth-of-type(3){order:5}
   .basket .summary{order:2}
   .basket #bons{order:4}
 }

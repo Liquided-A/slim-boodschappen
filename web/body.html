@@ -100,6 +100,7 @@
               <button type="button" class="switch" role="switch" id="oldreg" data-act="oldreg" aria-checked="false" aria-label="Ook oude gewone prijzen gebruiken"></button></div>
           </details>
         </section>
+        <section class="panel meals" aria-labelledby="h-meals"><header><div><h2 id="h-meals">Wat eten we?</h2><p class="small muted">Kies een gerecht, dan komen de boodschappen op je lijstje.</p></div></header><div class="hscroll mealrow" id="meals"></div></section>
         <div id="bons"></div>
       </div>
       <aside class="summary" id="summary" aria-live="polite"></aside>
@@ -260,7 +261,7 @@ document.addEventListener('error', e => {
 
 /* ---------- opslaan ---------- */
 function save(){
-  try{ localStorage.setItem(KEY, JSON.stringify({items:S.items.map(i => [i.q, i.qty]), off:[...S.off], demo:S.demo, oldReg:S.oldReg, v:2, done:[...S.done], hist:S.hist, saved:S.saved, onb:S.onb})); }catch(e){}
+  try{ localStorage.setItem(KEY, JSON.stringify({items:S.items.map(i => [i.q, i.qty]), off:[...S.off], demo:S.demo, oldReg:S.oldReg, v:2, done:[...S.done], hist:S.hist, saved:S.saved, onb:S.onb, persons:S.persons})); }catch(e){}
 }
 function load(){
   try{
@@ -269,7 +270,7 @@ function load(){
     S.items = d.items.map(([q, qty]) => ({id:S.nextId++, q:String(q), qty:Math.max(1, Math.min(99, +qty || 1))}));
     S.off = new Set(Array.isArray(d.off) ? d.off : []); S.demo = !!d.demo; S.oldReg = d.v >= 2 ? !!d.oldReg : true;
     S.done = new Set(Array.isArray(d.done) ? d.done : []); S.hist = d.hist && typeof d.hist === 'object' ? d.hist : {};
-    S.saved = d.saved || null; S.onb = d.onb !== false; return true;
+    S.saved = d.saved || null; S.onb = d.onb !== false; S.persons = Math.max(1, Math.min(12, +d.persons || 4)); return true;
   }catch(e){ return false; }
 }
 function remember(q){
@@ -387,6 +388,61 @@ function detailHtml(s, i){
     }).join('') + '</div><p class="small muted">Gesorteerd op prijs, de goedkoopste is groen. Let op het formaat: de prijs per kilo of liter helpt bij het vergelijken. Gewone prijzen kunnen iets afwijken.</p></div>' : '') +
     '<button type="button" class="btn ghost" data-act="closesheet" style="justify-content:center">Sluiten</button>';
 }
+/* ---------- maaltijdideeën (zoals de recepten in Bring! en AnyList) ---------- */
+const MEALS = [
+  ['boerenkool', '🥬', 'Boerenkoolstamppot', [['boerenkool', 2], ['aardappelen', 1], ['rookworst', 1], ['spekjes', 1], ['halfvolle melk', 1], ['roomboter', 1]]],
+  ['bolognese', '🍝', 'Spaghetti bolognese', [['spaghetti', 1], ['rundergehakt', 1], ['pastasaus', 1], ['uien', 1], ['knoflook', 1], ['geraspte kaas', 1]]],
+  ['nasi', '🍛', 'Nasi goreng', [['zilvervliesrijst', 1], ['kipfilet', 1], ['nasi groente', 1], ['nasi kruiden', 1], ['eieren', 1], ['kroepoek', 1]]],
+  ['pannenkoeken', '🥞', 'Pannenkoeken', [['pannenkoekenmix', 1], ['halfvolle melk', 1], ['eieren', 1], ['stroop', 1], ['poedersuiker', 1]]],
+  ['erwtensoep', '🍲', 'Erwtensoep', [['spliterwten', 1], ['rookworst', 1], ['prei', 1], ['winterpeen', 1], ['knolselderij', 1], ['speklapjes', 1]]],
+  ['hutspot', '🥕', 'Hutspot met rookworst', [['hutspot', 2], ['aardappelen', 1], ['rookworst', 1], ['roomboter', 1]]],
+  ['kipkerrie', '🍗', 'Kip kerrie met rijst', [['kipfilet', 1], ['kerriesaus', 1], ['zilvervliesrijst', 1], ['paprika', 2], ['uien', 1]]],
+  ['lasagne', '🧀', 'Lasagne', [['lasagnebladen', 1], ['rundergehakt', 1], ['pastasaus', 2], ['geraspte kaas', 1], ['uien', 1]]],
+  ['andijvie', '🥗', 'Andijviestamppot', [['andijvie', 1], ['aardappelen', 1], ['spekjes', 1], ['jong belegen kaas', 1]]],
+  ['wraps', '🌯', 'Wraps met kip', [['wraps', 1], ['kipfilet', 1], ['ijsbergsla', 1], ['tomaten', 1], ['komkommer', 1], ['knoflooksaus', 1]]],
+  ['macaroni', '🧀', 'Macaroni met ham en kaas', [['macaroni', 1], ['hamblokjes', 1], ['geraspte kaas', 1], ['tomatenpuree', 1], ['uien', 1]]],
+  ['zalm', '🐟', 'Zalm met broccoli en krieltjes', [['zalmfilet', 1], ['broccoli', 2], ['krieltjes', 1], ['citroen', 1]]],
+  ['pizza', '🍕', 'Pizza zelf maken', [['pizzabodem', 1], ['passata', 1], ['geraspte mozzarella', 1], ['salami', 1], ['champignons', 1]]],
+  ['soep', '🍅', 'Tomatensoep met balletjes', [['tomatensoep', 2], ['soepballetjes', 1], ['stokbrood', 1]]]
+];
+let MEALDEALS = null;   /* per gerecht: hoeveel ingrediënten deze week in de aanbieding zijn */
+function inDeal(q){
+  const on = new Set(enabledStores()), a = ENG.analyze(q, 8);
+  return a.per.some((e, k) => e && on.has(k) && e.cands.some(c => c.usual && c.score <= e.cands[0].score + 0.5));
+}
+function computeMealDeals(){
+  MEALDEALS = {}; let k = 0;
+  const step = () => {
+    const end = Math.min(MEALS.length, k + 2);
+    for (; k < end; k++){ const [id, , , ing] = MEALS[k]; MEALDEALS[id] = ing.filter(([q]) => inDeal(q)).length; }
+    if (k < MEALS.length) setTimeout(step, 30); else if (location.hash === '#lijstje') renderMeals();
+  };
+  setTimeout(step, 600);
+}
+function renderMeals(){
+  const order = MEALS.slice().sort((a, b) => ((MEALDEALS && MEALDEALS[b[0]]) || 0) - ((MEALDEALS && MEALDEALS[a[0]]) || 0));
+  $('meals').innerHTML = order.map(([id, e, t, ing]) => {
+    const n = MEALDEALS ? MEALDEALS[id] : null;
+    return '<button type="button" class="meal" data-act="meal" data-id="' + id + '"><span class="me" aria-hidden="true">' + e + '</span><span class="mt">' + esc(t) + '</span>' +
+      (n ? '<span class="tag sale">' + n + ' in de aanbieding</span>' : '<span class="small muted">' + ing.length + ' boodschappen</span>') + '</button>';
+  }).join('');
+}
+S.persons = 4;
+/* hoeveelheden zijn voor 4 personen; pas bij duidelijk meer of minder mensen een pak meer of minder */
+function mealQty(n, p){ return Math.max(1, Math.round(n * p / 4 - 0.25)); }
+function mealHtml(id){
+  const m = MEALS.find(x => x[0] === id); if (!m) return '';
+  const [, e, t, ing] = m, p = S.persons;
+  return '<h2>' + e + ' ' + esc(t) + '</h2>' +
+    '<div class="optrow" style="border:0;margin:0;padding:0"><span>Voor hoeveel personen?</span><div class="stepper"><button type="button" data-act="persons" data-d="-1" aria-label="Minder personen">−</button><span>' + p + '</span><button type="button" data-act="persons" data-d="1" aria-label="Meer personen">+</button></div></div>' +
+    '<div class="mealing">' + ing.map(([q, n], k) => {
+      const qty = mealQty(n, p), have = hasItem(q);
+      return '<label class="check big"><input type="checkbox" data-mealing="' + k + '"' + (have ? '' : ' checked') + '><span>' + (qty > 1 ? qty + ' × ' : '') + esc(q) + (have ? ' <span class="small muted">(staat al op je lijstje)</span>' : '') + '</span></label>';
+    }).join('') + '</div>' +
+    '<button type="button" class="btn primary" data-act="mealadd" data-id="' + id + '" style="justify-content:center;min-height:52px">Zet op mijn lijstje</button>' +
+    '<button type="button" class="btn ghost" data-act="closesheet" style="justify-content:center">Annuleren</button>';
+}
+
 /* prijs per kilo of liter, zoals op het schapkaartje */
 function unitPrice(cents, u, q){
   if (!q || (u !== 1 && u !== 2) || q < 20) return '';
@@ -648,7 +704,7 @@ function renderBasket(){
     '<section class="panel"><header><h2>Alle prijzen naast elkaar</h2><span class="small muted">groen = goedkoopst · ~ = omgerekend · • = aanbieding</span></header>' +
     '<div class="tablewrap"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div></section></div>';
 }
-function renderList(){ compute(); renderItems(); renderStores(); renderBasket(); renderCart(); }
+function renderList(){ compute(); renderItems(); renderStores(); renderBasket(); renderCart(); renderMeals(); }
 function renderAll(){ renderList(); renderShop(); renderFolders(); }
 
 /* ---------- folders ---------- */
@@ -1035,6 +1091,16 @@ document.addEventListener('click', e => {
     else addItem(q);
     return;
   }
+  else if (act === 'meal'){ openSheet(mealHtml(b.dataset.id), 'Gerecht'); $('sheetroot').dataset.meal = b.dataset.id; return; }
+  else if (act === 'persons'){ S.persons = Math.max(1, Math.min(12, S.persons + (+b.dataset.d))); save(); openSheet(mealHtml($('sheetroot').dataset.meal), 'Gerecht'); return; }
+  else if (act === 'mealadd'){
+    const m = MEALS.find(x => x[0] === b.dataset.id); if (!m) return;
+    const picks = [...document.querySelectorAll('[data-mealing]')].filter(x => x.checked).map(x => m[3][+x.dataset.mealing]);
+    if (S.demo){ S.items = []; S.an = {}; S.pins = {}; S.demo = false; }
+    picks.forEach(([q, n]) => { const qty = mealQty(n, S.persons); const ex = S.items.find(y => y.q.toLowerCase() === q);
+      if (ex) ex.qty = Math.min(99, ex.qty + qty); else { const it = {id: S.nextId++, q, qty}; S.items.push(it); S.an[it.id] = ENG.analyze(q); remember(q); } });
+    closeSheet(); S.k = null; save(); renderAll(); toast(picks.length + ' boodschappen voor ' + m[2].toLowerCase() + ' op je lijstje gezet'); return;
+  }
   else if (act === 'detail'){ openSheet(detailHtml(+b.dataset.s, +b.dataset.i), 'Product'); return; }
   else if (act === 'adddetail'){ const q = b.dataset.q; if (!hasItem(q)){ addItem(q); toast('"' + q + '" op je lijstje gezet'); } closeSheet(); return; }
   else if (act === 'impadd' || act === 'impreplace'){
@@ -1217,6 +1283,7 @@ document.addEventListener('keydown', e => {
     if (fresh || !S.items.length) $('quick').open = true;
     if (fresh || !S.items.length){ useDemo(); S.off = new Set(STORES.filter(s => !DEFAULT_ON.has(s.k)).map(s => s.k)); }
     applyData(D);
+    computeMealDeals();
     if (PENDING_IMPORT){ const l = PENDING_IMPORT; PENDING_IMPORT = null; if (fresh) S.onb = true; setTimeout(() => offerImport(l), 300); }
     else if (fresh){ S.onb = false; setTimeout(() => openSheet(onboardingHtml(), 'Welkom'), 300); }
     refreshRemote();

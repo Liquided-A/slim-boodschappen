@@ -274,6 +274,24 @@ tr:last-child td{border-bottom:0}
 .foot p{font-size:.85rem;color:var(--muted);max-width:68ch}
 .fresh-table td,.fresh-table th{padding:5px 8px;font-size:.82rem}
 
+/* zoek-suggesties en assortiment */
+.qsugg{top:calc(100% + 6px);max-height:min(70vh,440px);color:var(--ink);z-index:22}
+.qsugg button{align-items:center;padding:11px 10px;min-height:52px}
+.qsugg .qtxt{display:flex;flex-direction:column;gap:1px;min-width:0}
+.qsugg .sm{white-space:normal}
+.qsugg .qadd{flex:none;background:var(--good-bg);color:var(--good);font-weight:700;font-size:.8rem;border-radius:8px;padding:5px 9px;white-space:nowrap}
+.qsugg .qall{border-bottom:1px solid var(--line);border-radius:8px 8px 0 0}
+.qsugg .qall .sq{color:var(--cta)}
+.assort{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:16px;display:flex;flex-direction:column;gap:8px}
+.assort>header{display:flex;flex-direction:column;gap:2px}
+.assort h2{font-size:1.05rem}
+.arows{display:flex;flex-direction:column}
+.arow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.arow:first-child{border-top:0}
+.arow .sq{display:block;font-weight:700;overflow-wrap:anywhere}
+.arow .sm{display:block;font-size:.8rem;color:var(--muted)}
+.arow .addbtn{margin:0;padding:9px 12px;white-space:nowrap}
+
 /* instellingen-knop in de kopbalk */
 .hdrbtns{display:flex;gap:8px;align-items:center}
 .iconbtn{display:grid;place-items:center;width:44px;height:44px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:var(--brand-2);color:var(--brand-ink);padding:0}
@@ -309,7 +327,11 @@ tr:last-child td{border-bottom:0}
   .switch{width:48px;height:28px}.switch::after{width:22px;height:22px}.switch[aria-checked="true"]::after{left:23px}
   .scanbtns .btn{flex:1 1 100%;justify-content:center;min-height:50px;font-size:1rem}
   .foot .inner{padding-bottom:24px}
-  .items li{grid-template-columns:44px minmax(0,1fr) auto auto;gap:8px}
+  .items li{grid-template-columns:48px minmax(0,1fr) auto;gap:6px 12px;align-items:start}
+  .items li .thumb{grid-column:1;grid-row:1/3;width:48px!important;height:48px!important}
+  .items li .iname{grid-column:2;grid-row:1;overflow-wrap:break-word}
+  .items li .x{grid-column:3;grid-row:1}
+  .items li .stepper{grid-column:2;grid-row:2;justify-self:start}
   .items .thumb{width:44px;height:44px}
 }
 

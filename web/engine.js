@@ -8,6 +8,21 @@ const UNITWORDS = new Set(['g','gr','gram','kg','kilo','ml','cl','dl','l','liter
 const PENALTY = new Set(['saus','mix','choco','chocolade','maaltijd','pizza','snack','smaak','drink','shake','vla','cholesterol','lactosevrij','glutenvrij','bio','biologisch','vegan','vegetarisch','light','zero','kant','klaar']);
 const HOUSE = new Set(['ah','jumbo','plus','dirk','deka','dekamarkt','dekavers','hoogvliet','spar','lidl','poiesz','vomar','woon','beste','de','zuivelmeester','melkan','budget','huismerk','pcd','kwetters','vleeschmeesters','daily','chef','basic','bakkershart','soma','van','den']);
 const STOP = new Set(['van','de','het','een','met','en','of','voor']);
+/* samenstellingen die wél hetzelfde product zijn: roomboter = boter, scharreleieren = eieren */
+const GOODPRE = ['room','scharrel','vrijeuitloop','biologische','zilvervlies','volkoren','tarwe','meergranen','spelt','waldkorn','kristal','riet','basmati','jasmijn','pandan','filter','snel','hand','stoof','kruimig','vast','runder','varkens','kalkoen','kippen','braad','was','vaat','toilet','keuken','cherry','tros','vlees','roma','trostomaat','snoep','mini','grote','groene','rode','gele','witte','zoete','vers','verse','halfvolle','volle','magere','griekse','turkse','boeren'];
+/* korte, algemene woorden: zoek eerst naar het gangbare product */
+const GENERIC = {
+  'melk':'halfvolle melk','kaas':'jong belegen kaas','brood':'volkoren brood','eieren':'scharreleieren','eiren':'scharreleieren','eitjes':'scharreleieren',
+  'boter':'roomboter ongezouten','wc papier':'toiletpapier','wcpapier':'toiletpapier','wc-papier':'toiletpapier','closetpapier':'toiletpapier','wcrol':'toiletpapier',
+  'pasta':'spaghetti','macaroni':'macaroni','suiker':'kristalsuiker','koffie':'filterkoffie','thee':'zwarte thee','yoghurt':'magere yoghurt','yogurt':'magere yoghurt',
+  'rijst':'zilvervliesrijst','gehakt':'half om half gehakt','chips':'chips naturel','hagelslag':'hagelslag melk','aardappels':'aardappelen','piepers':'aardappelen',
+  'cola':'coca cola','bier':'pils','pils':'pils','frisdrank':'cola','sap':'sinaasappelsap','jus':'sinaasappelsap','water':'mineraalwater','olie':'zonnebloemolie',
+  'appels':'appels jonagold','appel':'appels jonagold','peren':'handperen','sla':'ijsbergsla','wasmiddel':'wasmiddel','vla':'vanillevla','kwark':'magere kwark',
+  'worst':'rookworst','vleeswaren':'kipfilet beleg','beleg':'jonge kaas plakken','ham':'beenham','bloem':'tarwebloem','meel':'tarwebloem','zout':'keukenzout',
+  'koekjes':'biscuit','koek':'ontbijtkoek','tomaat':'tomaten','ui':'uien','paprika':'paprika rood','wortels':'winterpeen','wortelen':'winterpeen','peen':'winterpeen',
+  'kip':'kipfilet','vis':'zalmfilet','zalm':'zalmfilet','pindakaas':'pindakaas','jam':'aardbeienjam','mayo':'mayonaise','ketchup':'tomatenketchup',
+  'shampoo':'shampoo','tandpasta':'tandpasta','luiers':'luiers','afwasblokjes':'vaatwastabletten','vaatwastabletten':'vaatwastabletten'
+};
 
 function norm(s){
   return ' ' + String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
@@ -66,6 +81,16 @@ class Engine {
     return [].concat(...tiers.map((arr, t) => arr.map(i => ({i, tier: t}))));
   }
   analyze(query, limit){
+    const g = GENERIC[String(query).toLowerCase().trim().replace(/\s+/g, ' ')];
+    if (g && g !== String(query).toLowerCase().trim()){
+      /* "melk" -> eerst halfvolle melk; winkels zonder treffer vallen terug op het gewone zoekwoord */
+      const a = this._analyze(g, limit), b = this._analyze(query, limit);
+      a.per = a.per.map((e, s) => e || b.per[s]); a.query = query;
+      return a;
+    }
+    return this._analyze(query, limit);
+  }
+  _analyze(query, limit){
     const p = parseQuery(query);
     const qset = new Set(p.tokens);
     const joined = ' ' + p.tokens.join(' ') + ' ';
@@ -79,7 +104,11 @@ class Engine {
           let c = null;
           for (const t of qset){
             if (w === t){ c = 0; break; }
-            if (w.endsWith(t)) c = c === null ? 0.4 : Math.min(c, 0.4);   /* roomboter = boter */
+            if (w.endsWith(t) && w.length > t.length){
+              const pre = w.slice(0, w.length - t.length);
+              const v = GOODPRE.includes(pre) ? 0.4 : 1.6;               /* roomboter = boter, maar karnemelk is geen melk */
+              c = c === null ? v : Math.min(c, v);
+            }
           }
           if (c === null){
             let related = false;
@@ -142,7 +171,13 @@ class Engine {
   suggest(text, storeIdxs, limit){
     const p = parseQuery(text);
     if (!p.tokens.length || p.tokens.join('').length < 3) return [];
-    const a = this.analyze(text, 80);
+    const a = this._analyze(text, 80);
+    const gq = GENERIC[String(text).toLowerCase().trim().replace(/\s+/g, ' ')];
+    if (gq && gq !== String(text).toLowerCase().trim()){
+      /* algemeen woord: het gangbare product bovenaan, daarna de andere soorten */
+      const ga = this._analyze(gq, 30);
+      a.per = a.per.map((e, s) => !ga.per[s] ? e : !e ? ga.per[s] : {cands: ga.per[s].cands.concat(e.cands), mode: ga.per[s].mode});
+    }
     const groups = new Map();
     storeIdxs.forEach(s => {
       const e = a.per[s]; if (!e) return;
@@ -166,10 +201,19 @@ class Engine {
       if (p.kind) size = fmtQty(p.kind, p.amount);
       else if (g.sizes.size){ size = [...g.sizes.entries()].sort((x, y) => y[1] - x[1])[0][0]; }
       g.q = g.base + (size ? ' ' + size : '');
-      g.rank = Math.min(g.stores.size, 6) + g.tier * 1.5 - 0.6 * (g.words - 1);
+      const last = g.base.split(' ').pop();
+      const head = p.tokens.some(t => last === t || (last.endsWith(t) && GOODPRE.includes(last.slice(0, last.length - t.length))));
+      const bad = p.tokens.some(t => g.base.split(' ').some(w => w !== t && ((w.endsWith(t) && !GOODPRE.includes(w.slice(0, w.length - t.length))) || w.startsWith(t))));
+      g.gen = !!gq && gq.split(' ').every(w => g.base.split(' ').some(b => b === w || b.endsWith(w)));
+      g.rank = Math.min(g.stores.size, 6) + g.tier * 1.5 - 0.6 * (g.words - 1) + (head ? 2.5 : 0) - (bad && !head ? 2 : 0);
       return g;
     });
-    return out.sort((x, y) => y.rank - x.rank || x.min - y.min).slice(0, limit);
+    out.sort((x, y) => y.rank - x.rank || x.min - y.min);
+    if (!gq) return out.slice(0, limit);
+    /* bij een algemeen woord: eerst een paar keer het gangbare product, dan de andere soorten */
+    const gen = out.filter(g => g.gen), rest = out.filter(g => !g.gen);
+    const head = gen.slice(0, Math.min(3, limit));
+    return head.concat(rest, gen.slice(head.length)).slice(0, limit);
   }
 }
 

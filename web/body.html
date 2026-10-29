@@ -3,8 +3,9 @@
   <div class="inner">
     <a class="logo" href="#aanbiedingen"><span class="mk" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"/><circle cx="9.5" cy="20" r="1.2"/><circle cx="17" cy="20" r="1.2"/></svg></span>Slim Boodschappen</a>
     <form class="search" id="searchform" role="search">
-      <input id="q" type="search" placeholder="Zoek in alle aanbiedingen, bijv. koffie of wasmiddel" aria-label="Zoek in alle aanbiedingen" autocomplete="off">
+      <input id="q" type="search" placeholder="Zoek een product, bijv. melk of koffie" aria-label="Zoek een product" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="qsugg" enterkeyhint="search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <div class="sugg qsugg" id="qsugg" role="listbox" aria-label="Suggesties" hidden></div>
     </form>
     <div class="hdrbtns">
     <button class="iconbtn" type="button" data-act="settings" aria-label="Instellingen: tekstgrootte en weergave"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19 9 5l5 14M5.8 14h6.4"/><path d="M15 19l3-8 3 8M15.9 16.6h4.2"/></svg></button>
@@ -53,6 +54,7 @@
           </select>
         </div>
         <div class="chips" id="chips"></div>
+        <section class="assort" id="assort" hidden></section>
         <div class="grid" id="grid"></div>
         <div class="more"><button class="btn ghost" id="more" type="button" hidden>Toon meer</button></div>
       </div>
@@ -90,7 +92,7 @@
           <details class="storebox" id="storebox">
             <summary><span>Mijn winkels <span class="muted small" id="storecount"></span></span></summary>
             <div class="storelist" id="stores"></div>
-            <div class="optrow"><span class="small">Ook oude gewone prijzen gebruiken<br><span class="muted">Van winkels waar alleen de aanbiedingen actueel zijn</span></span>
+            <div class="optrow"><span class="small">Ook oudere gewone prijzen gebruiken<br><span class="muted">Zo vind je het hele assortiment. Bij AH, PLUS, Dirk en een paar andere winkels zijn de gewone prijzen soms maanden oud en dus een schatting; aanbiedingen zijn altijd actueel.</span></span>
               <button type="button" class="switch" role="switch" id="oldreg" data-act="oldreg" aria-checked="false" aria-label="Ook oude gewone prijzen gebruiken"></button></div>
           </details>
         </section>
@@ -155,7 +157,7 @@ const NATIVE = window.SlimNative || null;
 function sheetUrl(n){ return CFG && CFG.remote && n >= (CFG.localSheets || 0) ? CFG.remote + 'img/s' + n + '.jpg' : 'img/s' + n + '.jpg'; }
 
 let ENG = null, STORES = [], CATS = [], DEALS = [], PFETCH = null, HASIMG = false;
-const S = {items:[], off:new Set(), k:null, pins:{}, an:{}, demo:true, nextId:1, oldReg:false,
+const S = {items:[], off:new Set(), k:null, pins:{}, an:{}, demo:true, nextId:1, oldReg:true,
   q:'', cat:'all', fstores:new Set(), fdisc:0, fmulti:false, fnow:false, fphoto:false, sort:'top', show:36, moreStores:false,
   sugg:[], suggSel:-1};
 
@@ -186,14 +188,14 @@ function imgHtml(ref, fallback){
 
 /* ---------- opslaan ---------- */
 function save(){
-  try{ localStorage.setItem(KEY, JSON.stringify({items:S.items.map(i => [i.q, i.qty]), off:[...S.off], demo:S.demo, oldReg:S.oldReg})); }catch(e){}
+  try{ localStorage.setItem(KEY, JSON.stringify({items:S.items.map(i => [i.q, i.qty]), off:[...S.off], demo:S.demo, oldReg:S.oldReg, v:2})); }catch(e){}
 }
 function load(){
   try{
     const raw = localStorage.getItem(KEY); if (!raw) return false;
     const d = JSON.parse(raw); if (!Array.isArray(d.items)) return false;
     S.items = d.items.map(([q, qty]) => ({id:S.nextId++, q:String(q), qty:Math.max(1, Math.min(99, +qty || 1))}));
-    S.off = new Set(Array.isArray(d.off) ? d.off : []); S.demo = !!d.demo; S.oldReg = !!d.oldReg; return true;
+    S.off = new Set(Array.isArray(d.off) ? d.off : []); S.demo = !!d.demo; S.oldReg = d.v >= 2 ? !!d.oldReg : true; return true;
   }catch(e){ return false; }
 }
 function useDemo(){ S.items = DEMO.map(([q, qty]) => ({id:S.nextId++, q, qty})); S.demo = true; }
@@ -311,6 +313,32 @@ function renderSugg(){
   if (S.suggSel >= 0) inp.setAttribute('aria-activedescendant', 'sg' + S.suggSel); else inp.removeAttribute('aria-activedescendant');
 }
 function closeSugg(){ S.sugg = []; renderSugg(); }
+
+/* ---------- zoekbalk: suggesties uit het hele assortiment ---------- */
+S.qs = []; S.qsSel = -1;
+function updateQSugg(){
+  const v = $('q').value.trim();
+  S.qs = v.length >= 2 && ENG ? ENG.suggest(v, enabledStores(), 6) : []; S.qsSel = -1; renderQSugg(); renderAssort();
+}
+function suggMeta(g){ return 'vanaf ' + money(g.min) + ' bij ' + esc(STORES[g.minStore].c) + ' · ' + g.stores.size + ' winkel' + (g.stores.size === 1 ? '' : 's'); }
+function renderQSugg(){
+  const box = $('qsugg'), inp = $('q'), v = inp.value.trim();
+  if (!S.qs.length || document.activeElement !== inp){ box.hidden = true; inp.setAttribute('aria-expanded', 'false'); return; }
+  const nDeals = baseFiltered().length;
+  box.innerHTML = '<button type="button" role="option" class="qall" data-act="qsearch"><span class="sq">Zoek "' + esc(v) + '" in de aanbiedingen</span><span class="sm">' + nDeals + ' gevonden</span></button>' +
+    S.qs.map((g, j) => '<button type="button" role="option" id="qs' + j + '" data-act="qpick" data-j="' + j + '" aria-selected="' + (j === S.qsSel) + '">' +
+      '<span class="qtxt"><span class="sq">' + esc(g.q) + '</span><span class="sm">' + suggMeta(g) + '</span></span><span class="qadd" aria-hidden="true">' + (hasItem(g.q) ? '✓' : '+ Lijstje') + '</span></button>').join('');
+  box.hidden = false; inp.setAttribute('aria-expanded', 'true');
+}
+function closeQSugg(){ $('qsugg').hidden = true; $('q').setAttribute('aria-expanded', 'false'); }
+function renderAssort(){
+  const el = $('assort');
+  if (!S.q || !S.qs.length){ el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = '<header><h2>In het assortiment</h2><span class="small muted">Gewone prijzen, ook als het nergens in de aanbieding is</span></header><div class="arows">' +
+    S.qs.map((g, j) => '<div class="arow"><div><span class="sq">' + esc(g.q) + '</span><span class="sm">' + suggMeta(g) + '</span></div>' +
+      '<button type="button" class="addbtn" data-act="qpick" data-j="' + j + '" aria-pressed="' + hasItem(g.q) + '">' + (hasItem(g.q) ? '✓ Op je lijstje' : '+ Op mijn lijstje') + '</button></div>').join('') + '</div>';
+}
 
 /* ---------- lijstje ---------- */
 let LAST = null;
@@ -647,6 +675,7 @@ function addItem(q){
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
   if (!e.target.closest('.addwrap')) closeSugg();
+  if (!e.target.closest('#searchform')) closeQSugg();
   if (!b || b.tagName === 'SELECT' || b.tagName === 'INPUT') return;
   const act = b.dataset.act, id = +b.dataset.id, it = S.items.find(x => x.id === id);
   if (act === 'inc' && it){ it.qty = Math.min(99, it.qty + 1); }
@@ -660,17 +689,23 @@ document.addEventListener('click', e => {
   else if (act === 'morestores'){ S.moreStores = !S.moreStores; renderFilters(); return; }
   else if (act === 'unchip'){
     const k = b.dataset.k;
-    if (k === 'q'){ S.q = ''; $('q').value = ''; } else if (k === 'cat') S.cat = 'all'; else if (k[0] === 's') S.fstores.delete(+k.slice(1));
+    if (k === 'q'){ S.q = ''; $('q').value = ''; S.qs = []; renderAssort(); } else if (k === 'cat') S.cat = 'all'; else if (k[0] === 's') S.fstores.delete(+k.slice(1));
     else if (k === 'fdisc') S.fdisc = 0; else S[k] = false;
     S.show = 36; renderShop(); return;
   }
-  else if (act === 'clearfilters'){ S.q = ''; $('q').value = ''; S.cat = 'all'; S.fstores.clear(); S.fdisc = 0; S.fmulti = S.fnow = S.fphoto = false; S.show = 36; renderShop(); return; }
+  else if (act === 'clearfilters'){ S.q = ''; $('q').value = ''; S.qs = []; renderAssort(); S.cat = 'all'; S.fstores.clear(); S.fdisc = 0; S.fmulti = S.fnow = S.fphoto = false; S.show = 36; renderShop(); return; }
   else if (act === 'adddeal'){
     const q = b.dataset.q;
     if (hasItem(q)){ const x = S.items.find(y => y.q.toLowerCase() === q.toLowerCase()); S.items = S.items.filter(y => y !== x); delete S.an[x.id]; S.k = null; save(); renderAll(); }
     else addItem(q);
     return;
   }
+  else if (act === 'qpick'){
+    const g = S.qs[+b.dataset.j]; if (!g) return;
+    if (hasItem(g.q)){ toast('"' + g.q + '" staat al op je lijstje'); return; }
+    addItem(g.q); toast('"' + g.q + '" op je lijstje gezet'); renderQSugg(); renderAssort(); return;
+  }
+  else if (act === 'qsearch'){ closeQSugg(); $('q').blur(); return; }
   else if (act === 'closesheet'){ if (b.classList.contains('sheetbg') && e.target !== b) return; closeSheet(); return; }
   else if (act === 'settings'){ openSheet(settingsHtml(), 'Instellingen'); return; }
   else if (act === 'pref'){ PREFS[b.dataset.key] = b.dataset.v; applyPrefs(); openSheet(settingsHtml(), 'Instellingen'); return; }
@@ -716,8 +751,19 @@ document.addEventListener('change', e => {
   S.show = 36; renderShop();
 });
 let qTimer = 0;
-$('q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value.trim(); S.show = 36; if (location.hash === '#lijstje' || location.hash === '#folders') location.hash = 'aanbiedingen'; renderShop(); }, 160); });
-$('searchform').addEventListener('submit', e => { e.preventDefault(); S.q = $('q').value.trim(); S.show = 36; location.hash = 'aanbiedingen'; renderShop(); });
+$('q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value.trim(); S.show = 36; if (location.hash === '#lijstje' || location.hash === '#folders') location.hash = 'aanbiedingen'; renderShop(); updateQSugg(); }, 180); });
+$('q').addEventListener('focus', () => { if (S.qs.length) renderQSugg(); });
+$('q').addEventListener('keydown', e => {
+  if (!S.qs.length || $('qsugg').hidden) return;
+  if (e.key === 'ArrowDown'){ e.preventDefault(); S.qsSel = (S.qsSel + 1) % S.qs.length; renderQSugg(); }
+  else if (e.key === 'ArrowUp'){ e.preventDefault(); S.qsSel = (S.qsSel - 1 + S.qs.length) % S.qs.length; renderQSugg(); }
+  else if (e.key === 'Escape') closeQSugg();
+});
+$('searchform').addEventListener('submit', e => {
+  e.preventDefault();
+  if (S.qsSel >= 0 && S.qs[S.qsSel]){ const g = S.qs[S.qsSel]; if (!hasItem(g.q)){ addItem(g.q); toast('"' + g.q + '" op je lijstje gezet'); } S.qsSel = -1; renderQSugg(); return; }
+  S.q = $('q').value.trim(); S.show = 36; location.hash = 'aanbiedingen'; renderShop(); updateQSugg(); closeQSugg(); $('q').blur();
+});
 $('more').addEventListener('click', () => { S.show += 36; renderShop(); });
 $('filtertoggle').addEventListener('click', () => {
   const f = $('filters'), open = f.dataset.open !== 'true';

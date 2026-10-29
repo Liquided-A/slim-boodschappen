@@ -39,7 +39,7 @@ jobs:
           python3 -I kit/freshness.py /tmp/cjb /tmp/fresh.json
           python3 -I kit/fetch_promos.py /tmp/promos.json
           timeout 25m python3 -I kit/fetch_images.py /tmp/promos.json data/images.json data/img 1500 || echo "foto's deels overgeslagen"
-          python3 -I kit/compact.py /tmp/cjb/data/supermarkets.json /tmp/promos.json /tmp/fresh.json /tmp/data.b64 data/images.json
+          python3 -I kit/compact.py /tmp/cjb/data/supermarkets.json /tmp/promos.json /tmp/fresh.json /tmp/data.b64 data/images.json data/fotolinks.json
           cp /tmp/data.b64 data/data.b64
 
       - name: Nieuwe foto's bewaren
@@ -47,7 +47,7 @@ jobs:
         run: |
           git config user.name "slim-boodschappen-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/images.json data/img
+          git add data/images.json data/img data/fotolinks.json
           if ! git diff --cached --quiet; then
             git commit -m "Nieuwe productfoto's $(date +%F)"
             for i in 1 2 3; do git pull --rebase -X theirs origin main && git push && break; sleep 5; done

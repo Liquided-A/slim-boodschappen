@@ -181,12 +181,49 @@ function regLabel(s){ return !s.r ? 'alleen aanbiedingen' : regFresh(s) ? 'actue
 function keep(s, i){ const st = STORES[s]; return i < st.r ? (regFresh(st) || S.oldReg) : promoActive(st, i - st.r); }
 function usesOldPrices(s){ const st = STORES[s]; return S.oldReg && st.r && !regFresh(st); }
 function shopUrl(st, i){ const l = st.l[i]; if (!l) return ''; return /^https?:\/\//.test(l) ? l : (st.b ? st.b + l : ''); }
-function imgRef(st, i){ if (!st.pi || i < st.r) return -1; const v = st.pi[i - st.r]; return v === undefined ? -1 : v; }
-function imgHtml(ref, fallback){
-  if (ref < 0) return '<span class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h14l-1.3 9.2a2 2 0 0 1-2 1.8H8.3a2 2 0 0 1-2-1.8Z"/><path d="M9 9V7a3 3 0 0 1 6 0v2"/></svg>' + (fallback ? '<small>' + esc(fallback) + '</small>' : '') + '</span>';
+/* foto van een product: eerst de foto van de supermarkt zelf, anders Open Food Facts, anders een plaatje bij het soort product */
+function imgRef(st, i){
+  let u = st.im && st.im[i] ? (st.im[i][0] === '!' ? st.im[i].slice(1) : (st.ib || '') + st.im[i]) : '';
+  let t = -1;
+  if (st.pi && i >= st.r){ const v = st.pi[i - st.r]; if (v !== undefined) t = v; }
+  return (u || t >= 0) ? {u, t, n: st.n[i]} : {u: '', t: -1, n: st.n[i], none: true};
+}
+const EMOJI = [['melk|karnemelk|chocomel|zuivel','🥛'],['kaas','🧀'],['brood|bolletjes|broodjes|stokbrood|beschuit|crackers','🍞'],['croissant','🥐'],['eieren|ei ','🥚'],
+  ['boter|margarine','🧈'],['yoghurt|kwark|vla|skyr','🥣'],['banaan|bananen','🍌'],['appel','🍎'],['peer|peren','🍐'],['sinaasappel|mandarijn','🍊'],['citroen','🍋'],
+  ['aardbei','🍓'],['druif|druiven','🍇'],['avocado','🥑'],['tomaat|tomaten','🍅'],['komkommer','🥒'],['paprika','🫑'],['wortel|peen','🥕'],['aardappel|friet','🥔'],
+  ['ui |uien','🧅'],['knoflook','🧄'],['sla|spinazie|andijvie|boerenkool|kool','🥬'],['champignon','🍄'],['broccoli|bloemkool','🥦'],['mais','🌽'],
+  ['kip|kalkoen','🍗'],['gehakt|biefstuk|rund|varken|vlees|worst|spek|ham','🥩'],['vis|zalm|tonijn|kabeljauw|garnalen|haring','🐟'],
+  ['pasta|spaghetti|macaroni|penne|noedels|lasagne','🍝'],['rijst','🍚'],['pizza','🍕'],['soep','🍲'],['saus|ketchup|mayo|mosterd','🥫'],
+  ['koffie','☕'],['thee','🍵'],['cola|frisdrank|limonade|sinas|fanta|sprite','🥤'],['sap|jus','🧃'],['water','💧'],['bier|pils','🍺'],['wijn','🍷'],
+  ['chocola|hagelslag|reep','🍫'],['koek|biscuit|cake|stroopwafel','🍪'],['chips|nootjes|pinda','🥜'],['snoep|drop','🍬'],['ijs','🍦'],['honing|jam|stroop|pindakaas','🍯'],
+  ['suiker|zout|bloem|meel|kruiden|peper','🧂'],['olie','🫒'],['toiletpapier|keukenrol|tissue','🧻'],['wasmiddel|afwas|schoonmaak|allesreiniger|wc','🧼'],
+  ['tandpasta|tandenborstel','🪥'],['shampoo|douche|zeep|deo','🧴'],['luier|baby','👶'],['kat|katten','🐱'],['hond|honden','🐶'],['diepvries','🧊']];
+function emojiFor(name){
+  const n = ' ' + String(name || '').toLowerCase() + ' ';
+  for (const [k, e] of EMOJI) if (k.split('|').some(w => n.includes(w))) return e;
+  return '';
+}
+function phHtml(name, fallback){
+  const e = emojiFor(name);
+  if (e) return '<span class="ph emo" aria-hidden="true">' + e + '</span>';
+  return '<span class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h14l-1.3 9.2a2 2 0 0 1-2 1.8H8.3a2 2 0 0 1-2-1.8Z"/><path d="M9 9V7a3 3 0 0 1 6 0v2"/></svg>' + (fallback ? '<small>' + esc(fallback) + '</small>' : '') + '</span>';
+}
+function spriteHtml(ref){
   const sheet = Math.floor(ref / 100), pos = ref % 100, col = pos % 10, row = Math.floor(pos / 10);
   return '<span class="img" role="img" aria-label="Productfoto" style="background-image:url(' + sheetUrl(sheet) + ');background-position:' + (col / 9 * 100).toFixed(3) + '% ' + (row / 9 * 100).toFixed(3) + '%"></span>';
 }
+function imgHtml(ref, fallback){
+  if (!ref || ref.none) return phHtml(ref && ref.n, fallback);
+  if (ref.u) return '<img class="img pimg" src="' + esc(ref.u) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-t="' + ref.t + '" data-n="' + esc(ref.n || '') + '">';
+  return spriteHtml(ref.t);
+}
+/* foto niet te laden (of geblokkeerd): val terug op de reservefoto of het plaatje */
+document.addEventListener('error', e => {
+  const t = e.target;
+  if (!t || t.tagName !== 'IMG' || !t.classList.contains('pimg')) return;
+  const k = +t.dataset.t;
+  t.outerHTML = k >= 0 ? spriteHtml(k) : phHtml(t.dataset.n, '');
+}, true);
 
 /* ---------- opslaan ---------- */
 function save(){
@@ -220,7 +257,7 @@ function buildDeals(){
       const upcoming = !!(mmddToDate(st.pf[j], true) > NOW);
       if (!promoActive(st, j) && !upcoming) continue;
       const usual = st.po[j], price = st.p[i], img = imgRef(st, i);
-      if (img >= 0) HASIMG = true;
+      if (!img.none) HASIMG = true;
       DEALS.push({s, i, j, name: st.n[i], norm: norm(st.n[i]), price, usual, pct: usual ? Math.round(100 * (1 - price / usual)) : 0,
         cat: CATS[st.pc[j]], label: st.pl[j], multi: st.pm[j] > 1, until: mmddToDate(st.pv[j]), from: mmddToDate(st.pf[j], true), upcoming, img,
         q: cleanName(st.n[i]) + (st.u[i] && st.q[i] ? ' ' + fmtQty(st.u[i], st.q[i]) : '')});
@@ -232,7 +269,7 @@ function baseFiltered(skip){
   return DEALS.filter(d =>
     (skip === 'cat' || S.cat === 'all' || d.cat === S.cat) &&
     (skip === 'store' || !S.fstores.size || S.fstores.has(d.s)) &&
-    (!S.fdisc || d.pct >= S.fdisc) && (!S.fmulti || d.multi) && (!S.fnow || !d.upcoming) && (!S.fphoto || d.img >= 0) &&
+    (!S.fdisc || d.pct >= S.fdisc) && (!S.fmulti || d.multi) && (!S.fnow || !d.upcoming) && (!S.fphoto || !d.img.none) &&
     (!words.length || words.every(w => d.norm.includes(w))));
 }
 function renderCatbar(){
@@ -270,8 +307,8 @@ function renderChips(){
 }
 function sortedDeals(){
   let list = baseFiltered();
-  if (S.sort === 'top') list.sort((a, b) => (a.upcoming - b.upcoming) || ((b.img >= 0) - (a.img >= 0)) || (Math.min(b.pct, 50) - Math.min(a.pct, 50)) || a.price - b.price);
-  else if (S.sort === 'pct') list.sort((a, b) => (a.upcoming - b.upcoming) || b.pct - a.pct || (b.img >= 0) - (a.img >= 0) || a.price - b.price);
+  if (S.sort === 'top') list.sort((a, b) => (a.upcoming - b.upcoming) || ((!b.img.none) - (!a.img.none)) || (Math.min(b.pct, 50) - Math.min(a.pct, 50)) || a.price - b.price);
+  else if (S.sort === 'pct') list.sort((a, b) => (a.upcoming - b.upcoming) || b.pct - a.pct || (!b.img.none) - (!a.img.none) || a.price - b.price);
   else if (S.sort === 'price') list.sort((a, b) => a.price - b.price);
   else if (S.sort === 'end') list.sort((a, b) => (a.until ? a.until.getTime() : 9e15) - (b.until ? b.until.getTime() : 9e15) || b.pct - a.pct);
   else list.sort((a, b) => a.name.localeCompare(b.name, 'nl'));
@@ -361,9 +398,17 @@ function compute(){
 }
 function itemImg(i){
   /* foto van het product dat in de gekozen winkel wordt gekocht */
-  if (!LAST || !LAST.cur) return -1;
-  const a = LAST.cur.assign.find(x => x[0] === i); if (!a) return -1;
-  const cell = LAST.m[i][LAST.sel.indexOf(a[1])]; return cell ? imgRef(STORES[a[1]], cell.c.i) : -1;
+  const none = {u: '', t: -1, n: S.items[i] ? S.items[i].q : '', none: true};
+  if (!LAST || !LAST.cur) return none;
+  const a = LAST.cur.assign.find(x => x[0] === i); if (!a) return none;
+  const cell = LAST.m[i][LAST.sel.indexOf(a[1])];
+  const own = cell ? imgRef(STORES[a[1]], cell.c.i) : none;
+  if (!own.none) return own;
+  /* geen foto van precies dit product: toon een foto van een vergelijkbaar product uit een andere winkel */
+  const an = S.an[S.items[i].id];
+  if (an) for (const s of LAST.sel){ const e = an.per[s]; if (!e) continue;
+    for (const c of e.cands.slice(0, 4)){ if (c.score > e.cands[0].score + 0.5) break; const r = imgRef(STORES[s], c.i); if (!r.none) return r; } }
+  return own;
 }
 function renderOften(){
   const on = new Set(S.items.map(doneKey));
@@ -495,7 +540,7 @@ function renderFolders(){
       const k = Object.keys(c).sort((a, b) => c[b] - c[a])[0]; return k ? new Date(+k) : null; };
     const from = mode('from'), until = mode('until');
     const seen = new Set(), top = [];
-    for (const d of list.slice().sort((a, b) => (b.img >= 0) - (a.img >= 0) || b.pct - a.pct)){
+    for (const d of list.slice().sort((a, b) => (!b.img.none) - (!a.img.none) || b.pct - a.pct)){
       const k = cleanName(d.name).split(' ')[0]; if (seen.has(k)) continue; seen.add(k); top.push(d); if (top.length === 3) break;
     }
     const slug = FOLDERZ[st.k];

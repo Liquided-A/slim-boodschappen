@@ -7,17 +7,7 @@ jobs:
       - name: Fotoservers testen
         run: |
           set +e
-          t(){ c=$(curl -s --http1.1 -A 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36' -o /tmp/x -w '%{http_code} %{content_type} %{size_download}' -H 'Referer: https://appassets.androidplatform.net/' "$1"); echo "::notice::$c  $1"; }
-          t "https://static.ah.nl/dam/product/AHI_4354523130313233303530?revLabel=1&rendition=800x800_WEBP&fileType=binary"
-          t "https://static.ah.nl/dam/product/AHI_4354523130313233303530?revLabel=1&rendition=200x200_JPG&fileType=binary"
-          t "https://static.ah.nl/dam/product/AHI_4354523130313233303530?revLabel=1&rendition=400x400_JPG&fileType=binary"
-          t "https://static.ah.nl/dam/product/AHI_4354523130313233303530?revLabel=1&rendition=200x200_WEBP&fileType=binary"
-          t "https://www.jumbo.com/dam-images/fit-in/360x360/Products/18092023_1695059507098_1695059511451_8718452689743_1.png"
-          t "https://www.jumbo.com/dam-images/fit-in/200x200/Products/18092023_1695059507098_1695059511451_8718452689743_1.png"
-          t "https://images.ctfassets.net/s0lodsnpsezb/284088_M/720f387324c081b45e31146eaf158757/284088.png?h=200&w=200&fm=webp"
-          t "https://web-fileserver.dirk.nl/artikelen/238510_1_453554_638895711175939239.png"
-          t "https://web-fileserver.dirk.nl/artikelen/238510_1_453554_638895711175939239.png?width=200"
-          t "https://images.poiesz-supermarkten.nl/artikelen/701081.png"
+          t(){ c=$(curl -s --http1.1 -A 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36' -o /tmp/x -w '%{http_code} %{content_type} %{size_download}' -H 'Referer: https://appassets.androidplatform.net/' "$1"); echo "$c  $1" >> /tmp/res.txt; }
           t "https://images.poiesz-supermarkten.nl/artikelen/589247.png"
           t "https://web-fileserver.dekamarkt.nl/artikelen/190282_1_466490_638647828090377774.png"
           t "https://static.hoogvliet.nl/ecom/product/032126000.jpg"
@@ -27,3 +17,10 @@ jobs:
           t "https://www.lidl.nl/assets/gcpbefad06a8dc5454ea45048782568e691.png"
           t "https://cdn.jafolders.com/hotspots/8260808f-e9a5-4448-9357-ee24ded479bc/small.webp?v=63958497563"
           t "https://amazingoriental.com/wp-content/uploads/2026/02/92731-92732-92733-92734-92735.webp"
+          t "https://images.poiesz-supermarkten.nl/artikelen/701081.png?width=200"
+          t "https://images.poiesz-supermarkten.nl/artikelen/701081.png?w=200"
+          t "https://web-fileserver.dekamarkt.nl/artikelen/190282_1_466490_638647828090377774.png?width=200"
+          t "https://static.hoogvliet.nl/ecom/product/032126000.jpg?width=200"
+          t "https://www.jumbo.com/dam-images/fit-in/180x180/Products/18092023_1695059507098_1695059511451_8718452689743_1.png"
+          t "https://www.jumbo.com/dam-images/fit-in/240x240/Products/18092023_1695059507098_1695059511451_8718452689743_1.png"
+          echo "::notice::$(sed ':a;N;$!ba;s/\n/ ## /g' /tmp/res.txt)"

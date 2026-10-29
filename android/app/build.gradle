@@ -14,6 +14,7 @@ android {
         targetSdk 34
         versionCode((System.getenv('VERSION_CODE') ?: '1').toInteger())
         versionName(System.getenv('VERSION_NAME') ?: '1.0')
+        ndk { abiFilters 'armeabi-v7a', 'arm64-v8a' }   // alleen telefoons: maakt de download half zo groot
     }
 
     signingConfigs {
@@ -29,7 +30,9 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig ksFile ? signingConfigs.release : signingConfigs.debug
         }
     }

@@ -279,6 +279,25 @@ tr:last-child td{border-bottom:0}
 .foot p{font-size:.85rem;color:var(--muted);max-width:68ch}
 .fresh-table td,.fresh-table th{padding:5px 8px;font-size:.82rem}
 
+/* productpagina */
+.pic[data-act],.cname[data-act]{cursor:pointer}
+.dtop{display:grid;grid-template-columns:120px minmax(0,1fr);gap:16px;align-items:start}
+.dpic{width:120px;height:120px;border-radius:14px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;overflow:hidden}
+.dpic .img{width:90%;height:90%;background-repeat:no-repeat;background-size:1000% 1000%}
+.dpic .ph{width:100%;height:100%}
+.dtop h2{font-size:1.1rem;margin:6px 0 2px}
+.dtop .prow .now{color:var(--sale);font-weight:800;font-size:1.5rem}
+.dtop .prow .old{color:var(--muted);text-decoration:line-through}
+.dbtns{display:flex;gap:8px;flex-wrap:wrap}
+.dbtns .btn{flex:1 1 160px;justify-content:center;min-height:48px}
+.dcmp{display:flex;flex-direction:column}
+.drow{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px;border-radius:10px}
+.drow .thumb{width:44px;height:44px}
+.drow>div:nth-child(2){display:flex;flex-direction:column;min-width:0}
+.drow .dp{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.drow.best{background:var(--good-bg)}
+.drow.best b{color:var(--good)}
+
 /* voor jou, welkom */
 .savedbox{background:var(--good-bg);color:var(--good);border-radius:10px;padding:10px 12px;font-size:.92rem}
 .foryou{margin-bottom:18px;display:flex;flex-direction:column;gap:10px}

@@ -197,8 +197,8 @@ const EMOJI = [['melk|karnemelk|chocomel|zuivel','🥛'],['kaas','🧀'],['brood
   ['kip|kalkoen','🍗'],['gehakt|biefstuk|rund|varken|vlees|worst|spek|ham','🥩'],['vis|zalm|tonijn|kabeljauw|garnalen|haring','🐟'],
   ['pasta|spaghetti|macaroni|penne|noedels|lasagne','🍝'],['rijst','🍚'],['pizza','🍕'],['soep','🍲'],['saus|ketchup|mayo|mosterd','🥫'],
   ['koffie','☕'],['thee','🍵'],['cola|frisdrank|limonade|sinas|fanta|sprite','🥤'],['sap|jus','🧃'],['water','💧'],['bier|pils','🍺'],['wijn','🍷'],
-  ['chocola|hagelslag|reep','🍫'],['koek|biscuit|cake|stroopwafel','🍪'],['chips|nootjes|pinda','🥜'],['snoep|drop','🍬'],['ijs','🍦'],['honing|jam|stroop|pindakaas','🍯'],
-  ['suiker|zout|bloem|meel|kruiden|peper','🧂'],['olie','🫒'],['toiletpapier|keukenrol|tissue','🧻'],['wasmiddel|afwas|schoonmaak|allesreiniger|wc','🧼'],
+  ['chocola|hagelslag|reep','🍫'],['koek|biscuit|cake|stroopwafel','🍪'],['chips|nootjes|pinda','🥜'],['snoep|drop','🍬'],['ijs','🍦'],['honing|jam|stroop','🍯'],
+  ['suiker|zout|bloem|meel|kruiden|peper','🧂'],['olie','🫒'],['toiletpapier|keukenrol|tissue','🧻'],['wasmiddel|afwasmiddel|afwas|schoonmaak|allesreiniger|vaatwas|wc ','🧼'],['pindakaas','🥜'],['koffiemelk','🥛'],
   ['tandpasta|tandenborstel','🪥'],['shampoo|douche|zeep|deo','🧴'],['luier|baby','👶'],['kat|katten','🐱'],['hond|honden','🐶'],['diepvries','🧊']];
 /* afdelingen in de volgorde waarin je meestal door de winkel loopt (zoals Listonic en Bring! sorteren) */
 const AFD = [
@@ -231,8 +231,10 @@ function afdIndex(text, cat){
 function afdOf(it, st, i){ return afdIndex(it.q + ' ' + st.n[i], i >= st.r ? CATS[st.pc[i - st.r]] : ''); }
 function emojiFor(name){
   const n = ' ' + String(name || '').toLowerCase() + ' ';
-  for (const [k, e] of EMOJI) if (k.split('|').some(w => n.includes(w))) return e;
-  return '';
+  /* het langste passende woord wint: pindakaas is geen kaas, afwasmiddel geen appel */
+  let best = '', len = 0;
+  for (const [k, e] of EMOJI) for (const w of k.split('|')) if (w.length > len && n.includes(w)){ best = e; len = w.length; }
+  return best;
 }
 function phHtml(name, fallback){
   const e = emojiFor(name);
@@ -302,7 +304,7 @@ function baseFiltered(skip){
     (skip === 'cat' || S.cat === 'all' || d.cat === S.cat) &&
     (skip === 'store' || !S.fstores.size || S.fstores.has(d.s)) &&
     (!S.fdisc || d.pct >= S.fdisc) && (!S.fmulti || d.multi) && (!S.fnow || !d.upcoming) && (!S.fphoto || !d.img.none) &&
-    (!words.length || words.every(w => d.norm.includes(w))));
+    (!words.length || words.every(w => d.norm.includes(' ' + w))));
 }
 function renderCatbar(){
   const cc = {}; baseFiltered('cat').forEach(d => { cc[d.cat] = (cc[d.cat] || 0) + 1; });
@@ -351,6 +353,40 @@ function sortedDeals(){
   }
   return list;
 }
+/* productpagina: grote foto, actie en wat het bij de andere winkels kost */
+function detailHtml(s, i){
+  const st = STORES[s], j = i - st.r, isDeal = i >= st.r;
+  const d = DEALS.find(x => x.s === s && x.i === i);
+  const q = cleanName(st.n[i]) + (st.u[i] && st.q[i] ? ' ' + fmtQty(st.u[i], st.q[i]) : '');
+  const ref = imgRef(st, i), url = shopUrl(st, i), size = st.u[i] && st.q[i] ? fmtQty(st.u[i], st.q[i]) : '';
+  const on = new Set(enabledStores()), sz = st.u[i] && st.q[i] ? ' ' + fmtQty(st.u[i], st.q[i]) : '';
+  const rowsFor = qq => { const an = ENG.analyze(qq, 6); return an.per.map((e, k) => e && on.has(k) ? {k, c: e.cands[0]} : null).filter(Boolean).filter(r => r.c.score <= 2.5); };
+  /* eerst precies dit product; vindt dat weinig, dan het soort product (pindakaas, halfvolle melk) */
+  let rows = rowsFor(q), cmpLabel = 'Vergelijkbaar bij andere winkels';
+  if (rows.length < 3){
+    const words = cleanName(st.n[i]).split(' ').filter(w => w.length >= 4);
+    let best = null;
+    words.forEach((w, k) => [w, k ? words[k - 1] + ' ' + w : ''].filter(Boolean).forEach(cand => {
+      const r = rowsFor(cand + sz); if (r.length >= 3 && (!best || r.length > best.r.length || (r.length === best.r.length && cand.length > best.q.length))) best = {q: cand, r};
+    }));
+    if (best){ rows = best.r; cmpLabel = 'Andere ' + best.q + ' bij andere winkels'; }
+  }
+  rows = rows.sort((a, b) => a.c.eff - b.c.eff).slice(0, 10);
+  const min = rows.length ? rows[0].c.eff : 0;
+  return '<div class="dtop"><span class="dpic">' + imgHtml(ref, '') + '</span><div><span class="tag">' + esc(st.c) + '</span><h2>' + esc(st.n[i]) + '</h2>' +
+      (size ? '<p class="muted">' + esc(size) + (unitPrice(st.p[i], st.u[i], st.q[i]) ? ' · ' + unitPrice(st.p[i], st.u[i], st.q[i]) : '') + '</p>' : '') +
+      '<div class="prow">' + (isDeal && st.po[j] ? '<span class="old">' + money(st.po[j]) + '</span>' : '') + '<span class="now">' + money(st.p[i]) + '</span></div>' +
+      (isDeal && st.pl[j] ? '<span class="mech">' + esc(st.pl[j]) + '</span>' : '') +
+      (d && d.until ? '<p class="small muted">Geldig t/m ' + esc(dayFmt.format(d.until)) + '</p>' : (!isDeal ? '<p class="small muted">Gewone prijs' + (regFresh(st) ? '' : ', ' + esc(regLabel(st))) + '</p>' : '')) + '</div></div>' +
+    '<div class="dbtns"><button type="button" class="btn primary" data-act="adddetail" data-q="' + esc(q) + '">' + (hasItem(q) ? '✓ Op je lijstje' : '+ Op mijn lijstje') + '</button>' +
+      (url ? '<a class="btn ghost" href="' + esc(url) + '" target="_blank" rel="noopener">Bekijk bij ' + esc(st.c) + ' ↗</a>' : '') + '</div>' +
+    (rows.length > 1 ? '<div class="setrow"><h3>' + esc(cmpLabel) + '</h3><div class="dcmp">' + rows.map(r => {
+      const S2 = STORES[r.k], c = r.c;
+      return '<div class="drow' + (c.eff === min ? ' best' : '') + '"><span class="thumb">' + imgHtml(imgRef(S2, c.i), '') + '</span><div><b>' + esc(S2.c) + '</b><span class="small muted">' + esc(c.name) + (c.q && !norm(c.name).includes(' ' + String(fmtQty(c.u, c.q)).split(' ')[0].replace(',', ' ')) ? ' · ' + esc(fmtQty(c.u, c.q)) : '') + '</span></div>' +
+        '<div class="dp"><b>' + money(c.price) + '</b>' + (c.usual ? '<span class="tag sale">actie</span>' : '') + (unitPrice(c.price, c.u, c.q) ? '<span class="small muted">' + unitPrice(c.price, c.u, c.q) + '</span>' : '') + '</div></div>';
+    }).join('') + '</div><p class="small muted">Gesorteerd op prijs, de goedkoopste is groen. Let op het formaat: de prijs per kilo of liter helpt bij het vergelijken. Gewone prijzen kunnen iets afwijken.</p></div>' : '') +
+    '<button type="button" class="btn ghost" data-act="closesheet" style="justify-content:center">Sluiten</button>';
+}
 /* prijs per kilo of liter, zoals op het schapkaartje */
 function unitPrice(cents, u, q){
   if (!q || (u !== 1 && u !== 2) || q < 20) return '';
@@ -359,10 +395,10 @@ function unitPrice(cents, u, q){
 function cardHtml(d){
   const st = STORES[d.s], on = hasItem(d.q), url = shopUrl(st, d.i);
   const size = st.u[d.i] && st.q[d.i] ? fmtQty(st.u[d.i], st.q[d.i]) : '';
-  return '<article class="card"><div class="pic">' + imgHtml(d.img, CATLABEL[d.cat] || '') +
+  return '<article class="card"><div class="pic" data-act="detail" data-s="' + d.s + '" data-i="' + d.i + '" role="button" tabindex="0" aria-label="Meer over ' + esc(d.name) + '">' + imgHtml(d.img, CATLABEL[d.cat] || '') +
     '<span class="store">' + esc(st.c) + '</span>' + (d.pct > 0 ? '<span class="disc">−' + d.pct + '%</span>' : '') +
     (d.upcoming ? '<span class="soon">Vanaf ' + esc(dayFmt.format(d.from)) + '</span>' : '') + '</div>' +
-    '<div class="cbody"><div class="cname" title="' + esc(d.name) + '">' + esc(d.name) + '</div>' +
+    '<div class="cbody"><div class="cname" data-act="detail" data-s="' + d.s + '" data-i="' + d.i + '" title="' + esc(d.name) + '">' + esc(d.name) + '</div>' +
     (size ? '<div class="csize">' + esc(size) + (unitPrice(d.price, st.u[d.i], st.q[d.i], d.multi ? 1 : 1) ? ' · ' + unitPrice(d.price, st.u[d.i], st.q[d.i]) : '') + '</div>' : '') +
     (d.label ? '<span class="mech">' + esc(d.label) + '</span>' : '') +
     '<div class="prow">' + (d.usual ? '<span class="old">' + money(d.usual) + '</span>' : '') + '<span class="now">' + money(d.price) + '</span>' +
@@ -393,10 +429,14 @@ function personalDeals(){
   }
   return out.sort((a, b) => b.pct - a.pct).slice(0, 16);
 }
+let FY = {sig: '', list: []};
 function renderForYou(){
   const el = $('foryou');
   if (S.cat !== 'all' || S.q || S.fstores.size){ el.hidden = true; return; }
-  const list = personalDeals();
+  /* alleen opnieuw uitrekenen als je lijstje, je winkels of de prijzen veranderd zijn */
+  const sig = S.items.map(it => it.q).join('|') + '#' + Object.keys(S.hist).length + '#' + [...S.off].join(',') + '#' + DEALS.length + '#' + S.oldReg;
+  if (sig !== FY.sig) FY = {sig, list: personalDeals()};
+  const list = FY.list;
   if (!list.length){ el.hidden = true; return; }
   el.hidden = false;
   el.innerHTML = '<header><h2>Voor jou in de aanbieding</h2><span class="small muted">Producten van je lijstje en wat je vaak koopt</span></header><div class="hscroll">' + list.map(cardHtml).join('') + '</div>';
@@ -995,6 +1035,8 @@ document.addEventListener('click', e => {
     else addItem(q);
     return;
   }
+  else if (act === 'detail'){ openSheet(detailHtml(+b.dataset.s, +b.dataset.i), 'Product'); return; }
+  else if (act === 'adddetail'){ const q = b.dataset.q; if (!hasItem(q)){ addItem(q); toast('"' + q + '" op je lijstje gezet'); } closeSheet(); return; }
   else if (act === 'impadd' || act === 'impreplace'){
     if (!INCOMING) return;
     if (act === 'impreplace' || S.demo){ S.items = []; S.an = {}; S.pins = {}; S.done.clear(); }
@@ -1159,7 +1201,10 @@ async function refreshRemote(){
   }catch(e){}
 }
 window.slimBack = function(){ if ($('sheetroot').innerHTML){ closeSheet(); return true; } return false; };
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('sheetroot').innerHTML) closeSheet(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && $('sheetroot').innerHTML) closeSheet();
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('pic')){ e.preventDefault(); e.target.click(); }
+});
 (async function start(){
   route();
   initScan();

@@ -1,0 +1,67 @@
+name: Prijzen bijwerken en website publiceren
+
+on:
+  schedule:
+    - cron: '20 5 * * *'      # elke ochtend rond 06:20 (winter) / 07:20 (zomer), na de nachtelijke update van PrijsProfeet
+  push:
+    branches: [main]
+    paths: ['web/**', 'site/**', '.github/workflows/dagelijks.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  bijwerken:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install pillow
+
+      - name: Nieuwe prijzen en aanbiedingen ophalen
+        if: github.event_name != 'push'
+        run: |
+          git clone --shallow-since="$(date -d '15 months ago' +%F)" https://github.com/supermarkt/checkjebon.git /tmp/cjb
+          python3 -I kit/freshness.py /tmp/cjb /tmp/fresh.json
+          python3 -I kit/fetch_promos.py /tmp/promos.json
+          timeout 25m python3 -I kit/fetch_images.py /tmp/promos.json data/images.json data/img 1500 || echo "foto's deels overgeslagen"
+          python3 -I kit/compact.py /tmp/cjb/data/supermarkets.json /tmp/promos.json /tmp/fresh.json /tmp/data.b64 data/images.json
+          cp /tmp/data.b64 data/data.b64
+
+      - name: Nieuwe foto's bewaren
+        if: github.event_name != 'push'
+        run: |
+          git config user.name "slim-boodschappen-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/images.json data/img
+          git diff --cached --quiet || (git commit -m "Nieuwe productfoto's $(date +%F)" && git push)
+
+      - name: Website samenstellen
+        run: |
+          mkdir -p _site/img
+          cp data/data.b64 _site/
+          cp data/img/s*.jpg _site/img/
+          cp site/* _site/
+          python3 -I web/assemble.py --wrap web/style.html web/body.html web/engine.js data/data.b64 _site/app.html
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

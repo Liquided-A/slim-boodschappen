@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0D5C45">
+<title>Slim Boodschappen</title>
+<link rel="icon" href="icon.png">
+<style>
+:root{--bg:#F4F6F5;--surface:#fff;--ink:#13201B;--muted:#5B6964;--line:#DFE5E2;--brand:#0D5C45;--cta:#118A5F;--cta-ink:#fff;--soft:#DDF3E8}
+@media (prefers-color-scheme:dark){:root{--bg:#0E1513;--surface:#17211E;--ink:#E9F1EE;--muted:#9DB0A9;--line:#2A3833;--brand:#0B3D2F;--cta:#2DBB82;--cta-ink:#04130D;--soft:#12352A}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.55 system-ui,-apple-system,'Segoe UI',sans-serif}
+header{background:var(--brand);color:#fff;padding:28px 16px 64px;text-align:center}
+header img{width:84px;height:84px;border-radius:22px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+h1{margin:14px 0 6px;font-size:1.9rem;letter-spacing:-.02em}
+header p{margin:0 auto;max-width:34ch;opacity:.9}
+main{max-width:560px;margin:-40px auto 40px;padding:0 16px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.big{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--cta);color:var(--cta-ink);text-decoration:none;font-weight:800;font-size:1.15rem;border-radius:14px;padding:18px;min-height:64px}
+.big svg{width:26px;height:26px}
+.alt{display:flex;align-items:center;justify-content:center;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:700;border-radius:14px;padding:14px;min-height:54px}
+h2{margin:0;font-size:1.2rem}
+ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:8px}
+.muted{color:var(--muted);font-size:.92rem}
+.feat{display:grid;grid-template-columns:auto 1fr;gap:10px 12px;align-items:start}
+.feat span{width:34px;height:34px;border-radius:10px;background:var(--soft);display:grid;place-items:center;font-size:1.1rem}
+</style>
+</head>
+<body>
+<header>
+  <img src="icon.png" alt="">
+  <h1>Slim Boodschappen</h1>
+  <p>Alle aanbiedingen van de supermarkten op één plek, en zien waar je lijstje het goedkoopst is.</p>
+</header>
+<main>
+  <section class="card">
+    <a class="big" id="apk" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>Download voor Android</a>
+    <a class="alt" href="app.html">Of open de app in je browser (ook iPhone)</a>
+    <p class="muted">Gratis, zonder account en zonder reclame. In de browser-versie werkt het inlezen van een foto niet; in de Android-app wel.</p>
+  </section>
+  <section class="card">
+    <h2>Zo installeer je de app</h2>
+    <ol>
+      <li>Tik hierboven op <b>Download voor Android</b>.</li>
+      <li>Open het bestand <b>SlimBoodschappen.apk</b> als het gedownload is (via de melding of de map Downloads).</li>
+      <li>Vraagt je telefoon om toestemming? Kies <b>Instellingen</b> en zet <b>Toestaan van deze bron</b> aan. Ga terug en tik op <b>Installeren</b>.</li>
+      <li>Krijg je een melding van Play Protect? Kies <b>Toch installeren</b>. De app komt niet uit de Play Store, daarom vraagt Android dit.</li>
+    </ol>
+    <p class="muted">Een nieuwe versie installeer je op dezelfde manier; je lijstje blijft dan bewaard. De prijzen werkt de app zelf elke dag bij.</p>
+  </section>
+  <section class="card">
+    <h2>Wat kan de app?</h2>
+    <div class="feat"><span>🏷️</span><div>Ruim 12.000 folderacties van zo'n 20 supermarkten, elke ochtend bijgewerkt.</div>
+      <span>📷</span><div>Maak een foto van je boodschappenbriefje of deel een lijstje uit Notities: de app zet het op je lijstje.</div>
+      <span>🧮</span><div>Zie of het loont om bij 1, 2, 3 of 4 winkels te halen.</div>
+      <span>🔠</span><div>Grote letters en grote knoppen, in te stellen met de knop Aa.</div></div>
+  </section>
+  <p class="muted" style="text-align:center">Aanbiedingen via PrijsProfeet · gewone prijzen via Checkjebon · foto's via Open Food Facts. Onafhankelijk, geen band met de supermarkten.</p>
+</main>
+<script>
+  // adres van de download afleiden uit deze website (gebruiker.github.io/opslagplaats)
+  const owner = location.hostname.split('.')[0], repo = location.pathname.split('/').filter(Boolean)[0] || 'slim-boodschappen';
+  document.getElementById('apk').href = 'https://github.com/' + owner + '/' + repo + '/releases/download/app/SlimBoodschappen.apk';
+</script>
+</body>
+</html>

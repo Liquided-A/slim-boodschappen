@@ -1,0 +1,63 @@
+name: Android-app bouwen
+
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', 'web/**', '.github/workflows/apk.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk
+  cancel-in-progress: true
+
+jobs:
+  bouwen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Webapp en nieuwste prijzen in de app zetten
+        run: |
+          OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          REPO=${GITHUB_REPOSITORY#*/}
+          SITE="https://$OWNER.github.io/$REPO/"
+          # nieuwste prijzen van de website, anders die uit de opslagplaats
+          curl -fsSL "${SITE}data.b64" -o /tmp/data.b64 || cp data/data.b64 /tmp/data.b64
+          N=$(ls data/img/s*.jpg | wc -l)
+          FULL=$(( N > 0 ? N - 1 : 0 ))   # het laatste fotoblad kan nog groeien, dat komt van de website
+          echo "{\"remote\":\"$SITE\",\"localSheets\":$FULL,\"version\":\"1.$GITHUB_RUN_NUMBER\"}" > /tmp/cfg.json
+          mkdir -p android/app/src/main/assets/www/img
+          python3 -I web/assemble.py --wrap web/style.html web/body.html web/engine.js /tmp/data.b64 android/app/src/main/assets/www/index.html /tmp/cfg.json
+          cp data/img/s*.jpg android/app/src/main/assets/www/img/
+
+      - name: APK bouwen
+        env:
+          KEYSTORE_FILE: ${{ github.workspace }}/android/sleutel/release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'Cmly4L4jVNGriX2P9ont5_vm' }}
+          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'Cmly4L4jVNGriX2P9ont5_vm' }}
+          KEY_ALIAS: slim
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 1.${{ github.run_number }}
+        run: gradle -p android assembleRelease --no-daemon --stacktrace
+
+      - name: Publiceren als download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk SlimBoodschappen.apk
+          NOTES="Versie 1.${{ github.run_number }} van $(date +%d-%m-%Y). Open deze pagina op je Android-telefoon en tik op SlimBoodschappen.apk om te installeren."
+          gh release view app >/dev/null 2>&1 || gh release create app --title "Slim Boodschappen voor Android" --notes "$NOTES"
+          gh release upload app SlimBoodschappen.apk --clobber
+          gh release edit app --notes "$NOTES"

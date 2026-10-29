@@ -18,7 +18,8 @@ const GENERIC = {
   'rijst':'zilvervliesrijst','gehakt':'half om half gehakt','chips':'chips naturel','hagelslag':'hagelslag melk','aardappels':'aardappelen','piepers':'aardappelen',
   'cola':'coca cola','bier':'pils','pils':'pils','frisdrank':'cola','sap':'sinaasappelsap','jus':'sinaasappelsap','water':'mineraalwater','olie':'zonnebloemolie',
   'appels':'appels jonagold','appel':'appels jonagold','peren':'handperen','sla':'ijsbergsla','wasmiddel':'wasmiddel','vla':'vanillevla','kwark':'magere kwark',
-  'worst':'rookworst','vleeswaren':'kipfilet beleg','beleg':'jonge kaas plakken','ham':'beenham','bloem':'tarwebloem','meel':'tarwebloem','zout':'keukenzout',
+  'worst':'rookworst','diepvriespizza':'pizza','kippendijen':'kipdijfilet','kipdijen':'kipdijfilet',
+  'keukenpapier':'keukenrol','vuilniszak':'vuilniszakken','deo':'deodorant','pindas':'pinda','nootjes':'notenmix','toetje':'vla','slagroom':'slagroom','beleg':'jonge kaas plakken','ham':'beenham','bloem':'tarwebloem','meel':'tarwebloem','zout':'keukenzout',
   'koekjes':'biscuit','koek':'ontbijtkoek','tomaat':'tomaten','ui':'uien','paprika':'paprika rood','wortels':'winterpeen','wortelen':'winterpeen','peen':'winterpeen',
   'kip':'kipfilet','vis':'zalmfilet','zalm':'zalmfilet','pindakaas':'pindakaas','jam':'aardbeienjam','mayo':'mayonaise','ketchup':'tomatenketchup',
   'shampoo':'shampoo','tandpasta':'tandpasta','luiers':'luiers','afwasblokjes':'vaatwastabletten','vaatwastabletten':'vaatwastabletten'

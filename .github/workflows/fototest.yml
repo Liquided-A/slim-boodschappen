@@ -6,7 +6,8 @@ jobs:
     steps:
       - name: Fotoservers testen
         run: |
-          t(){ c=$(curl -s -o /tmp/x -w '%{http_code} %{content_type} %{size_download}' -H 'Referer: https://appassets.androidplatform.net/' "$1"); echo "::notice::$c  $1"; }
+          set +e
+          t(){ c=$(curl -s --http1.1 -A 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36' -o /tmp/x -w '%{http_code} %{content_type} %{size_download}' -H 'Referer: https://appassets.androidplatform.net/' "$1"); echo "::notice::$c  $1"; }
           t "https://static.ah.nl/dam/product/AHI_4354523130313233303530?revLabel=1&rendition=800x800_WEBP&fileType=binary"
           t "https://static.ah.nl/dam/product/AHI_4354523130313233303530?revLabel=1&rendition=200x200_JPG&fileType=binary"
           t "https://static.ah.nl/dam/product/AHI_4354523130313233303530?revLabel=1&rendition=400x400_JPG&fileType=binary"

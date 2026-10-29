@@ -12,6 +12,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.speech.RecognizerIntent;
 import android.util.Base64;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -49,7 +50,7 @@ public class MainActivity extends Activity {
 
     private static final String HOST = "appassets.androidplatform.net";
     private static final String START = "https://" + HOST + "/assets/www/index.html";
-    private static final int REQ_CAMERA = 11, REQ_GALLERY = 12;
+    private static final int REQ_CAMERA = 11, REQ_GALLERY = 12, REQ_VOICE = 13;
     private static final int MAX_SIDE = 2200;
 
     private WebView web;
@@ -155,6 +156,23 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> startScan(mode, token));
         }
 
+        /** Boodschappen inspreken met de spraakherkenning van de telefoon. */
+        @JavascriptInterface
+        public void voice(final int token) {
+            runOnUiThread(() -> {
+                scanToken = token;
+                Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "nl-NL");
+                i.putExtra(RecognizerIntent.EXTRA_PROMPT, "Noem je boodschappen, bijvoorbeeld: melk, brood en twee pakken koffie");
+                try {
+                    startActivityForResult(i, REQ_VOICE);
+                } catch (ActivityNotFoundException e) {
+                    sendError("Inspreken werkt niet op deze telefoon. Installeer of activeer de Google-app voor spraak.");
+                }
+            });
+        }
+
         /** Lijstje delen via WhatsApp, sms, mail enz. */
         @JavascriptInterface
         public void share(final String text) {
@@ -211,6 +229,17 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_VOICE) {
+            ArrayList<String> said = data != null && resultCode == RESULT_OK ? data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS) : null;
+            if (said == null || said.isEmpty()) { send(state("cancel")); return; }
+            JSONObject o = state("done");
+            JSONArray lines = new JSONArray();
+            lines.put(said.get(0));
+            put(o, "lines", lines);
+            put(o, "spoken", true);
+            send(o);
+            return;
+        }
         if (requestCode != REQ_CAMERA && requestCode != REQ_GALLERY) return;
         if (resultCode != RESULT_OK) {
             send(state("cancel"));
@@ -226,6 +255,16 @@ public class MainActivity extends Activity {
 
     /** Iemand deelt een screenshot of een stukje tekst (bijv. uit Notities) met de app. */
     private void handleShare(Intent intent) {
+        if (intent != null && Intent.ACTION_VIEW.equals(intent.getAction()) && intent.getData() != null) {
+            // gedeeld lijstje: https://.../app.html#lijst=...
+            String frag = intent.getData().getEncodedFragment();
+            if (frag != null) {
+                final String js = "window.slimImport && window.slimImport(" + JSONObject.quote(frag) + ")";
+                runOnUiThread(() -> { if (pageReady) web.evaluateJavascript(js, null); else pending.add(js); });
+            }
+            intent.setAction(Intent.ACTION_MAIN);
+            return;
+        }
         if (intent == null || !Intent.ACTION_SEND.equals(intent.getAction())) return;
         scanToken = -1;
         String type = intent.getType() == null ? "" : intent.getType();

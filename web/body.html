@@ -54,6 +54,7 @@
             <option value="name">Naam A-Z</option>
           </select>
         </div>
+        <section class="foryou" id="foryou" hidden></section>
         <div class="chips" id="chips"></div>
         <section class="assort" id="assort" hidden></section>
         <div class="grid" id="grid"></div>
@@ -82,11 +83,12 @@
           <div class="addwrap">
             <form class="add" id="addform" autocomplete="off">
               <input id="newItem" type="text" placeholder="Product toevoegen, bijv. halfvolle melk 1 l" aria-label="Product toevoegen" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg" enterkeyhint="done">
-              <button type="submit">Toevoegen</button>
+              <button type="submit" aria-label="Toevoegen"><span class="tl">Toevoegen</span></button>
             </form>
             <div class="sugg" id="sugg" role="listbox" hidden></div>
           </div>
           <div class="often" id="often" hidden></div>
+          <details class="quick" id="quick"><summary>Snel kiezen met plaatjes</summary><div class="qgrid" id="qgrid"></div></details>
           <div class="notice" id="demonote" hidden>Dit is een voorbeeldlijstje. Voeg je eigen producten toe of wis het.</div>
           <ul class="items" id="items"></ul>
         </section>
@@ -198,6 +200,35 @@ const EMOJI = [['melk|karnemelk|chocomel|zuivel','🥛'],['kaas','🧀'],['brood
   ['chocola|hagelslag|reep','🍫'],['koek|biscuit|cake|stroopwafel','🍪'],['chips|nootjes|pinda','🥜'],['snoep|drop','🍬'],['ijs','🍦'],['honing|jam|stroop|pindakaas','🍯'],
   ['suiker|zout|bloem|meel|kruiden|peper','🧂'],['olie','🫒'],['toiletpapier|keukenrol|tissue','🧻'],['wasmiddel|afwas|schoonmaak|allesreiniger|wc','🧼'],
   ['tandpasta|tandenborstel','🪥'],['shampoo|douche|zeep|deo','🧴'],['luier|baby','👶'],['kat|katten','🐱'],['hond|honden','🐶'],['diepvries','🧊']];
+/* afdelingen in de volgorde waarin je meestal door de winkel loopt (zoals Listonic en Bring! sorteren) */
+const AFD = [
+  ['Groente & fruit', '🥕', 'groente|fruit|appel|peer|peren|banaan|bananen|sinaasappel|mandarijn|citroen|limoen|aardbei|druif|druiven|kiwi|meloen|ananas|mango|avocado|tomaat|tomaten|komkommer|paprika|wortel|peen|aardappel|ui |uien|knoflook|sla |ijsberg|spinazie|andijvie|boerenkool|kool|champignon|broccoli|bloemkool|courgette|aubergine|prei|selderij|bonen|sperzie|rucola|kruiden vers|gember|bosbes|framboos|salade', ['groente-fruit']],
+  ['Brood & bakkerij', '🍞', 'brood|bolletje|broodje|stokbrood|croissant|beschuit|crackers|knäcke|krentenbol|pistolet|wrap|tortilla|afbakbrood', ['brood-bakkerij']],
+  ['Vlees, vis & vega', '🥩', 'kip|kalkoen|gehakt|biefstuk|rund|varken|vlees|worst|spek|ham |schnitzel|hamburger|shoarma|vis|zalm|tonijn|kabeljauw|garnalen|haring|makreel|vega|tofu|tempeh|falafel', ['vlees','vis','vega']],
+  ['Kaas & vleeswaren', '🧀', 'kaas|salami|cervelaat|rookvlees|filet americain|leverworst|beenham|kipfilet beleg|boterhamworst|paté|pate', ['kaas']],
+  ['Zuivel & eieren', '🥛', 'melk|karnemelk|yoghurt|kwark|vla|skyr|room|boter|margarine|eieren|ei |chocomel|fristi|pudding|toetje', ['zuivel-eieren']],
+  ['Ontbijt & beleg', '🍯', 'hagelslag|pindakaas|jam|honing|stroop|muesli|cornflakes|havermout|ontbijt|choco|nutella|vlokken|speculoos|zoet beleg', ['ontbijt']],
+  ['Pasta, rijst & wereld', '🍝', 'pasta|spaghetti|macaroni|penne|lasagne|noedels|mie|rijst|couscous|bulgur|quinoa|wereld|tortilla|taco|nasi|bami|wok', ['pasta-rijst-wereldkeuken']],
+  ['Soep, sauzen & conserven', '🥫', 'soep|saus|ketchup|mayo|mosterd|blik|conserve|tomatenpuree|passata|bouillon|olie|azijn|zout|peper|kruiden|suiker|bloem|meel|bakken|maizena', ['soepen-conserven-sauzen']],
+  ['Kant-en-klaar', '🍲', 'maaltijd|pizza|kant en klaar|salade maaltijd|ovenschotel|stamppot', ['maaltijden']],
+  ['Koffie & thee', '☕', 'koffie|thee|cappuccino|espresso|pads|cups', ['koffie-thee']],
+  ['Snoep, koek & chips', '🍪', 'koek|biscuit|cake|stroopwafel|chocola|reep|snoep|drop|chips|nootjes|pinda|popcorn|zoutjes', ['snoep-koek-chips']],
+  ['Dranken', '🥤', 'cola|frisdrank|limonade|sinas|fanta|sprite|ice tea|sap |sappen|jus|water|bier|pils|wijn|drank|whisky|jenever', ['frisdrank','bier','wijn','sterke-drank','bier-wijn-sterke-drank']],
+  ['Diepvries', '🧊', 'diepvries|ijs |ijsjes|friet|patat|kroket|frikandel|bitterbal', ['diepvries']],
+  ['Huishouden', '🧼', 'toiletpapier|keukenrol|tissue|wasmiddel|afwas|vaatwas|schoonmaak|allesreiniger|wc |vuilniszak|aluminiumfolie|batterij|kaars', ['huishouden']],
+  ['Verzorging & drogisterij', '🧴', 'tandpasta|tandenborstel|shampoo|douche|zeep|deo|scheer|maandverband|tampon|pleister|paracetamol|crème|creme|lotion', ['huidverzorging','haarverzorging','mondverzorging','deodorant','drogisterij','gezondheid']],
+  ['Baby', '👶', 'luier|baby|billendoek', ['baby-kind']],
+  ['Huisdier', '🐾', 'kat|katten|hond|honden|kattenbak|dierenvoer', ['huisdier']],
+];
+function afdIndex(text, cat){
+  if (cat) for (let k = 0; k < AFD.length; k++) if (AFD[k][3].includes(cat)) return k;
+  const n = ' ' + String(text || '').toLowerCase() + ' ';
+  /* het langste passende woord wint: pindakaas is beleg, geen kaas */
+  let best = AFD.length, len = 0;
+  for (let k = 0; k < AFD.length; k++) for (const w of AFD[k][2].split('|')) if (w.length > len && n.includes(w)){ best = k; len = w.length; }
+  return best;
+}
+function afdOf(it, st, i){ return afdIndex(it.q + ' ' + st.n[i], i >= st.r ? CATS[st.pc[i - st.r]] : ''); }
 function emojiFor(name){
   const n = ' ' + String(name || '').toLowerCase() + ' ';
   for (const [k, e] of EMOJI) if (k.split('|').some(w => n.includes(w))) return e;
@@ -227,7 +258,7 @@ document.addEventListener('error', e => {
 
 /* ---------- opslaan ---------- */
 function save(){
-  try{ localStorage.setItem(KEY, JSON.stringify({items:S.items.map(i => [i.q, i.qty]), off:[...S.off], demo:S.demo, oldReg:S.oldReg, v:2, done:[...S.done], hist:S.hist})); }catch(e){}
+  try{ localStorage.setItem(KEY, JSON.stringify({items:S.items.map(i => [i.q, i.qty]), off:[...S.off], demo:S.demo, oldReg:S.oldReg, v:2, done:[...S.done], hist:S.hist, saved:S.saved, onb:S.onb})); }catch(e){}
 }
 function load(){
   try{
@@ -235,7 +266,8 @@ function load(){
     const d = JSON.parse(raw); if (!Array.isArray(d.items)) return false;
     S.items = d.items.map(([q, qty]) => ({id:S.nextId++, q:String(q), qty:Math.max(1, Math.min(99, +qty || 1))}));
     S.off = new Set(Array.isArray(d.off) ? d.off : []); S.demo = !!d.demo; S.oldReg = d.v >= 2 ? !!d.oldReg : true;
-    S.done = new Set(Array.isArray(d.done) ? d.done : []); S.hist = d.hist && typeof d.hist === 'object' ? d.hist : {}; return true;
+    S.done = new Set(Array.isArray(d.done) ? d.done : []); S.hist = d.hist && typeof d.hist === 'object' ? d.hist : {};
+    S.saved = d.saved || null; S.onb = d.onb !== false; return true;
   }catch(e){ return false; }
 }
 function remember(q){
@@ -319,6 +351,11 @@ function sortedDeals(){
   }
   return list;
 }
+/* prijs per kilo of liter, zoals op het schapkaartje */
+function unitPrice(cents, u, q){
+  if (!q || (u !== 1 && u !== 2) || q < 20) return '';
+  return money(Math.round(cents * 1000 / q)) + (u === 1 ? '/kg' : '/l');
+}
 function cardHtml(d){
   const st = STORES[d.s], on = hasItem(d.q), url = shopUrl(st, d.i);
   const size = st.u[d.i] && st.q[d.i] ? fmtQty(st.u[d.i], st.q[d.i]) : '';
@@ -326,7 +363,7 @@ function cardHtml(d){
     '<span class="store">' + esc(st.c) + '</span>' + (d.pct > 0 ? '<span class="disc">−' + d.pct + '%</span>' : '') +
     (d.upcoming ? '<span class="soon">Vanaf ' + esc(dayFmt.format(d.from)) + '</span>' : '') + '</div>' +
     '<div class="cbody"><div class="cname" title="' + esc(d.name) + '">' + esc(d.name) + '</div>' +
-    (size ? '<div class="csize">' + esc(size) + '</div>' : '') +
+    (size ? '<div class="csize">' + esc(size) + (unitPrice(d.price, st.u[d.i], st.q[d.i], d.multi ? 1 : 1) ? ' · ' + unitPrice(d.price, st.u[d.i], st.q[d.i]) : '') + '</div>' : '') +
     (d.label ? '<span class="mech">' + esc(d.label) + '</span>' : '') +
     '<div class="prow">' + (d.usual ? '<span class="old">' + money(d.usual) + '</span>' : '') + '<span class="now">' + money(d.price) + '</span>' +
     (d.multi ? '<span class="per">per stuk</span>' : '') + '</div>' +
@@ -334,8 +371,38 @@ function cardHtml(d){
     '<button type="button" class="addbtn" data-act="adddeal" data-q="' + esc(d.q) + '" aria-pressed="' + on + '">' + (on ? '✓ Op je lijstje' : '+ Op mijn lijstje') + '</button>' +
     (url ? '<a class="shoplink" href="' + esc(url) + '" target="_blank" rel="noopener">Bekijk bij ' + esc(st.c) + ' ↗</a>' : '') + '</div></article>';
 }
+/* aanbiedingen voor wat op je lijstje staat of wat je vaak koopt */
+function personalDeals(){
+  const idx = new Map(); DEALS.forEach((d, k) => idx.set(d.s + ':' + d.i, k));
+  const keys = [], seenK = new Set();
+  S.items.forEach(it => { const k = it.q.toLowerCase(); if (!seenK.has(k)){ seenK.add(k); keys.push([k, S.an[it.id]]); } });
+  Object.keys(S.hist).sort((a, b) => S.hist[b] - S.hist[a]).slice(0, 15).forEach(k => { if (!seenK.has(k)){ seenK.add(k); keys.push([k, null]); } });
+  const on = new Set(enabledStores()), out = [], used = new Set();
+  for (const [k, an0] of keys.slice(0, 30)){
+    const an = an0 || ENG.analyze(k, 15);
+    an.per.forEach((e, st) => {
+      if (!e || !on.has(st)) return;
+      const best = e.cands[0];
+      e.cands.forEach(c => {
+        if (!c.usual || c.score > best.score + 1) return;
+        const j = idx.get(st + ':' + c.i); if (j === undefined || used.has(j)) return;
+        const d = DEALS[j]; if (d.upcoming) return;
+        used.add(j); out.push(Object.assign({forq: k}, d));
+      });
+    });
+  }
+  return out.sort((a, b) => b.pct - a.pct).slice(0, 16);
+}
+function renderForYou(){
+  const el = $('foryou');
+  if (S.cat !== 'all' || S.q || S.fstores.size){ el.hidden = true; return; }
+  const list = personalDeals();
+  if (!list.length){ el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = '<header><h2>Voor jou in de aanbieding</h2><span class="small muted">Producten van je lijstje en wat je vaak koopt</span></header><div class="hscroll">' + list.map(cardHtml).join('') + '</div>';
+}
 function renderShop(){
-  renderCatbar(); renderFilters(); renderChips();
+  renderCatbar(); renderFilters(); renderChips(); renderForYou();
   const list = sortedDeals(), shown = list.slice(0, S.show);
   $('rescount').textContent = list.length.toLocaleString('nl-NL') + ' aanbieding' + (list.length === 1 ? '' : 'en');
   $('h-shop').textContent = S.cat === 'all' ? 'Aanbiedingen' : (CATLABEL[S.cat] || S.cat);
@@ -410,6 +477,18 @@ function itemImg(i){
     for (const c of e.cands.slice(0, 4)){ if (c.score > e.cands[0].score + 0.5) break; const r = imgRef(STORES[s], c.i); if (!r.none) return r; } }
   return own;
 }
+/* veelgekochte boodschappen als tegels met een plaatje (zoals in Bring!) */
+const QUICK = [['🥛','Melk','halfvolle melk'],['🍞','Brood','volkoren brood'],['🥚','Eieren','scharreleieren'],['🧀','Kaas','jong belegen kaas'],['🧈','Boter','roomboter'],
+  ['🥣','Yoghurt','magere yoghurt'],['🍌','Bananen','bananen'],['🍎','Appels','appels'],['🥔','Aardappels','aardappelen'],['🧅','Uien','uien'],['🍅','Tomaten','tomaten'],
+  ['🥒','Komkommer','komkommer'],['🫑','Paprika','paprika'],['🥕','Wortels','winterpeen'],['🥬','Sla','ijsbergsla'],['🍗','Kipfilet','kipfilet'],['🥩','Gehakt','half om half gehakt'],
+  ['🐟','Vis','zalmfilet'],['🍝','Pasta','spaghetti'],['🍚','Rijst','zilvervliesrijst'],['🥜','Pindakaas','pindakaas'],['🍫','Hagelslag','hagelslag melk'],['🍓','Jam','aardbeienjam'],
+  ['☕','Koffie','filterkoffie'],['🍵','Thee','zwarte thee'],['🧃','Sap','sinaasappelsap'],['🥤','Cola','coca cola'],['💧','Water','mineraalwater'],['🍺','Bier','pils'],
+  ['🍪','Koekjes','biscuit'],['🍿','Chips','chips naturel'],['🍕','Pizza','pizza'],['🧻','Wc-papier','toiletpapier'],['🧼','Wasmiddel','wasmiddel'],['🫧','Afwasmiddel','afwasmiddel'],
+  ['🪥','Tandpasta','tandpasta'],['🧴','Douchegel','douchegel'],['🐱','Kattenvoer','kattenvoer'],['🐶','Hondenvoer','hondenvoer'],['👶','Luiers','luiers']];
+function renderQuick(){
+  const on = new Set(S.items.map(doneKey));
+  $('qgrid').innerHTML = QUICK.map(([e, l, q]) => '<button type="button" class="qtile" data-act="quick" data-q="' + esc(q) + '" aria-pressed="' + on.has(q) + '"><span class="qe" aria-hidden="true">' + e + '</span><span class="ql">' + esc(l) + '</span></button>').join('');
+}
 function renderOften(){
   const on = new Set(S.items.map(doneKey));
   const list = Object.keys(S.hist).filter(k => !on.has(k)).sort((a, b) => S.hist[b] - S.hist[a]).slice(0, 10);
@@ -417,7 +496,7 @@ function renderOften(){
   $('often').innerHTML = '<span class="small muted">Vaak gekocht:</span>' + list.map(k => '<button type="button" class="chip addchip" data-act="addoften" data-q="' + esc(k) + '">+ ' + esc(k) + '</button>').join('');
 }
 function renderItems(){
-  renderOften();
+  renderOften(); renderQuick();
   $('demonote').hidden = !(S.demo && S.items.length);
   const sel = enabledStores();
   $('items').innerHTML = S.items.length ? S.items.map((it, idx) => {
@@ -484,6 +563,7 @@ function renderBasket(){
     (ci > baseIdx && base.total > cur.total ? '<div><span class="tag good">Je bespaart ' + money(base.total - cur.total) + '</span> <span class="small muted">t.o.v. alles bij ' + esc(names(base.combo)) + '</span></div>' : '') +
     (nDeals ? '<div class="small muted">' + nDeals + ' product' + (nDeals === 1 ? ' is' : 'en zijn') + ' deze week in de aanbieding.</div>' : '') +
     '<div role="radiogroup" aria-label="Aantal winkels" class="kopts">' + opts + '</div>' +
+    (S.saved && S.saved.c > 0 ? '<div class="savedbox">🎉 Dit jaar bespaard met aanbiedingen: <b>' + money(S.saved.c) + '</b></div>' : '') +
     '<p class="hint">Het advies stopt waar een extra winkel minder dan € 2,00 oplevert.' + (baseIdx > 0 ? ' Geen enkele winkel heeft alles, daarom begint de vergelijking bij ' + (baseIdx + 1) + ' winkels.' : '') + '</p>' +
     (pl.missing.length ? '<div class="warnbox">Niet gevonden en niet meegeteld: ' + pl.missing.map(i => esc(S.items[i].q)).join(', ') + '.</div>' : '') + '</div>';
 
@@ -491,13 +571,19 @@ function renderBasket(){
   cur.assign.forEach(([i, s]) => { (by[s] = by[s] || []).push(i); });
   const bons = cur.combo.map(s => {
     const pos = sel.indexOf(s), st = STORES[s];
+    /* op volgorde van de afdelingen, zodat je in één keer door de winkel loopt */
+    const afdOfRow = i => afdOf(S.items[i], st, m[i][pos].c.i);
+    (by[s] || []).sort((x, y) => afdOfRow(x) - afdOfRow(y) || S.items[x].q.localeCompare(S.items[y].q, 'nl'));
+    let lastAfd = -1;
     const rows = (by[s] || []).map(i => {
+      const ak = afdOfRow(i), head = ak !== lastAfd && (by[s] || []).length > 2 ? '<div class="afd">' + (AFD[ak] ? AFD[ak][1] + ' ' + esc(AFD[ak][0]) : 'Overig') + '</div>' : '';
+      lastAfd = ak;
       const it = S.items[i], cell = m[i][pos], c = cell.c, a = S.an[it.id];
       const opts = a.per[s].cands.map((x, j) => '<option value="' + j + '"' + (j === cell.j ? ' selected' : '') + '>' + esc(x.name) + (x.q ? ' · ' + fmtQty(x.u, x.q) : '') + ' · ' + money(x.price) + (x.usual ? ' (actie)' : '') + '</option>').join('');
       const nt = noteFor(c, a, it.qty), url = shopUrl(st, c.i);
       const deal = c.usual ? '<span class="tag sale">' + esc(c.label || ('−' + Math.round(100 * (1 - c.price / c.usual)) + '%')) + '</span>' + (c.until ? '<span class="small muted">t/m ' + esc(dayFmt.format(mmddToDate(c.until))) + '</span>' : '') : '';
       const dn = S.done.has(doneKey(it));
-      return '<div class="line' + (dn ? ' done' : '') + '"><button type="button" class="tick" data-act="tick" data-id="' + it.id + '" role="checkbox" aria-checked="' + dn + '" aria-label="' + esc(it.q) + ' in mijn mandje"></button><span class="thumb">' + imgHtml(imgRef(st, c.i), '') + '</span><div><div class="row"><span class="pn">' + (packsFor(it.qty, c.r) > 1 ? packsFor(it.qty, c.r) + ' × ' : '') + esc(c.name) +
+      return head + '<div class="line' + (dn ? ' done' : '') + '"><button type="button" class="tick" data-act="tick" data-id="' + it.id + '" role="checkbox" aria-checked="' + dn + '" aria-label="' + esc(it.q) + ' in mijn mandje"></button><span class="thumb">' + imgHtml(imgRef(st, c.i), '') + '</span><div><div class="row"><span class="pn">' + (packsFor(it.qty, c.r) > 1 ? packsFor(it.qty, c.r) + ' × ' : '') + esc(c.name) +
         (c.q && !norm(c.name).includes(' ' + String(fmtQty(c.u, c.q)).split(' ')[0].replace(',', ' ')) ? ' <span class="muted">(' + esc(fmtQty(c.u, c.q)) + ')</span>' : '') + '</span><span class="pp">' + money(cell.price) + '</span></div>' +
         '<div class="meta">' + deal + '</div>' + (nt ? '<span class="note">' + esc(nt) + '</span>' : '') +
         '<div class="meta"><details class="swap"><summary>Ander product</summary><select data-act="pin" data-id="' + it.id + '" data-s="' + s + '" aria-label="Kies product voor ' + esc(it.q) + '">' + opts + '</select></details>' +
@@ -576,13 +662,16 @@ const SCAN_ERR = {
 let SCANMODE = null, nativeToken = 0;
 const ICON_CAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
 const ICON_SHARE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></svg>';
+const ICON_MIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
 const ICON_PIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>';
 function enableScan(mode){
   SCANMODE = mode; $('scan').hidden = false; $('bn-scan').hidden = false;
   document.querySelector('.bnav').style.gridTemplateColumns = 'repeat(4,1fr)';
   if (mode === 'native') $('scan').querySelector('.scanbtns').innerHTML =
     '<button type="button" class="btn primary scanbtn" data-act="nscan" data-mode="camera">' + ICON_CAM + 'Foto maken</button>' +
-    '<button type="button" class="btn ghost scanbtn" data-act="nscan" data-mode="gallery">' + ICON_PIC + 'Screenshot of afbeelding kiezen</button>';
+    '<button type="button" class="btn ghost scanbtn" data-act="nscan" data-mode="gallery">' + ICON_PIC + 'Screenshot of afbeelding kiezen</button>' +
+    (NATIVE.voice ? '<button type="button" class="btn ghost scanbtn" data-act="voice">' + ICON_MIC + 'Inspreken</button>' : '');
+  if (mode === 'native' && NATIVE.voice){ const f = $('addform'); if (!f.querySelector('.micbtn')) f.insertAdjacentHTML('beforeend', '<button type="button" class="micbtn" data-act="voice" aria-label="Boodschappen inspreken">' + ICON_MIC + '</button>'); }
 }
 async function initScan(){
   document.querySelector('.bnav').style.gridTemplateColumns = 'repeat(3,1fr)';
@@ -604,6 +693,7 @@ function scanMenu(){
   openSheet('<h2>Boodschappenbriefje inlezen</h2><p class="muted">De app leest wat erop staat en zet het op je lijstje. Je kunt alles eerst nakijken.</p>' +
     b('camera', ICON_CAM, 'Foto maken', 'Van een briefje op papier') +
     b('gallery', ICON_PIC, 'Screenshot of foto kiezen', 'Bijvoorbeeld een lijstje uit Notities') +
+    (SCANMODE === 'native' && NATIVE.voice ? '<button type="button" class="bigbtn" data-act="voice">' + ICON_MIC + '<span>Inspreken<small>Zeg bijvoorbeeld: melk, brood en twee pakken koffie</small></span></button>' : '') +
     '<button type="button" class="btn ghost" data-act="closesheet" style="justify-content:center">Annuleren</button>', 'Briefje inlezen');
 }
 function scanBusy(img, stoppable){
@@ -620,11 +710,37 @@ window.slimNativeScan = function(res){
   if (res.state === 'cancel'){ if (!SCAN) $('scanout').innerHTML = ''; return; }
   if (res.state === 'error'){ $('scanout').innerHTML = '<p class="warnbox">' + esc(res.message || 'Het lezen is niet gelukt. Probeer een scherpere foto.') + '</p>'; return; }
   if (res.state === 'done'){
-    SCAN = {rows: parseLines(res.lines || String(res.text || '').split('\n')), url: res.thumb || ''};
+    let lines = res.lines || String(res.text || '').split('\n');
+    if (res.spoken) lines = splitSpoken(spokenToLines(lines.join(' , ')));
+    SCAN = {rows: parseLines(lines), url: res.thumb || ''};
     if (location.hash === '#lijstje' || location.hash === '#folders') location.hash = 'aanbiedingen';
     renderScan(); setTimeout(() => $('scan').scrollIntoView({behavior:'smooth', block:'start'}), 80);
   }
 };
+/* ingesproken tekst: "melk, brood en twee pakken koffie" -> losse regels met cijfers */
+const NUMW = {een:1, twee:2, drie:3, vier:4, vijf:5, zes:6, zeven:7, acht:8, negen:9, tien:10, elf:11, twaalf:12};
+function spokenToLines(t){
+  return String(t).toLowerCase().replace(/\b(en|plus|ook|nog|daarna|verder)\b/g, ',').split(/[,.;]/)
+    .map(x => x.trim().replace(/^(een|twee|drie|vier|vijf|zes|zeven|acht|negen|tien|elf|twaalf)\b/, w => String(NUMW[w])).replace(/^1\s+/, ''))
+    .filter(Boolean);
+}
+/* zonder komma's ingesproken ("melk brood kaas"): splits als de woorden samen geen product zijn */
+function found(q){ try{ const a = ENG.analyze(q, 3); return a.per.filter(e => e && e.cands[0].score <= 1.5).length >= 2; }catch(e){ return true; } }
+function splitSpoken(lines){
+  const out = [];
+  lines.forEach(l => {
+    const m = l.match(/^(\d+\s*(?:x|pakken|pak|flessen|fles|zakken|zak|blikken|blik|potten|pot|stuks)?\s+)?(.*)$/i), pre = m[1] || '', words = m[2].trim().split(/\s+/);
+    if (words.length < 2 || found(m[2])){ out.push(l); return; }
+    /* van links naar rechts de langste reeks woorden die wel een product is */
+    let k = 0, first = true;
+    while (k < words.length){
+      let len = Math.min(3, words.length - k);
+      while (len > 1 && !found(words.slice(k, k + len).join(' '))) len--;
+      out.push((first ? pre : '') + words.slice(k, k + len).join(' ')); first = false; k += len;
+    }
+  });
+  return out;
+}
 /* tekstregels (van de tekstherkenning) omzetten naar boodschappen */
 const SKIPLINE = /^(boodschappen(lijst(je)?)?|lijst(je)?|notitie|notities|notes?|gereed|klaar|done|bewerk(en)?|delen|zoeken|vandaag|gisteren|herinneringen|to ?do|takenlijst|winkel(lijst(je)?)?|alle (notities|herinneringen)|map(pen)?|terug|annuleer|annuleren)[:.!]?$/i;
 const PACK = '(?:x|×|stuks?|st\\.?|pakken?|pak|pakjes?|flessen|fles|potten|potje|pot|zakken?|zakjes?|zak|blikken?|blikjes?|blik|bossen?|bosjes?|bos|bakjes?|bak|dozen|doos|rollen?|netjes?|net)';
@@ -709,8 +825,34 @@ function listText(){
     if (L.pl.missing.length) out += '\nNiet gevonden:\n' + L.pl.missing.map(i => '- ' + S.items[i].q).join('\n') + '\n';
     out += '\nTotaal ongeveer ' + money(L.cur.total) + '\n';
   } else out += S.items.map(it => '- ' + (it.qty > 1 ? it.qty + ' × ' : '') + it.q).join('\n') + '\n';
-  return out + '\nGemaakt met Slim Boodschappen';
+  return out + '\nOpen dit lijstje in de app: ' + listLink();
 }
+/* lijstje als link: wie hem opent, krijgt het lijstje in de app of de website */
+const SITE = (CFG && CFG.remote) || 'https://liquided-a.github.io/slim-boodschappen/';
+function listLink(){
+  const json = JSON.stringify(S.items.map(it => [it.q, it.qty]));
+  const b64 = btoa(unescape(encodeURIComponent(json))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return SITE + 'app.html#lijst=' + b64;
+}
+function readListHash(h){
+  const m = String(h || '').match(/lijst=([A-Za-z0-9_-]+)/); if (!m) return null;
+  try{
+    const b = m[1].replace(/-/g, '+').replace(/_/g, '/');
+    const arr = JSON.parse(decodeURIComponent(escape(atob(b + '==='.slice((b.length + 3) % 4)))));
+    return Array.isArray(arr) ? arr.filter(x => Array.isArray(x) && typeof x[0] === 'string').slice(0, 100).map(([q, n]) => [q.slice(0, 80), Math.max(1, Math.min(99, +n || 1))]) : null;
+  }catch(e){ return null; }
+}
+let INCOMING = null;
+function offerImport(list){
+  if (!list || !list.length) return;
+  INCOMING = list;
+  openSheet('<h2>Je hebt een lijstje gekregen</h2><p class="muted">' + list.length + ' product' + (list.length === 1 ? '' : 'en') + ': ' + esc(list.slice(0, 8).map(x => x[0]).join(', ')) + (list.length > 8 ? ', …' : '') + '</p>' +
+    '<button type="button" class="btn primary" data-act="impadd" style="justify-content:center;min-height:52px">Toevoegen aan mijn lijstje</button>' +
+    (S.items.length && !S.demo ? '<button type="button" class="btn ghost" data-act="impreplace" style="justify-content:center">Mijn lijstje vervangen</button>' : '') +
+    '<button type="button" class="btn ghost" data-act="closesheet" style="justify-content:center">Niet nu</button>', 'Lijstje ontvangen');
+}
+window.slimImport = h => { const l = readListHash(h); if (l) (ENG ? offerImport(l) : (PENDING_IMPORT = l)); };
+let PENDING_IMPORT = readListHash(location.hash);
 async function copyText(t){
   try{ await navigator.clipboard.writeText(t); toast('Lijstje gekopieerd. Plak het in een bericht.'); }
   catch(e){ toast('Kopiëren lukte niet op dit apparaat.'); }
@@ -747,6 +889,7 @@ async function checkAppUpdate(){
 /* ---------- weergave wisselen ---------- */
 function route(){
   const v = location.hash === '#lijstje' ? 'list' : location.hash === '#folders' ? 'folders' : 'shop';
+  if (/^#lijst=/.test(location.hash) && ENG){ const l = readListHash(location.hash); history.replaceState(null, '', '#lijstje'); if (l) offerImport(l); return route(); }
   $('view-shop').hidden = v !== 'shop'; $('view-list').hidden = v !== 'list'; $('view-folders').hidden = v !== 'folders';
   document.querySelector('.catbar').hidden = v !== 'shop';
   ['shop','folders','list'].forEach(k => { [$('tab-' + k), $('bn-' + k)].forEach(t => { if (v === k) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current'); }); });
@@ -780,8 +923,22 @@ function settingsHtml(){
     '<p class="small muted">Prijzen opgehaald op ' + (PFETCH ? esc(dayFmt.format(PFETCH)) : '…') + '. ' + (CFG ? 'De app haalt elke dag zelf de nieuwe aanbiedingen op.' : '') + (CFG && CFG.version ? ' Versie ' + esc(CFG.version) + '.' : '') + '</p>' +
     '<button type="button" class="btn primary" data-act="closesheet" style="justify-content:center">Klaar</button>';
 }
+/* eerste keer: kies je supermarkten (zoals 'Mijn supermarkten' in andere apps) */
+function onboardingHtml(){
+  const big = STORES.map((st, i) => i).filter(i => STORES[i].n.length > 250).sort((a, b) => STORES[b].n.length - STORES[a].n.length);
+  return '<h2>Welkom bij Slim Boodschappen</h2><p class="muted">Bij welke supermarkten doe je boodschappen? De app vergelijkt alleen die winkels. Je kunt dit later altijd aanpassen bij Mijn lijstje.</p>' +
+    '<div class="onbgrid">' + big.map(i => '<button type="button" class="onbstore" data-act="onbstore" data-k="' + esc(STORES[i].k) + '" aria-pressed="' + !S.off.has(STORES[i].k) + '">' + esc(STORES[i].c) + '</button>').join('') + '</div>' +
+    '<div class="setrow"><h3>Tekstgrootte</h3><div class="seg">' + [['normaal', 'Normaal', 's1'], ['groot', 'Groot', 's2'], ['extra', 'Extra groot', 's3']].map(([v, l, c]) =>
+      '<button type="button" data-act="onbsize" data-v="' + v + '" aria-pressed="' + (PREFS.size === v) + '" class="' + c + '">' + l + '</button>').join('') + '</div></div>' +
+    '<button type="button" class="btn primary" data-act="onbdone" style="justify-content:center;min-height:52px">Aan de slag</button>';
+}
 let toastTimer = 0;
-function toast(msg){ const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3800); }
+let toastFn = null;
+function toast(msg, label, fn){
+  const t = $('toast'); toastFn = fn || null;
+  t.innerHTML = esc(msg) + (label ? ' <button type="button" class="toastbtn" data-act="toastdo">' + esc(label) + '</button>' : '');
+  t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; toastFn = null; }, label ? 6000 : 3800);
+}
 window.addEventListener('hashchange', () => { route(); window.scrollTo(0, 0); });
 
 /* ---------- acties ---------- */
@@ -801,8 +958,18 @@ document.addEventListener('click', e => {
   const act = b.dataset.act, id = +b.dataset.id, it = S.items.find(x => x.id === id);
   if (act === 'inc' && it){ it.qty = Math.min(99, it.qty + 1); }
   else if (act === 'dec' && it){ it.qty = Math.max(1, it.qty - 1); }
-  else if (act === 'rm' && it){ S.items = S.items.filter(x => x.id !== id); delete S.an[id]; delete S.pins[id]; S.demo = false; S.k = null; }
-  else if (act === 'clear'){ S.items = []; S.an = {}; S.pins = {}; S.demo = false; S.k = null; }
+  else if (act === 'rm' && it){
+    const pos = S.items.indexOf(it);
+    S.items = S.items.filter(x => x.id !== id); delete S.an[id]; delete S.pins[id]; S.demo = false; S.k = null;
+    toast('"' + it.q + '" verwijderd', 'Ongedaan maken', () => { S.items.splice(Math.min(pos, S.items.length), 0, it); S.an[it.id] = ENG.analyze(it.q); S.k = null; save(); renderAll(); });
+  }
+  else if (act === 'toastdo'){ const f = toastFn; $('toast').hidden = true; toastFn = null; f && f(); return; }
+  else if (act === 'clear' && S.items.length){
+    const keepItems = S.items.slice();
+    S.items = []; S.an = {}; S.pins = {}; S.demo = false; S.k = null;
+    toast('Lijstje gewist', 'Ongedaan maken', () => { S.items = keepItems; reanalyze(); S.k = null; save(); renderAll(); });
+  }
+  else if (act === 'clear_old'){ S.items = []; S.an = {}; S.pins = {}; S.demo = false; S.k = null; }
   else if (act === 'store'){ const k = b.dataset.k; S.off.has(k) ? S.off.delete(k) : S.off.add(k); S.k = null; }
   else if (act === 'oldreg'){ S.oldReg = !S.oldReg; ENG.setMask(keep); reanalyze(); S.k = null; }
   else if (act === 'k'){ S.k = +b.dataset.k; }
@@ -828,15 +995,41 @@ document.addEventListener('click', e => {
     else addItem(q);
     return;
   }
+  else if (act === 'impadd' || act === 'impreplace'){
+    if (!INCOMING) return;
+    if (act === 'impreplace' || S.demo){ S.items = []; S.an = {}; S.pins = {}; S.done.clear(); }
+    INCOMING.forEach(([q, n]) => { const ex = S.items.find(y => y.q.toLowerCase() === q.toLowerCase());
+      if (ex) ex.qty = Math.min(99, ex.qty + n); else { const it = {id: S.nextId++, q, qty: n}; S.items.push(it); S.an[it.id] = ENG.analyze(q); } });
+    const n = INCOMING.length; INCOMING = null; S.demo = false; S.k = null; closeSheet(); save(); renderAll();
+    location.hash = 'lijstje'; toast(n + ' product' + (n === 1 ? '' : 'en') + ' op je lijstje gezet'); return;
+  }
+  else if (act === 'onbstore'){ const k = b.dataset.k; S.off.has(k) ? S.off.delete(k) : S.off.add(k); b.setAttribute('aria-pressed', String(!S.off.has(k))); save(); return; }
+  else if (act === 'onbsize'){ PREFS.size = b.dataset.v; applyPrefs(); openSheet(onboardingHtml(), 'Welkom'); return; }
+  else if (act === 'onbdone'){ S.onb = true; closeSheet(); S.k = null; save(); renderAll(); return; }
+  else if (act === 'quick'){
+    const q = b.dataset.q;
+    if (hasItem(q)){ const x = S.items.find(y => y.q.toLowerCase() === q); S.items = S.items.filter(y => y !== x); delete S.an[x.id]; delete S.pins[x.id]; S.k = null; }
+    else { addItem(q); return; }
+  }
   else if (act === 'tick'){
     if (!it) return; const k = doneKey(it); S.done.has(k) ? S.done.delete(k) : S.done.add(k);
     if (navigator.vibrate) try{ navigator.vibrate(12); }catch(err){}
   }
   else if (act === 'finish'){
     const n = S.items.filter(x => S.done.has(doneKey(x))).length;
+    /* besparing bijhouden: wat je op aanbiedingen bespaarde t.o.v. de gewone prijs */
+    let saved = 0;
+    if (LAST && LAST.cur) LAST.cur.assign.forEach(([i, st]) => {
+      const it = S.items[i]; if (!S.done.has(doneKey(it))) return;
+      const cell = LAST.m[i][LAST.sel.indexOf(st)], c = cell && cell.c;
+      if (c && c.usual) saved += Math.max(0, packsFor(it.qty, c.r) * c.usual - cell.price);
+    });
+    const yr = String(new Date().getFullYear());
+    S.saved = S.saved && S.saved.y === yr ? S.saved : {y: yr, c: 0, n: 0};
+    S.saved.c += saved; S.saved.n += 1;
     S.items.filter(x => S.done.has(doneKey(x))).forEach(x => { delete S.an[x.id]; delete S.pins[x.id]; });
     S.items = S.items.filter(x => !S.done.has(doneKey(x))); S.done.clear(); S.demo = false; S.k = null;
-    toast(n + ' product' + (n === 1 ? '' : 'en') + ' afgestreept en van je lijstje gehaald');
+    toast(n + ' product' + (n === 1 ? '' : 'en') + ' afgestreept.' + (saved > 0 ? ' Je bespaarde ' + money(saved) + ' met aanbiedingen; dit jaar al ' + money(S.saved.c) + '.' : ''));
   }
   else if (act === 'share'){ shareList(); return; }
   else if (act === 'addoften'){ addItem(b.dataset.q); toast('"' + b.dataset.q + '" op je lijstje gezet'); return; }
@@ -852,6 +1045,11 @@ document.addEventListener('click', e => {
   else if (act === 'pref'){ PREFS[b.dataset.key] = b.dataset.v; applyPrefs(); openSheet(settingsHtml(), 'Instellingen'); return; }
   else if (act === 'gostores'){ closeSheet(); setTimeout(() => { $('storebox').open = true; $('storebox').scrollIntoView({block:'start'}); }, 80); return; }
   else if (act === 'scanmenu'){ scanMenu(); return; }
+  else if (act === 'voice'){
+    closeSheet(); nativeToken++;
+    try{ NATIVE.voice(nativeToken); }catch(err){ toast('Inspreken lukt niet op deze telefoon.'); }
+    return;
+  }
   else if (act === 'nscan'){
     closeSheet(); nativeToken++;
     try{ NATIVE.scan(b.dataset.mode, nativeToken); }catch(err){ $('scanout').innerHTML = '<p class="warnbox">De camera kon niet worden geopend.</p>'; }
@@ -970,8 +1168,12 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('sheetro
     const C = CFG ? await cachedData() : null;
     if (C && new Date(C.promoFetched) > new Date(D.promoFetched)) D = C;
     STORES = D.stores;
-    if (!load() || !S.items.length){ useDemo(); S.off = new Set(STORES.filter(s => !DEFAULT_ON.has(s.k)).map(s => s.k)); }
+    const fresh = !load();
+    if (fresh || !S.items.length) $('quick').open = true;
+    if (fresh || !S.items.length){ useDemo(); S.off = new Set(STORES.filter(s => !DEFAULT_ON.has(s.k)).map(s => s.k)); }
     applyData(D);
+    if (PENDING_IMPORT){ const l = PENDING_IMPORT; PENDING_IMPORT = null; if (fresh) S.onb = true; setTimeout(() => offerImport(l), 300); }
+    else if (fresh){ S.onb = false; setTimeout(() => openSheet(onboardingHtml(), 'Welkom'), 300); }
     refreshRemote();
     checkAppUpdate();
     document.addEventListener('visibilitychange', () => { if (!document.hidden && (Date.now() - PFETCH) / 36e5 > 20) refreshRemote(); });

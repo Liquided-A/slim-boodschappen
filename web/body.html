@@ -763,6 +763,9 @@ function applyPrefs(){
   try{ localStorage.setItem(PKEY, JSON.stringify(PREFS)); }catch(e){}
 }
 applyPrefs();
+/* hoogte van de kopbalk bijhouden, zodat de categoriebalk er netjes onder blijft staan */
+(function(){ const h = document.querySelector('.hdr'); const set = () => document.documentElement.style.setProperty('--hdrh', h.offsetHeight + 'px');
+  set(); if (window.ResizeObserver) new ResizeObserver(set).observe(h); window.addEventListener('resize', set); })();
 function openSheet(html, label){
   $('sheetroot').innerHTML = '<div class="sheetbg" data-act="closesheet"><div class="sheet" role="dialog" aria-modal="true" aria-label="' + esc(label) + '"><span class="grab" aria-hidden="true"></span>' + html + '</div></div>';
   const f = $('sheetroot').querySelector('button, [tabindex], label'); f && f.focus();
@@ -803,7 +806,14 @@ document.addEventListener('click', e => {
   else if (act === 'store'){ const k = b.dataset.k; S.off.has(k) ? S.off.delete(k) : S.off.add(k); S.k = null; }
   else if (act === 'oldreg'){ S.oldReg = !S.oldReg; ENG.setMask(keep); reanalyze(); S.k = null; }
   else if (act === 'k'){ S.k = +b.dataset.k; }
-  else if (act === 'cat'){ S.cat = b.dataset.k; S.show = 36; renderShop(); return; }
+  else if (act === 'cat'){
+    S.cat = b.dataset.k; S.show = 36; renderShop();
+    /* naar het begin van de lijst als je al naar beneden gescrold was */
+    const top = $('view-shop').querySelector('.shop').getBoundingClientRect().top + scrollY - document.querySelector('.hdr').offsetHeight - 60;
+    if (scrollY > top) window.scrollTo({top, behavior: 'smooth'});
+    const nb = $('catbar').querySelector('[aria-pressed="true"]'); nb && nb.scrollIntoView({inline: 'center', block: 'nearest'});
+    return;
+  }
   else if (act === 'morestores'){ S.moreStores = !S.moreStores; renderFilters(); return; }
   else if (act === 'unchip'){
     const k = b.dataset.k;

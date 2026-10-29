@@ -79,6 +79,8 @@ a{color:var(--cta)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .catbar button[aria-pressed="true"]{color:var(--cta)}}
 .notice-band{background:var(--warn-bg);color:var(--warn);font-size:.88rem}
 .notice-band .inner{padding-block:8px}
+.notice-band.upd{background:var(--good-bg);color:var(--good);font-size:.95rem}
+.notice-band.upd .inner{padding-block:12px}
 
 /* weergaven */
 .view{padding-block:22px 48px}
@@ -273,6 +275,33 @@ tr:last-child td{border-bottom:0}
 @media (min-width:860px){.foot .inner{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}}
 .foot p{font-size:.85rem;color:var(--muted);max-width:68ch}
 .fresh-table td,.fresh-table th{padding:5px 8px;font-size:.82rem}
+
+/* winkelmodus, delen, vaak gekocht */
+.line{grid-template-columns:auto 44px minmax(0,1fr)}
+.tick{width:34px;height:34px;border-radius:50%;border:2px solid var(--line);background:var(--surface);padding:0;align-self:center;display:grid;place-items:center;flex:none}
+.tick[aria-checked="true"]{background:var(--cta);border-color:var(--cta)}
+.tick[aria-checked="true"]::after{content:"";width:11px;height:6px;border:solid var(--cta-ink);border-width:0 0 3px 3px;transform:translateY(-2px) rotate(-45deg)}
+.line.done .pn,.line.done .pp{text-decoration:line-through;color:var(--muted)}
+.line.done .thumb{opacity:.5}
+.bon.alldone>header{border-bottom-color:var(--cta)}
+.bon.alldone>header h3::after{content:" ✓";color:var(--cta)}
+.bonshead{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.bonshead p{margin-top:2px}
+.bonsbtns{display:flex;gap:8px;flex-wrap:wrap}
+.bonsbtns .btn{padding:10px 14px;font-size:.9rem;min-height:44px}
+.bonsbtns svg{width:18px;height:18px}
+.often{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.addchip{cursor:pointer;color:var(--ink);padding:6px 12px;min-height:36px}
+.addchip:hover{border-color:var(--cta)}
+@media (max-width:999px){
+  /* op de telefoon: eerst je producten en het advies, daarna wat je waar haalt */
+  .basket .col:first-child{display:contents}
+  .basket .col:first-child>section:nth-of-type(1){order:1}
+  .basket .col:first-child>section:nth-of-type(2){order:3}
+  .basket .summary{order:2}
+  .basket #bons{order:4}
+}
+@media (max-width:720px){.tick{width:40px;height:40px}.line{gap:10px}}
 
 /* zoek-suggesties en assortiment */
 .qsugg{top:calc(100% + 6px);max-height:min(70vh,440px);color:var(--ink);z-index:22}

@@ -24,9 +24,9 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -48,7 +48,24 @@ jobs:
           git config user.name "slim-boodschappen-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/images.json data/img
-          git diff --cached --quiet || (git commit -m "Nieuwe productfoto's $(date +%F)" && git push)
+          if ! git diff --cached --quiet; then
+            git commit -m "Nieuwe productfoto's $(date +%F)"
+            for i in 1 2 3; do git pull --rebase -X theirs origin main && git push && break; sleep 5; done
+          fi
+
+      - name: Laatste prijzen van de website gebruiken (bij een wijziging in de app)
+        if: github.event_name == 'push'
+        run: |
+          OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          curl -fsSL "https://$OWNER.github.io/${GITHUB_REPOSITORY#*/}/data.b64" -o /tmp/site.b64 || exit 0
+          python3 - <<'PY'
+          import base64, gzip, json, shutil
+          def when(p):
+              try: return json.loads(gzip.decompress(base64.b64decode(open(p).read())))['promoFetched']
+              except Exception: return ''
+          if when('/tmp/site.b64') > when('data/data.b64'):
+              shutil.copy('/tmp/site.b64', 'data/data.b64'); print('prijzen van de website gebruikt')
+          PY
 
       - name: Website samenstellen
         run: |

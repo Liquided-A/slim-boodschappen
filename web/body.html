@@ -19,6 +19,7 @@
 <nav class="tabs" aria-label="Weergave"><div class="inner"><a href="#aanbiedingen" id="tab-shop">Aanbiedingen</a><a href="#folders" id="tab-folders">Folders</a><a href="#lijstje" id="tab-list">Mijn lijstje</a></div></nav>
 <nav class="catbar" aria-label="Categorieën"><div class="inner" id="catbar"></div></nav>
 <div class="notice-band" id="staleband" hidden><div class="inner" id="staletext"></div></div>
+<div class="notice-band upd" id="updband" hidden><div class="inner" id="updtext"></div></div>
 
 <main>
   <section class="view inner" id="view-shop" aria-labelledby="h-shop">
@@ -85,6 +86,7 @@
             </form>
             <div class="sugg" id="sugg" role="listbox" hidden></div>
           </div>
+          <div class="often" id="often" hidden></div>
           <div class="notice" id="demonote" hidden>Dit is een voorbeeldlijstje. Voeg je eigen producten toe of wis het.</div>
           <ul class="items" id="items"></ul>
         </section>
@@ -157,7 +159,7 @@ const NATIVE = window.SlimNative || null;
 function sheetUrl(n){ return CFG && CFG.remote && n >= (CFG.localSheets || 0) ? CFG.remote + 'img/s' + n + '.jpg' : 'img/s' + n + '.jpg'; }
 
 let ENG = null, STORES = [], CATS = [], DEALS = [], PFETCH = null, HASIMG = false;
-const S = {items:[], off:new Set(), k:null, pins:{}, an:{}, demo:true, nextId:1, oldReg:true,
+const S = {items:[], off:new Set(), k:null, pins:{}, an:{}, demo:true, nextId:1, oldReg:true, done:new Set(), hist:{},
   q:'', cat:'all', fstores:new Set(), fdisc:0, fmulti:false, fnow:false, fphoto:false, sort:'top', show:36, moreStores:false,
   sugg:[], suggSel:-1};
 
@@ -188,16 +190,22 @@ function imgHtml(ref, fallback){
 
 /* ---------- opslaan ---------- */
 function save(){
-  try{ localStorage.setItem(KEY, JSON.stringify({items:S.items.map(i => [i.q, i.qty]), off:[...S.off], demo:S.demo, oldReg:S.oldReg, v:2})); }catch(e){}
+  try{ localStorage.setItem(KEY, JSON.stringify({items:S.items.map(i => [i.q, i.qty]), off:[...S.off], demo:S.demo, oldReg:S.oldReg, v:2, done:[...S.done], hist:S.hist})); }catch(e){}
 }
 function load(){
   try{
     const raw = localStorage.getItem(KEY); if (!raw) return false;
     const d = JSON.parse(raw); if (!Array.isArray(d.items)) return false;
     S.items = d.items.map(([q, qty]) => ({id:S.nextId++, q:String(q), qty:Math.max(1, Math.min(99, +qty || 1))}));
-    S.off = new Set(Array.isArray(d.off) ? d.off : []); S.demo = !!d.demo; S.oldReg = d.v >= 2 ? !!d.oldReg : true; return true;
+    S.off = new Set(Array.isArray(d.off) ? d.off : []); S.demo = !!d.demo; S.oldReg = d.v >= 2 ? !!d.oldReg : true;
+    S.done = new Set(Array.isArray(d.done) ? d.done : []); S.hist = d.hist && typeof d.hist === 'object' ? d.hist : {}; return true;
   }catch(e){ return false; }
 }
+function remember(q){
+  const k = q.toLowerCase(); S.hist[k] = (S.hist[k] || 0) + 1;
+  const keys = Object.keys(S.hist); if (keys.length > 120){ keys.sort((a, b) => S.hist[a] - S.hist[b]).slice(0, keys.length - 120).forEach(x => delete S.hist[x]); }
+}
+const doneKey = it => it.q.toLowerCase();
 function useDemo(){ S.items = DEMO.map(([q, qty]) => ({id:S.nextId++, q, qty})); S.demo = true; }
 function enabledStores(){ return STORES.map((s, i) => i).filter(i => !S.off.has(STORES[i].k)); }
 function reanalyze(){ S.an = {}; S.pins = {}; S.items.forEach(it => { S.an[it.id] = ENG.analyze(it.q); }); }
@@ -357,7 +365,14 @@ function itemImg(i){
   const a = LAST.cur.assign.find(x => x[0] === i); if (!a) return -1;
   const cell = LAST.m[i][LAST.sel.indexOf(a[1])]; return cell ? imgRef(STORES[a[1]], cell.c.i) : -1;
 }
+function renderOften(){
+  const on = new Set(S.items.map(doneKey));
+  const list = Object.keys(S.hist).filter(k => !on.has(k)).sort((a, b) => S.hist[b] - S.hist[a]).slice(0, 10);
+  $('often').hidden = !list.length;
+  $('often').innerHTML = '<span class="small muted">Vaak gekocht:</span>' + list.map(k => '<button type="button" class="chip addchip" data-act="addoften" data-q="' + esc(k) + '">+ ' + esc(k) + '</button>').join('');
+}
 function renderItems(){
+  renderOften();
   $('demonote').hidden = !(S.demo && S.items.length);
   const sel = enabledStores();
   $('items').innerHTML = S.items.length ? S.items.map((it, idx) => {
@@ -390,9 +405,11 @@ function renderFresh(){
 }
 function noteFor(c, a, qty){
   const out = [];
-  if (c.mbq > 1 && c.usual && qty % c.mbq) out.push(qty < c.mbq ? 'De actie geldt bij ' + c.mbq + ' stuks. Bij ' + qty + ' betaal je de gewone prijs van ' + money(c.usual) + '.'
+  const packs = packsFor(qty, c.r);
+  if (c.mbq > 1 && c.usual && packs % c.mbq) out.push(packs < c.mbq ? 'De actie geldt bij ' + c.mbq + ' stuks. Bij ' + packs + ' betaal je de gewone prijs van ' + money(c.usual) + '.'
     : 'De actie geldt per ' + c.mbq + ' stuks. De rest betaal je tegen de gewone prijs.');
-  if (c.mode === 'scaled') out.push('Pak van ' + fmtQty(c.u, c.q) + ', omgerekend naar ' + fmtQty(a.kind, a.amount) + '.');
+  if (c.mode === 'scaled') out.push(c.r > 1 ? 'Je neemt ' + packs + ' pakken van ' + fmtQty(c.u, c.q) + ' (je vroeg ' + (qty > 1 ? qty + ' × ' : '') + fmtQty(a.kind, a.amount) + ').'
+    : 'Alleen een groter pak te koop: ' + fmtQty(c.u, c.q) + (packs > 1 ? ', ' + packs + ' pakken' : '') + ' (je vroeg ' + (qty > 1 ? qty + ' × ' : '') + fmtQty(a.kind, a.amount) + ').');
   if (c.mode === 'unknown') out.push('Formaat onbekend, prijs per verpakking.');
   if (c.mode === 'other') out.push('Ander formaat dan gevraagd.');
   return out.join(' ');
@@ -434,8 +451,9 @@ function renderBasket(){
       const opts = a.per[s].cands.map((x, j) => '<option value="' + j + '"' + (j === cell.j ? ' selected' : '') + '>' + esc(x.name) + (x.q ? ' · ' + fmtQty(x.u, x.q) : '') + ' · ' + money(x.price) + (x.usual ? ' (actie)' : '') + '</option>').join('');
       const nt = noteFor(c, a, it.qty), url = shopUrl(st, c.i);
       const deal = c.usual ? '<span class="tag sale">' + esc(c.label || ('−' + Math.round(100 * (1 - c.price / c.usual)) + '%')) + '</span>' + (c.until ? '<span class="small muted">t/m ' + esc(dayFmt.format(mmddToDate(c.until))) + '</span>' : '') : '';
-      return '<div class="line"><span class="thumb">' + imgHtml(imgRef(st, c.i), '') + '</span><div><div class="row"><span class="pn">' + (it.qty > 1 ? it.qty + ' × ' : '') + esc(c.name) +
-        (c.q ? ' <span class="muted">(' + esc(fmtQty(c.u, c.q)) + ')</span>' : '') + '</span><span class="pp">' + money(cell.price) + '</span></div>' +
+      const dn = S.done.has(doneKey(it));
+      return '<div class="line' + (dn ? ' done' : '') + '"><button type="button" class="tick" data-act="tick" data-id="' + it.id + '" role="checkbox" aria-checked="' + dn + '" aria-label="' + esc(it.q) + ' in mijn mandje"></button><span class="thumb">' + imgHtml(imgRef(st, c.i), '') + '</span><div><div class="row"><span class="pn">' + (packsFor(it.qty, c.r) > 1 ? packsFor(it.qty, c.r) + ' × ' : '') + esc(c.name) +
+        (c.q && !norm(c.name).includes(' ' + String(fmtQty(c.u, c.q)).split(' ')[0].replace(',', ' ')) ? ' <span class="muted">(' + esc(fmtQty(c.u, c.q)) + ')</span>' : '') + '</span><span class="pp">' + money(cell.price) + '</span></div>' +
         '<div class="meta">' + deal + '</div>' + (nt ? '<span class="note">' + esc(nt) + '</span>' : '') +
         '<div class="meta"><details class="swap"><summary>Ander product</summary><select data-act="pin" data-id="' + it.id + '" data-s="' + s + '" aria-label="Kies product voor ' + esc(it.q) + '">' + opts + '</select></details>' +
         (url ? '<a class="shoplink" href="' + esc(url) + '" target="_blank" rel="noopener">Bekijk ↗</a>' : '') + '</div></div></div>';
@@ -444,14 +462,18 @@ function renderBasket(){
     const nOff = (by[s] || []).filter(i => m[i][pos].mode !== 'exact').length;
     const warn = (nOff ? '<p class="bonnote">' + nOff + ' van ' + (by[s] || []).length + ' regels zijn omgerekend of hebben een onbekend formaat, dus dit totaal is een schatting.</p>' : '') +
       (usesOldPrices(s) ? '<p class="bonnote">Let op: de gewone prijzen van ' + esc(st.c) + ' zijn ' + esc(regLabel(st)) + '.</p>' : '');
-    return '<article class="bon"><header><h3>' + esc(st.c) + '</h3><span class="small muted">' + (by[s] || []).length + ' product' + ((by[s] || []).length === 1 ? '' : 'en') + '</span><span class="sub">' + money(sub) + '</span></header>' + rows + warn + '</article>';
+    const nb = (by[s] || []).length, nd = (by[s] || []).filter(i => S.done.has(doneKey(S.items[i]))).length;
+    return '<article class="bon' + (nb && nd === nb ? ' alldone' : '') + '"><header><h3>' + esc(st.c) + '</h3><span class="small muted">' + (nd ? nd + ' van ' + nb + ' in je mandje' : nb + ' product' + (nb === 1 ? '' : 'en')) + '</span><span class="sub">' + money(sub) + '</span></header>' + rows + warn + '</article>';
   }).join('');
   const head = '<tr><th>Product</th>' + sel.map(s => '<th class="' + (cur.combo.includes(s) ? 'on' : '') + '">' + esc(STORES[s].c) + '</th>').join('') + '</tr>';
   const body = S.items.map((it, i) => {
     const row = m[i], vals = row.filter(Boolean).map(x => x.price), mn = vals.length ? Math.min(...vals) : null;
     return '<tr><td>' + (it.qty > 1 ? it.qty + ' × ' : '') + esc(it.q) + '</td>' + row.map(x => x ? '<td class="' + (x.price === mn ? 'min' : '') + '" title="' + esc(x.c.name) + '">' + (x.mode !== 'exact' ? '~' : '') + money(x.price) + (x.c.usual ? ' •' : '') + '</td>' : '<td class="na">–</td>').join('') + '</tr>';
   }).join('');
-  bonsEl.innerHTML = '<div class="col"><h2>Wat haal je waar</h2><div class="bons">' + bons + '</div>' +
+  const anyDone = S.items.some(it => S.done.has(doneKey(it)));
+  bonsEl.innerHTML = '<div class="col"><div class="bonshead"><div><h2>Wat haal je waar</h2><p class="small muted">Tik in de winkel op het rondje om een product af te vinken.</p></div>' +
+    '<div class="bonsbtns"><button type="button" class="btn ghost" data-act="share">' + ICON_SHARE + 'Lijstje delen</button>' +
+    (anyDone ? '<button type="button" class="btn primary" data-act="finish">Klaar: afgevinkte weghalen</button>' : '') + '</div></div><div class="bons">' + bons + '</div>' +
     '<section class="panel"><header><h2>Alle prijzen naast elkaar</h2><span class="small muted">groen = goedkoopst · ~ = omgerekend · • = aanbieding</span></header>' +
     '<div class="tablewrap"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div></section></div>';
 }
@@ -508,6 +530,7 @@ const SCAN_ERR = {
    - 'claude': op de website binnen Claude, met het Claude-account van de kijker. */
 let SCANMODE = null, nativeToken = 0;
 const ICON_CAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+const ICON_SHARE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></svg>';
 const ICON_PIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>';
 function enableScan(mode){
   SCANMODE = mode; $('scan').hidden = false; $('bn-scan').hidden = false;
@@ -626,6 +649,56 @@ document.addEventListener('input', e => {
   if (t.dataset.act === 'scanqty') SCAN.rows[+t.dataset.k].qty = Math.max(1, Math.min(99, Math.round(+t.value || 1)));
 });
 
+/* ---------- lijstje delen ---------- */
+function listText(){
+  const L = LAST;
+  let out = 'Boodschappenlijstje\n';
+  if (L && L.cur){
+    const by = {}; L.cur.assign.forEach(([i, s]) => { (by[s] = by[s] || []).push(i); });
+    L.cur.combo.forEach(s => {
+      const pos = L.sel.indexOf(s), rows = by[s] || [];
+      const sub = rows.reduce((t, i) => t + L.m[i][pos].price, 0);
+      out += '\n' + STORES[s].c + ' (' + money(sub) + ')\n';
+      rows.forEach(i => { const it = S.items[i], c = L.m[i][pos].c, n = packsFor(it.qty, c.r); out += '- ' + (n > 1 ? n + ' × ' : '') + c.name + (c.usual ? ' (aanbieding)' : '') + '\n'; });
+    });
+    if (L.pl.missing.length) out += '\nNiet gevonden:\n' + L.pl.missing.map(i => '- ' + S.items[i].q).join('\n') + '\n';
+    out += '\nTotaal ongeveer ' + money(L.cur.total) + '\n';
+  } else out += S.items.map(it => '- ' + (it.qty > 1 ? it.qty + ' × ' : '') + it.q).join('\n') + '\n';
+  return out + '\nGemaakt met Slim Boodschappen';
+}
+async function copyText(t){
+  try{ await navigator.clipboard.writeText(t); toast('Lijstje gekopieerd. Plak het in een bericht.'); }
+  catch(e){ toast('Kopiëren lukte niet op dit apparaat.'); }
+}
+async function shareList(){
+  if (!S.items.length){ toast('Je lijstje is nog leeg.'); return; }
+  const t = listText();
+  if (NATIVE && NATIVE.share){ try{ NATIVE.share(t); return; }catch(e){} }
+  if (navigator.share){ try{ await navigator.share({text: t}); return; }catch(e){ if (e && e.name === 'AbortError') return; } }
+  openSheet('<h2>Lijstje delen</h2><p class="muted">Stuur je lijstje naar iemand die de boodschappen doet.</p>' +
+    '<a class="bigbtn" href="https://wa.me/?text=' + encodeURIComponent(t) + '" target="_blank" rel="noopener">' + ICON_SHARE + '<span>Via WhatsApp<small>Kies daarna naar wie</small></span></a>' +
+    '<button type="button" class="bigbtn" data-act="copylist">' + ICON_PIC.replace('<rect', '<rect') + '<span>Kopiëren<small>Plak het in een sms, mail of notitie</small></span></button>' +
+    '<button type="button" class="btn ghost" data-act="closesheet" style="justify-content:center">Sluiten</button>', 'Lijstje delen');
+}
+
+/* ---------- nieuwe versie van de Android-app ---------- */
+async function checkAppUpdate(){
+  if (!CFG || !CFG.repo || !CFG.version) return;
+  const UK = 'slim-update-check';
+  try{ const last = +localStorage.getItem(UK) || 0; if (Date.now() - last < 6 * 36e5) return; localStorage.setItem(UK, String(Date.now())); }catch(e){}
+  try{
+    const r = await fetch('https://api.github.com/repos/' + CFG.repo + '/releases/tags/app', {headers: {Accept: 'application/vnd.github+json'}});
+    if (!r.ok) return;
+    const rel = await r.json(), m = String(rel.body || '').match(/Versie\s+(\d+)\.(\d+)/);
+    if (!m) return;
+    const cur = String(CFG.version).split('.').map(Number);
+    if (+m[1] > cur[0] || (+m[1] === cur[0] && +m[2] > cur[1])){
+      $('updtext').innerHTML = 'Er is een nieuwe versie van de app (' + esc(m[1] + '.' + m[2]) + '). <a href="https://github.com/' + esc(CFG.repo) + '/releases/download/app/SlimBoodschappen.apk" style="color:inherit;font-weight:800">Tik hier om bij te werken</a>; je lijstje blijft bewaard.';
+      $('updband').hidden = false;
+    }
+  }catch(e){}
+}
+
 /* ---------- weergave wisselen ---------- */
 function route(){
   const v = location.hash === '#lijstje' ? 'list' : location.hash === '#folders' ? 'folders' : 'shop';
@@ -669,7 +742,7 @@ function addItem(q){
   if (!q || hasItem(q)) return false;
   S.demo = false;
   const it = {id:S.nextId++, q, qty:1};
-  S.items.push(it); S.an[it.id] = ENG.analyze(q); S.k = null;
+  S.items.push(it); S.an[it.id] = ENG.analyze(q); S.k = null; remember(q);
   save(); renderAll(); return true;
 }
 document.addEventListener('click', e => {
@@ -700,6 +773,19 @@ document.addEventListener('click', e => {
     else addItem(q);
     return;
   }
+  else if (act === 'tick'){
+    if (!it) return; const k = doneKey(it); S.done.has(k) ? S.done.delete(k) : S.done.add(k);
+    if (navigator.vibrate) try{ navigator.vibrate(12); }catch(err){}
+  }
+  else if (act === 'finish'){
+    const n = S.items.filter(x => S.done.has(doneKey(x))).length;
+    S.items.filter(x => S.done.has(doneKey(x))).forEach(x => { delete S.an[x.id]; delete S.pins[x.id]; });
+    S.items = S.items.filter(x => !S.done.has(doneKey(x))); S.done.clear(); S.demo = false; S.k = null;
+    toast(n + ' product' + (n === 1 ? '' : 'en') + ' afgestreept en van je lijstje gehaald');
+  }
+  else if (act === 'share'){ shareList(); return; }
+  else if (act === 'addoften'){ addItem(b.dataset.q); toast('"' + b.dataset.q + '" op je lijstje gezet'); return; }
+  else if (act === 'copylist'){ copyText(b.dataset.text || listText()); return; }
   else if (act === 'qpick'){
     const g = S.qs[+b.dataset.j]; if (!g) return;
     if (hasItem(g.q)){ toast('"' + g.q + '" staat al op je lijstje'); return; }
@@ -726,7 +812,7 @@ document.addEventListener('click', e => {
       const q = r.q.trim().replace(/\s+/g, ' ');
       const ex = S.items.find(y => y.q.toLowerCase() === q.toLowerCase());
       if (ex){ ex.qty = Math.min(99, ex.qty + r.qty); return; }
-      const it = {id:S.nextId++, q, qty:r.qty}; S.items.push(it); S.an[it.id] = ENG.analyze(q); added++;
+      const it = {id:S.nextId++, q, qty:r.qty}; S.items.push(it); S.an[it.id] = ENG.analyze(q); added++; remember(q);
     });
     S.demo = false; S.k = null; SCAN = null;
     const total = SCAN_N; $('scanout').innerHTML = '<div class="scandone"><span>' + total + ' product' + (total === 1 ? '' : 'en') + ' op je lijstje gezet.</span><a class="btn primary" href="#lijstje">Bekijk waar het goedkoopst is</a></div>';
@@ -832,6 +918,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('sheetro
     if (!load() || !S.items.length){ useDemo(); S.off = new Set(STORES.filter(s => !DEFAULT_ON.has(s.k)).map(s => s.k)); }
     applyData(D);
     refreshRemote();
+    checkAppUpdate();
     document.addEventListener('visibilitychange', () => { if (!document.hidden && (Date.now() - PFETCH) / 36e5 > 20) refreshRemote(); });
   }catch(err){
     $('grid').innerHTML = '<div class="warnbox">De prijzen konden niet worden geladen in deze browser. Probeer een recente versie van Chrome, Safari of Firefox.</div>';

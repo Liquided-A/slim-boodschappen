@@ -154,6 +154,24 @@ public class MainActivity extends Activity {
         public void scan(final String mode, final int token) {
             runOnUiThread(() -> startScan(mode, token));
         }
+
+        /** Lijstje delen via WhatsApp, sms, mail enz. */
+        @JavascriptInterface
+        public void share(final String text) {
+            runOnUiThread(() -> {
+                Intent i = new Intent(Intent.ACTION_SEND);
+                i.setType("text/plain");
+                i.putExtra(Intent.EXTRA_TEXT, text);
+                Intent chooser = Intent.createChooser(i, "Lijstje delen");
+                // de app zelf niet als keuze tonen
+                chooser.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, new android.content.ComponentName[]{
+                        new android.content.ComponentName(MainActivity.this, MainActivity.class)});
+                try {
+                    startActivity(chooser);
+                } catch (ActivityNotFoundException ignored) {
+                }
+            });
+        }
     }
 
     private void startScan(String mode, int token) {

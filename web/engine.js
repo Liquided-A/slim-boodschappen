@@ -5,7 +5,7 @@ const UNIT = {kg:['g',1000],kilo:['g',1000],kilogram:['g',1000],g:['g',1],gr:['g
 const KIND = {g:1,m:2,s:3};
 const KIND_LABEL = {1:'g',2:'ml',3:'st'};
 const UNITWORDS = new Set(['g','gr','gram','kg','kilo','ml','cl','dl','l','liter','stuks','stuk','st','per','x','pak','pakje','fles','blik','doos','zak','tray']);
-const PENALTY = new Set(['saus','mix','choco','chocolade','maaltijd','pizza','snack','smaak','drink','shake','vla','cholesterol','lactosevrij','glutenvrij','bio','biologisch','vegan','vegetarisch','light','zero','kant','klaar']);
+const PENALTY = new Set(['gesuikerde','gedroogde','gedroogd','gekonfijte','gepofte','snoep','chips','reep','koek','koekjes','ijs','siroop','yoghurtdrank','saus','mix','choco','chocolade','maaltijd','pizza','snack','smaak','drink','shake','vla','cholesterol','lactosevrij','glutenvrij','bio','biologisch','vegan','vegetarisch','light','zero','kant','klaar']);
 const HOUSE = new Set(['ah','jumbo','plus','dirk','deka','dekamarkt','dekavers','hoogvliet','spar','lidl','poiesz','vomar','woon','beste','de','zuivelmeester','melkan','budget','huismerk','pcd','kwetters','vleeschmeesters','daily','chef','basic','bakkershart','soma','van','den']);
 const STOP = new Set(['van','de','het','een','met','en','of','voor']);
 /* samenstellingen die wél hetzelfde product zijn: roomboter = boter, scharreleieren = eieren */
@@ -146,13 +146,14 @@ class Engine {
       /* 2. formaat: rekent af naar gewenste hoeveelheid waar dat kan */
       const make = x => {
         const i = x.i, u = st.u[i], q = st.q[i], price = st.p[i];
-        let eff = price, mode = 'other';
+        let eff = price, mode = 'other', r = 1;
         if (!kind) mode = 'exact';
         else if (u === kind && q > 0){
           if (Math.abs(q - amount) / amount <= tol) mode = 'exact';
-          else { const r = amount / q; if (r >= 0.25 && r <= 4){ eff = Math.round(price * r); mode = 'scaled'; } }
+          else { const rr = amount / q; if (rr >= 0.25 && rr <= 4){ r = rr; mode = 'scaled'; eff = price * packsFor(1, r); } }
         } else if (u === 0) mode = 'unknown';
-        const c = {i, name: st.n[i], price, eff, q, u, mode, score: x.score, usual: 0, mbq: 0, mbp: 0, label: '', until: ''};
+        /* je koopt hele pakken: kleiner pak = meer pakken, groter pak = je betaalt het hele pak */
+        const c = {i, name: st.n[i], price, eff, r, q, u, mode, score: x.score, usual: 0, mbq: 0, mbp: 0, label: '', until: ''};
         if (i >= st.r){
           const j = i - st.r;
           c.usual = st.po[j]; c.mbq = st.pm[j]; c.mbp = st.pp[j]; c.label = st.pl[j]; c.until = st.pv[j];
@@ -248,14 +249,15 @@ function priceMatrix(items, analyses, pins, storeIdxs){
 }
 
 /* echte kosten voor n stuks: meerstuksacties gelden alleen per volle bundel, de rest tegen de normale prijs */
+function packsFor(n, r){ return Math.max(1, Math.ceil(n * (r || 1) - 0.05)); }
 function lineCost(c, n){
-  const scale = c.price ? c.eff / c.price : 1;
+  const packs = packsFor(n, c.r);
   let cents;
   if (c.mbq > 1 && c.mbp && c.usual){
-    const bundles = Math.floor(n / c.mbq), rest = n % c.mbq;
+    const bundles = Math.floor(packs / c.mbq), rest = packs % c.mbq;
     cents = bundles * c.mbp + rest * c.usual;
-  } else cents = n * c.price;
-  return Math.round(cents * scale);
+  } else cents = packs * c.price;
+  return Math.round(cents);
 }
 function combos(arr, k){
   const out = [];

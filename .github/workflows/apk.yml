@@ -37,7 +37,7 @@ jobs:
           curl -fsSL "${SITE}data.b64" -o /tmp/data.b64 || cp data/data.b64 /tmp/data.b64
           N=$(ls data/img/s*.jpg | wc -l)
           FULL=$(( N > 0 ? N - 1 : 0 ))   # het laatste fotoblad kan nog groeien, dat komt van de website
-          echo "{\"remote\":\"$SITE\",\"localSheets\":$FULL,\"version\":\"1.$GITHUB_RUN_NUMBER\"}" > /tmp/cfg.json
+          echo "{\"remote\":\"$SITE\",\"localSheets\":$FULL,\"version\":\"1.$GITHUB_RUN_NUMBER\",\"repo\":\"$GITHUB_REPOSITORY\"}" > /tmp/cfg.json
           mkdir -p android/app/src/main/assets/www/img
           python3 -I web/assemble.py --wrap web/style.html web/body.html web/engine.js /tmp/data.b64 android/app/src/main/assets/www/index.html /tmp/cfg.json
           cp data/img/s*.jpg android/app/src/main/assets/www/img/

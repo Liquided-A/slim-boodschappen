@@ -690,7 +690,7 @@ function renderBasket(){
     const warn = (nOff ? '<p class="bonnote">' + nOff + ' van ' + (by[s] || []).length + ' regels zijn omgerekend of hebben een onbekend formaat, dus dit totaal is een schatting.</p>' : '') +
       (usesOldPrices(s) ? '<p class="bonnote">Let op: de gewone prijzen van ' + esc(st.c) + ' zijn ' + esc(regLabel(st)) + '.</p>' : '');
     const nb = (by[s] || []).length, nd = (by[s] || []).filter(i => S.done.has(doneKey(S.items[i]))).length;
-    return '<article class="bon' + (nb && nd === nb ? ' alldone' : '') + '"><header><h3>' + esc(st.c) + '</h3><span class="small muted">' + (nd ? nd + ' van ' + nb + ' in je mandje' : nb + ' product' + (nb === 1 ? '' : 'en')) + '</span><span class="sub">' + money(sub) + '</span></header>' + rows + warn + '</article>';
+    return '<article class="bon' + (nb && nd === nb ? ' alldone' : '') + '"><header><h3>' + esc(st.c) + '</h3><span class="small muted">' + (nd ? nd + ' van ' + nb + ' in je mandje · nog ' + money((by[s] || []).filter(i => !S.done.has(doneKey(S.items[i]))).reduce((t, i) => t + m[i][pos].price, 0)) : nb + ' product' + (nb === 1 ? '' : 'en')) + '</span><span class="sub">' + money(sub) + '</span></header>' + rows + warn + '</article>';
   }).join('');
   const head = '<tr><th>Product</th>' + sel.map(s => '<th class="' + (cur.combo.includes(s) ? 'on' : '') + '">' + esc(STORES[s].c) + '</th>').join('') + '</tr>';
   const body = S.items.map((it, i) => {

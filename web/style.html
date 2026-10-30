@@ -149,7 +149,7 @@ a{color:var(--cta)}
 
 /* lijstje (mandje) */
 .basket{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;align-items:start}
-@media (min-width:1000px){.basket{grid-template-columns:minmax(0,1fr) 360px}}
+
 .col{display:flex;flex-direction:column;gap:18px;min-width:0}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .panel>header{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
@@ -220,7 +220,9 @@ details.storebox[open] summary::after{content:"Sluiten"}
 .optrow{display:flex;gap:10px;align-items:center;justify-content:space-between;padding-top:10px;margin-top:6px;border-top:1px solid var(--line)}
 
 .summary{position:relative}
-@media (min-width:1000px){.summary{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--hdr) + 60px)}}
+.summary{margin-bottom:18px}
+@media (min-width:860px){.sumcard.has{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);column-gap:28px;align-items:start}.sumcard.has>.sleft{display:flex;flex-direction:column;gap:12px}.sumcard.has>.sright{display:flex;flex-direction:column;gap:12px}}
+.sleft,.sright{display:flex;flex-direction:column;gap:12px}
 .sumcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow)}
 .sumcard .total{font-size:2.2rem;font-weight:800;line-height:1;letter-spacing:-.02em}
 .sumcard .where{font-weight:600}
@@ -356,15 +358,6 @@ details.quick[open] summary::after{content:"Sluiten"}
 .often{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .addchip{cursor:pointer;color:var(--ink);padding:6px 12px;min-height:36px}
 .addchip:hover{border-color:var(--cta)}
-@media (max-width:999px){
-  /* op de telefoon: eerst je producten en het advies, daarna wat je waar haalt */
-  .basket .col:first-child{display:contents}
-  .basket .col:first-child>section:nth-of-type(1){order:1}
-  .basket .col:first-child>section:nth-of-type(2){order:3}
-  .basket .col:first-child>section:nth-of-type(3){order:5}
-  .basket .summary{order:2}
-  .basket #bons{order:4}
-}
 @media (max-width:720px){.tick{width:40px;height:40px}.line{gap:10px}}
 
 /* zoek-suggesties en assortiment */
@@ -450,4 +443,23 @@ details.quick[open] summary::after{content:"Sluiten"}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:11px 16px;border-radius:12px;font-weight:600;font-size:.9rem;z-index:45;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
 @media (min-width:721px){.toast{bottom:24px}}
 .toastbtn{margin-left:10px;border:0;background:var(--cta);color:var(--cta-ink);border-radius:8px;padding:6px 10px;font-weight:800}
+/* startpagina: pakkende kop */
+.hero{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:var(--brand-ink);border-radius:20px;padding:26px 22px;display:grid;gap:20px;margin-bottom:18px;box-shadow:var(--shadow)}
+@media (min-width:860px){.hero{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);align-items:center;padding:34px 36px}}
+.hero h1{font-size:clamp(1.55rem,4.6vw,2.3rem);line-height:1.12;letter-spacing:-.02em;margin:0 0 10px;text-wrap:balance}
+.hero p{margin:0 0 18px;opacity:.92;max-width:52ch;font-size:1.02rem}
+.herobtns{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.herocta{background:#fff;color:var(--brand);font-size:1.1rem;min-height:56px;padding:0 24px;box-shadow:0 6px 18px rgba(0,0,0,.2);justify-content:center}
+.herocta svg{width:22px;height:22px}
+.herolink{background:none;border:1px solid rgba(255,255,255,.55);color:var(--brand-ink);border-radius:10px;padding:0 16px;min-height:56px;font-weight:700;font-size:1rem}
+.herosteps{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.herosteps li{display:flex;gap:12px;align-items:center;background:rgba(255,255,255,.13);border-radius:12px;padding:10px 14px;font-weight:600}
+.herosteps b{flex:none;width:30px;height:30px;border-radius:50%;background:#fff;color:var(--brand);display:grid;place-items:center}
+@media (max-width:720px){.herosteps{display:none}.herocta{flex:1 1 100%}.herolink{flex:1 1 100%}}
+.h1like{font-size:1.35rem;margin:0}
+.scan{padding:10px 14px;gap:10px}
+.scanicon{width:34px;height:34px;border-radius:10px}.scanicon svg{width:19px;height:19px}
+.scanintro h2{font-size:.98rem;margin:0}
+.scanbtns .btn{padding:8px 14px;font-size:.92rem}
 </style>
+

@@ -554,7 +554,7 @@ function compute(){
   const sel = enabledStores();
   if (!S.items.length || !sel.length) return LAST = {sel, empty: true};
   const m = priceMatrix(S.items, S.an, S.pins, sel);
-  const pl = plan(m, sel, 4), adv = advise(pl.result, 200);
+  const pl = plan(m, sel, 4), adv = advise(pl.result, Math.round(parseFloat(PREFS.gain || '2') * 100));
   if (adv < 0 || !pl.found.length) return LAST = {sel, m, pl, none: true};
   let ci = S.k ? S.k - 1 : adv; if (!pl.result[ci]) ci = adv;
   return LAST = {sel, m, pl, adv, ci, cur: pl.result[ci], baseIdx: pl.result.findIndex(r => r)};
@@ -660,7 +660,7 @@ function renderBasket(){
     (nDeals ? '<div class="small muted">' + nDeals + ' product' + (nDeals === 1 ? ' is' : 'en zijn') + ' deze week in de aanbieding.</div>' : '') +
     '<div role="radiogroup" aria-label="Aantal winkels" class="kopts">' + opts + '</div>' +
     (S.saved && S.saved.c > 0 ? '<div class="savedbox">🎉 Dit jaar bespaard met aanbiedingen: <b>' + money(S.saved.c) + '</b></div>' : '') +
-    '<p class="hint">Het advies stopt waar een extra winkel minder dan € 2,00 oplevert.' + (baseIdx > 0 ? ' Geen enkele winkel heeft alles, daarom begint de vergelijking bij ' + (baseIdx + 1) + ' winkels.' : '') + '</p>' +
+    '<p class="hint">Het advies stopt waar een extra winkel minder dan ' + money(Math.round(parseFloat(PREFS.gain || '2') * 100)) + ' oplevert. Dit stel je in bij Instellingen.' + (baseIdx > 0 ? ' Geen enkele winkel heeft alles, daarom begint de vergelijking bij ' + (baseIdx + 1) + ' winkels.' : '') + '</p>' +
     (pl.missing.length ? '<div class="warnbox">Niet gevonden en niet meegeteld: ' + pl.missing.map(i => esc(S.items[i].q)).join(', ') + '.</div>' : '') + '</div>';
 
   const by = {};
@@ -993,7 +993,7 @@ function route(){
 
 /* ---------- instellingen: tekstgrootte en thema ---------- */
 const PKEY = 'slim-prefs';
-const PREFS = {size:'normaal', theme:'auto'};
+const PREFS = {size:'normaal', theme:'auto', gain:'2'};
 try{ Object.assign(PREFS, JSON.parse(localStorage.getItem(PKEY) || '{}')); }catch(e){}
 function applyPrefs(){
   const r = document.documentElement;
@@ -1015,6 +1015,7 @@ function settingsHtml(){
   return '<h2>Instellingen</h2>' +
     '<div class="setrow"><h3>Tekstgrootte</h3>' + seg('size', [['normaal', 'Normaal', 's1'], ['groot', 'Groot', 's2'], ['extra', 'Extra groot', 's3']]) + '</div>' +
     '<div class="setrow"><h3>Weergave</h3>' + seg('theme', [['auto', 'Automatisch'], ['light', 'Licht'], ['dark', 'Donker']]) + '</div>' +
+    '<div class="setrow"><h3>Extra winkel loont vanaf</h3><p class="small muted" style="margin:0 0 6px">Ver rijden of lopen? Kies een hoger bedrag, dan adviseert de app minder winkels.</p>' + seg('gain', [['1', '€ 1'], ['2', '€ 2'], ['3', '€ 3'], ['5', '€ 5']]) + '</div>' +
     '<div class="setrow"><h3>Winkels</h3><a class="bigbtn" href="#lijstje" data-act="gostores"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9M4 9v11h16V9M3 9h18M9 20v-6h6v6"/></svg><span>Kies je supermarkten<small>Alleen die winkels worden vergeleken</small></span></a></div>' +
     '<p class="small muted">Prijzen opgehaald op ' + (PFETCH ? esc(dayFmt.format(PFETCH)) : '…') + '. ' + (CFG ? 'De app haalt elke dag zelf de nieuwe aanbiedingen op.' : '') + (CFG && CFG.version ? ' Versie ' + esc(CFG.version) + '.' : '') + '</p>' +
     '<button type="button" class="btn primary" data-act="closesheet" style="justify-content:center">Klaar</button>';
@@ -1150,7 +1151,7 @@ document.addEventListener('click', e => {
   else if (act === 'qsearch'){ closeQSugg(); $('q').blur(); return; }
   else if (act === 'closesheet'){ if (b.classList.contains('sheetbg') && e.target !== b) return; closeSheet(); return; }
   else if (act === 'settings'){ openSheet(settingsHtml(), 'Instellingen'); return; }
-  else if (act === 'pref'){ PREFS[b.dataset.key] = b.dataset.v; applyPrefs(); openSheet(settingsHtml(), 'Instellingen'); return; }
+  else if (act === 'pref'){ PREFS[b.dataset.key] = b.dataset.v; applyPrefs(); if (b.dataset.key === 'gain'){ S.k = null; renderList(); } openSheet(settingsHtml(), 'Instellingen'); return; }
   else if (act === 'gostores'){ closeSheet(); setTimeout(() => { $('storebox').open = true; $('storebox').scrollIntoView({block:'start'}); }, 80); return; }
   else if (act === 'scanmenu'){ scanMenu(); return; }
   else if (act === 'voice'){

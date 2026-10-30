@@ -88,6 +88,7 @@
             <div class="sugg" id="sugg" role="listbox" hidden></div>
           </div>
           <div class="often" id="often" hidden></div>
+          <div class="often tpls" id="tpls"></div>
           <details class="quick" id="quick"><summary>Snel kiezen met plaatjes</summary><div class="qgrid" id="qgrid"></div></details>
           <div class="notice" id="demonote" hidden>Dit is een voorbeeldlijstje. Voeg je eigen producten toe of wis het.</div>
           <ul class="items" id="items"></ul>
@@ -164,7 +165,7 @@ function sheetUrl(n){ return CFG && CFG.remote && n >= (CFG.localSheets || 0) ? 
 let ENG = null, STORES = [], CATS = [], DEALS = [], PFETCH = null, HASIMG = false;
 const S = {items:[], off:new Set(), k:null, pins:{}, an:{}, demo:true, nextId:1, oldReg:true, done:new Set(), hist:{},
   q:'', cat:'all', fstores:new Set(), fdisc:0, fmulti:false, fnow:false, fphoto:false, sort:'top', show:36, moreStores:false,
-  sugg:[], suggSel:-1};
+  sugg:[], suggSel:-1, tpl:[]};
 
 function mmddToDate(mmdd, start){
   if (!mmdd) return null;
@@ -261,7 +262,7 @@ document.addEventListener('error', e => {
 
 /* ---------- opslaan ---------- */
 function save(){
-  try{ localStorage.setItem(KEY, JSON.stringify({items:S.items.map(i => [i.q, i.qty]), off:[...S.off], demo:S.demo, oldReg:S.oldReg, v:2, done:[...S.done], hist:S.hist, saved:S.saved, onb:S.onb, persons:S.persons})); }catch(e){}
+  try{ localStorage.setItem(KEY, JSON.stringify({items:S.items.map(i => [i.q, i.qty]), off:[...S.off], demo:S.demo, oldReg:S.oldReg, v:2, done:[...S.done], hist:S.hist, saved:S.saved, onb:S.onb, persons:S.persons, tpl:S.tpl})); }catch(e){}
 }
 function load(){
   try{
@@ -270,7 +271,7 @@ function load(){
     S.items = d.items.map(([q, qty]) => ({id:S.nextId++, q:String(q), qty:Math.max(1, Math.min(99, +qty || 1))}));
     S.off = new Set(Array.isArray(d.off) ? d.off : []); S.demo = !!d.demo; S.oldReg = d.v >= 2 ? !!d.oldReg : true;
     S.done = new Set(Array.isArray(d.done) ? d.done : []); S.hist = d.hist && typeof d.hist === 'object' ? d.hist : {};
-    S.saved = d.saved || null; S.onb = d.onb !== false; S.persons = Math.max(1, Math.min(12, +d.persons || 4)); return true;
+    S.saved = d.saved || null; S.onb = d.onb !== false; S.persons = Math.max(1, Math.min(12, +d.persons || 4)); S.tpl = Array.isArray(d.tpl) ? d.tpl.filter(t => t && t.n && Array.isArray(t.i)).slice(0, 12) : []; return true;
   }catch(e){ return false; }
 }
 function remember(q){
@@ -591,8 +592,12 @@ function renderOften(){
   $('often').hidden = !list.length;
   $('often').innerHTML = '<span class="small muted">Vaak gekocht:</span>' + list.map(k => '<button type="button" class="chip addchip" data-act="addoften" data-q="' + esc(k) + '">+ ' + esc(k) + '</button>').join('');
 }
+function renderTpls(){
+  $('tpls').innerHTML = '<span class="small muted">Vaste lijstjes:</span>' + S.tpl.map((t, k) => '<span class="tplchip"><button type="button" class="chip addchip" data-act="tpladd" data-k="' + k + '">+ ' + esc(t.n) + ' (' + t.i.length + ')</button><button type="button" class="tplx" data-act="tplrm" data-k="' + k + '" aria-label="Verwijder lijstje ' + esc(t.n) + '">×</button></span>').join('') +
+    (S.items.length && !S.demo ? '<button type="button" class="chip" data-act="tplsave">💾 Bewaar dit lijstje</button>' : (S.tpl.length ? '' : '<span class="small muted">Bewaar een lijstje dat je vaak nodig hebt, bijvoorbeeld de weekboodschappen.</span>'));
+}
 function renderItems(){
-  renderOften(); renderQuick();
+  renderOften(); renderQuick(); renderTpls();
   $('demonote').hidden = !(S.demo && S.items.length);
   const sel = enabledStores();
   $('items').innerHTML = S.items.length ? S.items.map((it, idx) => {
@@ -1141,6 +1146,12 @@ document.addEventListener('click', e => {
     toast(n + ' product' + (n === 1 ? '' : 'en') + ' afgestreept.' + (saved > 0 ? ' Je bespaarde ' + money(saved) + ' met aanbiedingen; dit jaar al ' + money(S.saved.c) + '.' : ''));
   }
   else if (act === 'share'){ shareList(); return; }
+  else if (act === 'tplsave'){
+    openSheet('<h2>Lijstje bewaren</h2><p class="muted">Geef dit lijstje een naam. Je zet het later in één tik weer op je lijstje.</p><form data-tplform><input id="tplname" class="tplin" type="text" maxlength="30" placeholder="Bijvoorbeeld: Weekboodschappen" autocomplete="off" aria-label="Naam van het lijstje"><button type="submit" class="btn primary" style="justify-content:center;min-height:52px;margin-top:10px;width:100%">Bewaren</button></form>', 'Lijstje bewaren');
+    setTimeout(() => { const i = $('tplname'); i && i.focus(); }, 60); return;
+  }
+  else if (act === 'tpladd'){ const t = S.tpl[+b.dataset.k]; if (!t) return; if (S.demo){ S.items = []; S.an = {}; S.pins = {}; S.demo = false; } t.i.forEach(([q, n]) => { if (!hasItem(q)){ addItem(q); const it = S.items[S.items.length - 1]; if (it && it.q === q) it.qty = n; } }); save(); renderAll(); toast(t.n + ' op je lijstje gezet'); return; }
+  else if (act === 'tplrm'){ const k = +b.dataset.k, t = S.tpl[k]; if (!t) return; S.tpl.splice(k, 1); save(); renderTpls(); toast('Lijstje "' + t.n + '" verwijderd', 'Ongedaan maken', () => { S.tpl.splice(k, 0, t); save(); renderTpls(); }); return; }
   else if (act === 'addoften'){ addItem(b.dataset.q); toast('"' + b.dataset.q + '" op je lijstje gezet'); return; }
   else if (act === 'copylist'){ copyText(b.dataset.text || listText()); return; }
   else if (act === 'qpick'){
@@ -1206,6 +1217,12 @@ $('q').addEventListener('keydown', e => {
   if (e.key === 'ArrowDown'){ e.preventDefault(); S.qsSel = (S.qsSel + 1) % S.qs.length; renderQSugg(); }
   else if (e.key === 'ArrowUp'){ e.preventDefault(); S.qsSel = (S.qsSel - 1 + S.qs.length) % S.qs.length; renderQSugg(); }
   else if (e.key === 'Escape') closeQSugg();
+});
+document.addEventListener('submit', e => {
+  if (!e.target.matches('[data-tplform]')) return; e.preventDefault();
+  const n = ($('tplname').value || '').trim().slice(0, 30); if (!n) return;
+  S.tpl = S.tpl.filter(t => t.n.toLowerCase() !== n.toLowerCase()); S.tpl.unshift({n, i:S.items.map(i => [i.q, i.qty])}); S.tpl = S.tpl.slice(0, 12);
+  save(); closeSheet(); renderTpls(); toast('Lijstje "' + n + '" bewaard');
 });
 $('searchform').addEventListener('submit', e => {
   e.preventDefault();

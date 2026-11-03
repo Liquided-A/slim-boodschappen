@@ -151,7 +151,7 @@ class Engine {
         if (!kind) mode = 'exact';
         else if (u === kind && q > 0){
           if (Math.abs(q - amount) / amount <= tol) mode = 'exact';
-          else { const rr = amount / q; if (rr >= 0.25 && rr <= 4){ r = rr; mode = 'scaled'; eff = price * packsFor(1, r); } }
+          else { const rr = amount / q; if (rr >= 0.05 && rr <= 20){ r = rr; mode = 'scaled'; eff = price * packsFor(1, r); } }
         } else if (u === 0) mode = 'unknown';
         /* je koopt hele pakken: kleiner pak = meer pakken, groter pak = je betaalt het hele pak */
         const c = {i, name: st.n[i], price, eff, r, q, u, mode, score: x.score, usual: 0, mbq: 0, mbp: 0, label: '', until: ''};
@@ -226,27 +226,48 @@ function cleanName(name){
     .slice(0, 5).join(' ');
 }
 
+/* exact of omgerekend naar de gevraagde hoeveelheid: alleen die prijzen zijn eerlijk te vergelijken */
+const comparable = x => !!x && (x.mode === 'exact' || x.mode === 'scaled');
+
 /* uitkomst voor een gekozen set winkels */
 function priceMatrix(items, analyses, pins, storeIdxs){
   return items.map(it => {
-    const a = analyses[it.id];
-    return storeIdxs.map(s => {
-      const e = a && a.per[s]; if (!e) return null;
-      const pinned = pins[it.id] && pins[it.id][s];
-      let j;
-      if (pinned !== undefined) j = Math.min(pinned, e.cands.length-1);
-      else {
-        /* kies binnen de best passende producten het product dat voor dit aantal echt het goedkoopst is */
-        const top = e.cands[0]; j = 0; let best = lineCost(top, it.qty);
-        e.cands.forEach((c, k) => {
-          if (k === 0 || c.mode !== top.mode || c.score > top.score + 0.5) return;
-          const v = lineCost(c, it.qty); if (v < best){ best = v; j = k; }
-        });
-      }
-      const c = e.cands[j];
-      return {price: lineCost(c, it.qty), c, mode: c.mode, j};
-    });
+    const row = priceRow(it, analyses[it.id], pins, storeIdxs);
+    /* zodra een andere winkel een vergelijkbaar product heeft, tellen niet mee: een ander soort product
+       (per stuk in plaats van per kilo, of veel te klein/groot) en een product met onbekend formaat dat ook
+       slechter bij de zoekterm past (bananenbrood bij "bananen"); zelf gekozen producten blijven staan */
+    const cmp = row.filter(comparable);
+    if (!cmp.length) return row;
+    const best = Math.min(...cmp.map(x => x.c.score));
+    return row.map(x => !x || x.pinned || comparable(x) || (x.mode === 'unknown' && x.c.score <= best + 1) ? x : null);
   });
+}
+function priceRow(it, a, pins, storeIdxs){
+  return storeIdxs.map(s => {
+    const e = a && a.per[s]; if (!e) return null;
+    const pinned = pins[it.id] && pins[it.id][s];
+    let j;
+    if (pinned !== undefined) j = Math.min(pinned, e.cands.length-1);
+    else {
+      /* kies binnen de best passende producten het product dat voor dit aantal echt het goedkoopst is */
+      const top = e.cands[0]; j = 0; let best = lineCost(top, it.qty);
+      e.cands.forEach((c, k) => {
+        if (k === 0 || c.mode !== top.mode || c.score > top.score + 0.5) return;
+        const v = lineCost(c, it.qty); if (v < best){ best = v; j = k; }
+      });
+    }
+    const c = e.cands[j];
+    return {price: lineCost(c, it.qty), c, mode: c.mode, j, pinned: pinned !== undefined};
+  });
+}
+
+/* prijs per kilo, liter of stuk; bij een meerstuksactie de actieprijs per stuk */
+function perUnit(c){
+  if (!c.u || !c.q) return null;
+  const each = c.mbq > 1 && c.mbp ? c.mbp / c.mbq : c.price;
+  if (c.u === 1) return {cents: Math.round(each * 1000 / c.q), per: 'kg'};
+  if (c.u === 2) return {cents: Math.round(each * 1000 / c.q), per: 'l'};
+  return {cents: Math.round(each / c.q), per: 'st'};
 }
 
 /* echte kosten voor n stuks: meerstuksacties gelden alleen per volle bundel, de rest tegen de normale prijs */
@@ -257,6 +278,9 @@ function lineCost(c, n){
   if (c.mbq > 1 && c.mbp && c.usual){
     const bundles = Math.floor(packs / c.mbq), rest = packs % c.mbq;
     cents = bundles * c.mbp + rest * c.usual;
+  } else if (c.mbq > 1 && c.mbp){
+    /* losse prijs onbekend: reken met hele bundels, dan is het totaal nooit te laag */
+    cents = Math.ceil(packs / c.mbq) * c.mbp;
   } else cents = packs * c.price;
   return Math.round(cents);
 }

@@ -40,6 +40,10 @@ jobs:
           python3 -I kit/fetch_promos.py /tmp/promos.json
           timeout 25m python3 -I kit/fetch_images.py /tmp/promos.json data/images.json data/img 1500 || echo "foto's deels overgeslagen"
           python3 -I kit/compact.py /tmp/cjb/data/supermarkets.json /tmp/promos.json /tmp/fresh.json /tmp/data.b64 data/images.json data/fotolinks.json
+          # vergelijken met wat nu op de website staat; bij een half mislukte import stopt de run hier
+          OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          curl -fsSL "https://$OWNER.github.io/${GITHUB_REPOSITORY#*/}/data.b64" -o /tmp/site.b64 || cp data/data.b64 /tmp/site.b64
+          python3 -I kit/check.py /tmp/data.b64 /tmp/site.b64
           cp /tmp/data.b64 data/data.b64
 
       - name: Nieuwe foto's bewaren

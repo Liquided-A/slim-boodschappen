@@ -3,7 +3,7 @@ Gebruik: python3 -I compact.py supermarkets.json promos.json fresh.json uit.b64 
 fotolinks.json onthoudt de productfoto's van de supermarkten (per winkel en productnummer). Elke dag komen er
 nieuwe bij uit de aanbiedingen, zodat steeds meer producten uit het gewone assortiment ook een foto krijgen.
 """
-import json, re, gzip, base64, sys, os
+import json, re, gzip, base64, sys, os, datetime
 
 src, promof, freshf, out = sys.argv[1:5]
 TILES = json.load(open(sys.argv[5]))['tiles'] if len(sys.argv) > 5 else {}
@@ -59,7 +59,7 @@ def parse_one(txt):
 def parse(size, name):
     r = parse_one(size) if size else None
     if r is None:
-        m = re.search(num+r'\s*(kg|g|gr|gram|ml|cl|l|liter)\b\s*$', name.lower())
+        m = re.search(num+r'\s*(kg|g|gr|gram|ml|cl|l|liter|st|stuks)\b\s*$', name.lower())   # "Scharreleieren 6st"
         if m: r = parse_one(m.group(0))
     return r or (0, 0)
 
@@ -108,26 +108,34 @@ for s in cjb:
 
 # 2. acties
 skipped = 0
+# acties zonder einddatum die al meer dan 60 dagen lopen zijn vrijwel altijd blijven hangen
+STALE_FROM = (datetime.date.fromisoformat(promos['fetched'][:10]) - datetime.timedelta(days=60)).isoformat()
 for r in promos['rows']:
     k = PPKEY.get(r['retailer'], r['retailer'])
     price, orig = r['price'], r['original_price']
     if price is None or price < 0.05 or not r['name']: skipped += 1; continue
     if r['savings_percentage'] is not None and r['savings_percentage'] >= 70: skipped += 1; continue   # boven 70% is vrijwel altijd een datafout
-    if not r['valid_until'] and (r['valid_from'] or '') < '2026-09-01': skipped += 1; continue
+    if not r['valid_until'] and (r['valid_from'] or '') < STALE_FROM: skipped += 1; continue
     st = store(k)
     u, q = parse(r['quantity'] or '', r['name'])
     kw = [w for w in (r['promotional_keywords'] or []) if w and w.upper() != 'ACTIE' and 'bezorging' not in w.lower()]
     label = kw[0] if kw else ''
     if r['loyalty_program']: label = (label + ' · ' if label else '') + 'met ' + r['loyalty_program']
     if r['in_store_only']: label = (label + ' · ' if label else '') + 'alleen in de winkel'
+    # "2 voor 0.50" zonder meerstuksgegevens: de prijs is dan die van de hele bundel
+    mbq, mbp = r['multi_buy_quantity'] or 0, r['multi_buy_price']
+    m = re.match(r'(\d+)\s*voor\s*(\d+[.,]\d{2})\b', kw[0].lower()) if kw and not mbq else None
+    if m and int(m.group(1)) > 1 and abs(float(m.group(2).replace(',', '.')) - price) < 0.005:
+        mbq, mbp = int(m.group(1)), price
+        price = price / mbq
     name = r['name'].strip()
     if r['brand'] and not name.lower().startswith(r['brand'].lower()) and r['brand'].lower() not in ('ah','jumbo','plus','dirk','aldi','lidl'):
         name = r['brand'] + ' ' + name
     st['n'].append(name); st['p'].append(int(round(price*100))); st['u'].append(u); st['q'].append(q)
     st['l'].append(r['product_url'] or '')
     st['po'].append(int(round(orig*100)) if orig and orig > price else 0)
-    st['pm'].append(r['multi_buy_quantity'] or 0)
-    st['pp'].append(int(round(r['multi_buy_price']*100)) if r['multi_buy_price'] else 0)
+    st['pm'].append(mbq)
+    st['pp'].append(int(round(mbp*100)) if mbp else 0)
     st['pl'].append(label)
     st['pf'].append((r['valid_from'] or '')[5:].replace('-',''))
     st['pv'].append((r['valid_until'] or '')[5:].replace('-',''))

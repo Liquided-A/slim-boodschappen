@@ -12,6 +12,7 @@ of het loont om bij 1, 2, 3 of 4 winkels te halen. Android-app + website.
 - `kit/`: scripts die de prijzen ophalen (PrijsProfeet-API, Checkjebon open data, foto's van Open Food Facts).
 - `data/`: productfoto's (fotobladen van 10 × 10) en de laatst bekende prijsdata.
 - `site/`: de downloadpagina.
+- `tests/`: rekentests voor prijzen, acties en het goedkoopste mandje (`node --test tests/*.test.js`). Ze draaien bij elke build.
 
 ## Automatisch
 - **Prijzen bijwerken en website publiceren** (`.github/workflows/dagelijks.yml`): elke ochtend nieuwe

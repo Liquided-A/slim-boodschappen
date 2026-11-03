@@ -168,6 +168,9 @@ form.add button{border:0;background:var(--cta);color:var(--cta-ink);border-radiu
 .scan{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-bottom:20px;box-shadow:var(--shadow)}
 @media (min-width:860px){.scan{grid-template-columns:minmax(0,1fr) auto;align-items:center}.scan #scanout{grid-column:1/-1}}
 .scan #scanout:empty{display:none}
+/* inlezen start via de knop bovenaan en in de onderbalk; dit blok toont alleen het resultaat */
+.scan .scanintro,.scan .scanbtns{display:none}
+.scan:has(#scanout:empty){display:none}
 .scanintro{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}
 .scanicon{width:48px;height:48px;border-radius:12px;background:var(--good-bg);color:var(--cta);display:grid;place-items:center}
 .scanicon svg{width:26px;height:26px}
@@ -363,7 +366,13 @@ details.quick[open] summary::after{content:"Sluiten"}
 /* zoek-suggesties en assortiment */
 .qsugg{top:calc(100% + 6px);max-height:min(70vh,440px);color:var(--ink);z-index:22}
 .qsugg button{align-items:center;padding:11px 10px;min-height:52px}
-.qsugg .qtxt{display:flex;flex-direction:column;gap:1px;min-width:0}
+.qsugg .qtxt{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+/* mini-fototje bij zoeksuggesties, zodat je producten sneller herkent */
+.sugg .sthumb{width:40px;height:40px;flex:none;border-radius:8px;align-self:center}
+.sugg .sthumb .ph.emo{font-size:1.25rem}
+.sugg button:not(.qall){align-items:center}
+.sugg button .sq{flex:1;min-width:0}
+.qsugg .qtxt .sq{flex:none}
 .qsugg .sm{white-space:normal}
 .qsugg .qadd{flex:none;background:var(--good-bg);color:var(--good);font-weight:700;font-size:.8rem;border-radius:8px;padding:5px 9px;white-space:nowrap}
 .qsugg .qall{border-bottom:1px solid var(--line);border-radius:8px 8px 0 0}

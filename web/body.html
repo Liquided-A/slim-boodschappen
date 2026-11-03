@@ -124,6 +124,7 @@
       <p>Aanbiedingen via <a href="https://www.prijsprofeet.nl" target="_blank" rel="noopener">PrijsProfeet</a>, opgehaald op <span id="pfdate"></span>. Gewone prijzen uit de open data van <a href="https://github.com/supermarkt/checkjebon" target="_blank" rel="noopener">Checkjebon.nl</a>. Productfoto's van <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (CC BY-SA), voor zover beschikbaar. Deze app is onafhankelijk en heeft geen band met de supermarkten.</p>
       <p>De korting is berekend ten opzichte van de van-prijs die de supermarkt zelf noemt. Bij acties als "1+1 gratis" of "4 voor" rekent de app alleen met de actieprijs als je het hele aantal koopt. Acties met meer dan 70% korting zijn weggelaten, omdat dat bijna altijd een fout in de bron is.</p>
       <p>Van een aantal winkels worden de gewone prijzen niet meer bijgewerkt. Die doen standaard alleen mee met hun actuele aanbiedingen. Dit is een prototype: controleer prijzen en producten in de winkel.</p>
+      <p><a href="https://liquided-a.github.io/slim-boodschappen/privacy.html" target="_blank" rel="noopener">Privacyverklaring</a>: geen account, geen tracking, je lijstje blijft op je telefoon.</p>
     </div>
     <div class="tablewrap"><table class="fresh-table"><thead><tr><th>Winkel</th><th>Gewone prijzen</th><th>Aanbiedingen</th></tr></thead><tbody id="freshrows"></tbody></table></div>
   </div>
@@ -525,7 +526,7 @@ function updateSugg(){ const v = $('newItem').value; S.sugg = v.trim().length >=
 function renderSugg(){
   const box = $('sugg'), inp = $('newItem');
   if (!S.sugg.length){ box.hidden = true; inp.setAttribute('aria-expanded', 'false'); inp.removeAttribute('aria-activedescendant'); return; }
-  box.innerHTML = S.sugg.map((g, j) => '<button type="button" role="option" id="sg' + j + '" data-act="pick" data-j="' + j + '" aria-selected="' + (j === S.suggSel) + '">' +
+  box.innerHTML = S.sugg.map((g, j) => '<button type="button" role="option" id="sg' + j + '" data-act="pick" data-j="' + j + '" aria-selected="' + (j === S.suggSel) + '">' + suggImg(g) +
     '<span class="sq">' + esc(g.q) + '</span><span class="sm">' + g.stores.size + ' winkel' + (g.stores.size === 1 ? '' : 's') + ' · vanaf ' + money(g.min) + '</span></button>').join('');
   box.hidden = false; inp.setAttribute('aria-expanded', 'true');
   if (S.suggSel >= 0) inp.setAttribute('aria-activedescendant', 'sg' + S.suggSel); else inp.removeAttribute('aria-activedescendant');
@@ -538,13 +539,33 @@ function updateQSugg(){
   const v = $('q').value.trim();
   S.qs = v.length >= 2 && ENG ? ENG.suggest(v, enabledStores(), 6) : []; S.qsSel = -1; renderQSugg(); renderAssort();
 }
+/* alle producten met een foto, op hun naam zonder merk en formaat ("halfvolle melk"); pas opgebouwd bij het eerste zoeken */
+let PHOTOS = null;
+function photoIndex(){
+  if (PHOTOS) return PHOTOS;
+  PHOTOS = new Map();
+  STORES.forEach((st, s) => { for (let i = 0; i < st.n.length; i++){ if (imgRef(st, i).none) continue; const b = cleanName(st.n[i]); if (b && !PHOTOS.has(b)) PHOTOS.set(b, [s, i]); } });
+  return PHOTOS;
+}
+/* mini-fototje bij een suggestie: een product uit die groep met een foto, anders een foto van hetzelfde soort
+   product uit een andere winkel, anders een plaatje */
+function suggImg(g){
+  const wrap = h => '<span class="thumb sthumb" aria-hidden="true">' + h + '</span>';
+  for (const [s, i] of g.refs || []){ const r = imgRef(STORES[s], i); if (!r.none) return wrap(imgHtml(r, '')); }
+  const idx = photoIndex(); let hit = idx.get(g.base);
+  if (!hit){
+    const words = g.base.split(' ');
+    for (const [b, ref] of idx){ const bw = b.split(' '); if (bw.length <= words.length + 1 && words.every(w => bw.includes(w))){ hit = ref; break; } }
+  }
+  return wrap(hit ? imgHtml(imgRef(STORES[hit[0]], hit[1]), '') : phHtml(g.base, ''));
+}
 function suggMeta(g){ return 'vanaf ' + money(g.min) + ' bij ' + esc(STORES[g.minStore].c) + ' · ' + g.stores.size + ' winkel' + (g.stores.size === 1 ? '' : 's'); }
 function renderQSugg(){
   const box = $('qsugg'), inp = $('q'), v = inp.value.trim();
   if (!S.qs.length || document.activeElement !== inp){ box.hidden = true; inp.setAttribute('aria-expanded', 'false'); return; }
   const nDeals = baseFiltered().length;
   box.innerHTML = '<button type="button" role="option" class="qall" data-act="qsearch"><span class="sq">Zoek "' + esc(v) + '" in de aanbiedingen</span><span class="sm">' + nDeals + ' gevonden</span></button>' +
-    S.qs.map((g, j) => '<button type="button" role="option" id="qs' + j + '" data-act="qpick" data-j="' + j + '" aria-selected="' + (j === S.qsSel) + '">' +
+    S.qs.map((g, j) => '<button type="button" role="option" id="qs' + j + '" data-act="qpick" data-j="' + j + '" aria-selected="' + (j === S.qsSel) + '">' + suggImg(g) +
       '<span class="qtxt"><span class="sq">' + esc(g.q) + '</span><span class="sm">' + suggMeta(g) + '</span></span><span class="qadd" aria-hidden="true">' + (hasItem(g.q) ? '✓' : '+ Lijstje') + '</span></button>').join('');
   box.hidden = false; inp.setAttribute('aria-expanded', 'true');
 }
@@ -1284,7 +1305,7 @@ async function cachedData(){
 }
 function applyData(D){
   NOW = new Date();
-  STORES = D.stores; CATS = D.cats; PFETCH = new Date(D.promoFetched);
+  STORES = D.stores; CATS = D.cats; PFETCH = new Date(D.promoFetched); PHOTOS = null;
   ENG = new Engine(STORES); HASIMG = false; S.fstores = new Set();
   ENG.setMask(keep); reanalyze(); buildDeals(); renderFresh();
   $('pfdate').textContent = dayFmt.format(PFETCH);

@@ -190,10 +190,11 @@ class Engine {
         if (!g){
           const bw = base.split(' ');
           const tier = p.tokens.every(t => bw.includes(t)) ? 2 : (p.tokens.every(t => bw.some(w => w === t || w.endsWith(t))) ? 1 : 0);
-          g = {base, stores: new Set(), sizes: new Map(), min: Infinity, minStore: s, words: bw.length, tier};
+          g = {base, stores: new Set(), sizes: new Map(), min: Infinity, minStore: s, words: bw.length, tier, refs: []};
           groups.set(base, g);
         }
         g.stores.add(s);
+        if (g.refs.length < 6) g.refs.push([s, c.i]);   /* producten om een fototje van te tonen */
         if (c.u && c.q){ const k = fmtQty(c.u, c.q); g.sizes.set(k, (g.sizes.get(k) || 0) + 1); }
         if (c.price < g.min){ g.min = c.price; g.minStore = s; }
       });

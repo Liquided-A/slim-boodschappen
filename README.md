@@ -26,5 +26,7 @@ Productfoto's van [Open Food Facts](https://world.openfoodfacts.org) (CC BY-SA).
 Deze app heeft geen band met de supermarkten. Controleer prijzen in de winkel.
 
 ## Sleutel
-`android/sleutel/release.jks` ondertekent de app, zodat updates over de oude versie heen geïnstalleerd kunnen
-worden. Bewaar een kopie; zonder deze sleutel moet de app bij een update eerst verwijderd worden.
+De sleutel die de app ondertekent staat níét in deze opslagplaats, maar in de geheime instellingen van GitHub
+(Settings > Secrets and variables > Actions): `KEYSTORE_BASE64` (het sleutelbestand als base64) en `KEYSTORE_PASSWORD`.
+Bewaar een kopie van het sleutelbestand en het wachtwoord op een veilige plek; zonder deze sleutel moet de app bij
+een update eerst verwijderd worden. Zet nooit een sleutel of wachtwoord in de code.

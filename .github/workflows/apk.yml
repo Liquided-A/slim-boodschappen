@@ -46,11 +46,20 @@ jobs:
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"; ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools" | tr '\n' ' ' | sed 's/^/::notice::/'
 
+      - name: Sleutel klaarzetten (uit de geheime instellingen van GitHub)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Geheimen KEYSTORE_BASE64 en KEYSTORE_PASSWORD ontbreken (Settings > Secrets and variables > Actions)"; exit 1; fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
+
       - name: APK bouwen
         env:
-          KEYSTORE_FILE: ${{ github.workspace }}/android/sleutel/release.jks
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'Cmly4L4jVNGriX2P9ont5_vm' }}
-          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'Cmly4L4jVNGriX2P9ont5_vm' }}
+          KEYSTORE_FILE: ${{ runner.temp }}/release.p12
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: slim
           VERSION_CODE: ${{ github.run_number }}
           VERSION_NAME: 1.${{ github.run_number }}

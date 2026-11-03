@@ -6,3 +6,7 @@ android/local.properties
 _site/
 *.iml
 .idea/
+android/sleutel/
+*.jks
+*.p12
+*.keystore

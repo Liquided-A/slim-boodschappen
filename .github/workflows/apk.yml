@@ -2,7 +2,7 @@ name: Android-app bouwen
 
 on:
   push:
-    branches: [main]
+    branches: ['**']        # op een werkbranch: alleen testen, niet publiceren (zie onderaan)
     paths: ['android/**', 'web/**', '.github/workflows/apk.yml']
   workflow_dispatch:
 
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: apk
+  group: apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -69,7 +69,24 @@ jobs:
             grep -E "error:|ERROR|FAILURE|What went wrong|Could not|> " /tmp/build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
             exit 1; }
 
+      - name: Controleren dat de app met de echte sleutel is ondertekend
+        run: |
+          SIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$SIGNER" verify --print-certs android/app/build/outputs/apk/release/app-release.apk | tee /tmp/cert.txt
+          # openbare vingerafdruk van de sleutel uit november 2026 (geen geheim)
+          grep -q "SHA-256 digest: 53c4b0f0978eef5e0ed273f67a4ab794dde1ee98753ad4414e7eec6ec0e2693a" /tmp/cert.txt || {
+            echo "::error::De app is niet met de sleutel van Slim Boodschappen ondertekend"; exit 1; }
+
+      - name: Testversie bewaren (werkbranch)
+        if: github.ref != 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SlimBoodschappen-test
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 7
+
       - name: Publiceren als download
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

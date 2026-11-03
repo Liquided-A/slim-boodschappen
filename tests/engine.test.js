@@ -1,4 +1,4 @@
-/* Tests voor de rekenmodule (web/engine.js). Draaien: node --test tests/ */
+/* Tests voor de rekenmodule (web/engine.js). Draaien: node --test tests/*.test.js */
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
@@ -8,8 +8,8 @@ const vm = require('vm');
 const ctx = {};
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'web', 'engine.js'), 'utf8') +
-  '\nObject.assign(globalThis, {Engine, priceMatrix, plan, advise, lineCost, packsFor, perUnit});', ctx);
-const {Engine, priceMatrix, plan, advise, lineCost} = ctx;
+  '\nObject.assign(globalThis, {Engine, priceMatrix, plan, advise, lineCost, packsFor, perUnit, betterValue, muchCheaperElsewhere});', ctx);
+const {Engine, priceMatrix, plan, advise, lineCost, betterValue, muchCheaperElsewhere} = ctx;
 /* objecten uit de vm hebben een ander prototype; via JSON vergelijken we alleen de inhoud */
 const plain = x => JSON.parse(JSON.stringify(x));
 const perUnit = c => plain(ctx.perUnit(c));
@@ -138,4 +138,40 @@ test('mandje met actie: de goedkoopste combinatie klopt', () => {
   assert.deepStrictEqual(plain(pl.result[0].combo), [1]);
   /* 2 winkels: melk bij B (99), pindakaas bij A (249) */
   assert.strictEqual(pl.result[1].total, 348);
+});
+
+test('extreem dure "match" (meer dan 8 keer) telt niet mee', () => {
+  /* A heeft alleen soesjes (240 g voor € 3,49), B echte bananen */
+  const A = store('A', [['A bananen soesjes 240 g', 349, 1, 240]]);
+  const B = store('B', [['B bananen 1 kg', 199, 1, 1000]]);
+  const {m, pl} = basket([A, B], [{id: 1, q: 'bananen 1 kg', qty: 1}]);
+  assert.strictEqual(m[0][0], null);
+  assert.deepStrictEqual(plain(pl.result[0].combo), [1]);
+});
+
+test('duurder A-merk blijft gewoon meedoen', () => {
+  /* koffie van € 7,49 tegenover huismerk € 3,99: minder dan 4 keer zo duur */
+  const A = store('A', [['A merkkoffie filterkoffie 500 g', 749, 1, 500]]);
+  const B = store('B', [['B filterkoffie 500 g', 399, 1, 500]]);
+  const {m} = basket([A, B], [{id: 1, q: 'filterkoffie 500 g', qty: 1}]);
+  assert.ok(m[0][0]);
+});
+
+test('tip: groter pak is per kilo voordeliger', () => {
+  const cands = [
+    {i: 0, name: 'Rijst 500 g', price: 189, u: 1, q: 500, score: 0, mode: 'exact'},
+    {i: 1, name: 'Rijst 1 kg', price: 279, u: 1, q: 1000, score: 0, mode: 'scaled'},
+    {i: 2, name: 'Rijst 5 kg', price: 999, u: 1, q: 5000, score: 0.4, mode: 'scaled'},
+    {i: 3, name: 'Rijstwafels', price: 99, u: 1, q: 130, score: 3, mode: 'scaled'}];
+  const t = betterValue(cands, 0);
+  /* 5 kg is per kilo het voordeligst (€ 2,00), maar rijstwafels passen niet bij de zoekterm */
+  assert.strictEqual(t.name, 'Rijst 5 kg');
+  assert.strictEqual(betterValue(cands, 2), null);
+});
+
+test('waarschuwing als een product veel duurder is dan elders', () => {
+  const row = [{price: 1745, mode: 'scaled'}, {price: 258, mode: 'scaled'}, {price: 400, mode: 'exact'}, null];
+  assert.strictEqual(muchCheaperElsewhere(row, 0).price, 258);
+  assert.strictEqual(muchCheaperElsewhere(row, 2), null);
+  assert.strictEqual(muchCheaperElsewhere(row, 1), null);
 });

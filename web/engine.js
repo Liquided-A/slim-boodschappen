@@ -151,7 +151,7 @@ class Engine {
         if (!kind) mode = 'exact';
         else if (u === kind && q > 0){
           if (Math.abs(q - amount) / amount <= tol) mode = 'exact';
-          else { const rr = amount / q; if (rr >= 0.05 && rr <= 20){ r = rr; mode = 'scaled'; eff = price * packsFor(1, r); } }
+          else { const rr = amount / q; if (rr >= 0.25 && rr <= 10){ r = rr; mode = 'scaled'; eff = price * packsFor(1, r); } }
         } else if (u === 0) mode = 'unknown';
         /* je koopt hele pakken: kleiner pak = meer pakken, groter pak = je betaalt het hele pak */
         const c = {i, name: st.n[i], price, eff, r, q, u, mode, score: x.score, usual: 0, mbq: 0, mbp: 0, label: '', until: ''};
@@ -239,8 +239,27 @@ function priceMatrix(items, analyses, pins, storeIdxs){
     const cmp = row.filter(comparable);
     if (!cmp.length) return row;
     const best = Math.min(...cmp.map(x => x.c.score));
-    return row.map(x => !x || x.pinned || comparable(x) || (x.mode === 'unknown' && x.c.score <= best + 1) ? x : null);
+    /* voor dezelfde hoeveelheid meer dan 8 keer zo duur als het goedkoopste product dat minstens even goed
+       bij de zoekterm past, én zelf slechter passend: vrijwel altijd een ander product (bananensoesjes bij
+       "bananen"); een duurder A-merk dat even goed past blijft gewoon meedoen */
+    const suspect = x => {
+      if (!comparable(x)) return false;
+      const better = cmp.filter(y => y !== x && y.c.score + 0.5 < x.c.score);
+      return better.length > 0 && x.price > OUTLIER * Math.min(...better.map(y => y.price));
+    };
+    return row.map(x => !x || x.pinned || (comparable(x) && !suspect(x)) || (x.mode === 'unknown' && x.c.score <= best + 1) ? x : null);
   });
+}
+const OUTLIER = 8;   /* gemeten op 40 gangbare producten: bij 4 of 6 vielen ook echte A-merken (Ariel, Dreft, Dove) af */
+
+/* positie j in een rij van priceMatrix minstens 3 keer zo duur als het goedkoopste vergelijkbare product
+   elders? Dan geeft de bon een waarschuwing (misschien een ander product); geeft die goedkopere cel terug */
+function muchCheaperElsewhere(row, j){
+  const x = row[j];
+  if (!comparable(x)) return null;
+  let low = null;
+  row.forEach((y, k) => { if (k !== j && comparable(y) && (!low || y.price < low.price)) low = y; });
+  return low && x.price >= 3 * low.price ? low : null;
 }
 function priceRow(it, a, pins, storeIdxs){
   return storeIdxs.map(s => {
@@ -268,6 +287,19 @@ function perUnit(c){
   if (c.u === 1) return {cents: Math.round(each * 1000 / c.q), per: 'kg'};
   if (c.u === 2) return {cents: Math.round(each * 1000 / c.q), per: 'l'};
   return {cents: Math.round(each / c.q), per: 'st'};
+}
+
+/* een product in dezelfde winkel dat even goed bij de zoekterm past en per kilo/liter/stuk minstens
+   15% voordeliger is dan het gekozen product (meestal een groter pak); null als er geen is */
+function betterValue(cands, j){
+  const cur = cands[j], up = cur && perUnit(cur);
+  if (!up) return null;
+  let pick = null, low = up.cents * 0.85;
+  cands.forEach((c, k) => {
+    if (k === j || c.u !== cur.u || c.score > cur.score + 0.5) return;
+    const v = perUnit(c); if (v && v.cents < low){ low = v.cents; pick = c; }
+  });
+  return pick;
 }
 
 /* echte kosten voor n stuks: meerstuksacties gelden alleen per volle bundel, de rest tegen de normale prijs */

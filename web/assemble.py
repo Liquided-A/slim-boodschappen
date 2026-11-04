@@ -23,7 +23,7 @@ page = page.replace('__DATA__', open(data, encoding='utf-8').read().strip())
 if wrap:
     html = ('<!doctype html>\n<html lang="nl">\n<head>\n<meta charset="utf-8">\n'
             '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'
-            '<meta name="theme-color" content="#0D5C45">\n' + head + '\n</head>\n<body>\n' + page + '\n</body>\n</html>\n')
+            '<meta name="theme-color" content="#0E6278">\n' + head + '\n</head>\n<body>\n' + page + '\n</body>\n</html>\n')
 else:
     html = head + page
 open(out, 'w', encoding='utf-8').write(html)

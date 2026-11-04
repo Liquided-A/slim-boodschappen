@@ -585,7 +585,7 @@ function compute(){
   const sel = enabledStores();
   if (!S.items.length || !sel.length) return LAST = {sel, empty: true};
   const m = priceMatrix(S.items, S.an, S.pins, sel);
-  const pl = plan(m, sel, 4), adv = advise(pl.result, Math.round(parseFloat(PREFS.gain || '2') * 100));
+  const pl = plan(m, sel, 4), adv = advise(pl.result, Math.round(parseFloat(PREFS.gain || '2') * 100), (a, b) => fairSaving(a, b, m, sel));
   if (adv < 0 || !pl.found.length) return LAST = {sel, m, pl, none: true};
   let ci = S.k ? S.k - 1 : adv; if (!pl.result[ci]) ci = adv;
   return LAST = {sel, m, pl, adv, ci, cur: pl.result[ci], baseIdx: pl.result.findIndex(r => r)};
@@ -691,6 +691,7 @@ function renderBasket(){
   }
   const {m, pl, adv, ci, cur, baseIdx, sel} = L, base = pl.result[baseIdx];
   const names = idxs => idxs.map(i => STORES[i].c).join(' + ');
+  const saved = ci > baseIdx ? fairSaving(base, cur, m, sel) : 0;
   const nDeals = cur.assign.filter(([i, s]) => m[i][sel.indexOf(s)].c.usual).length;
   const opts = pl.result.map((r, i) => {
     if (!r) return '<button class="kopt" type="button" role="radio" aria-checked="false" disabled><span class="dot"></span><span class="kn">' + (i+1) + ' winkel' + (i ? 's' : '') + '<span class="ks">niet alles verkrijgbaar</span></span><span></span></button>';
@@ -699,7 +700,7 @@ function renderBasket(){
   }).join('');
   sumEl.innerHTML = '<div class="sumcard has"><div class="sleft"><h2>Zo betaal je het minst</h2>' +
     '<div><div class="total">' + money(cur.total) + '</div><div class="where">bij ' + esc(names(cur.combo)) + '</div></div>' +
-    (ci > baseIdx && base.total > cur.total ? '<div><span class="tag good">Je bespaart ' + money(base.total - cur.total) + '</span> <span class="small muted">t.o.v. alles bij ' + esc(names(base.combo)) + '</span></div>' : '') +
+    (saved > 0 ? '<div><span class="tag good">Je bespaart ' + money(saved) + '</span> <span class="small muted">t.o.v. alles bij ' + esc(names(base.combo)) + (saved < base.total - cur.total ? ', zonder producten met een waarschuwing' : '') + '</span></div>' : '') +
     (nDeals ? '<div class="small muted">' + nDeals + ' product' + (nDeals === 1 ? ' is' : 'en zijn') + ' deze week in de aanbieding.</div>' : '') +
     '</div><div class="sright"><div role="radiogroup" aria-label="Aantal winkels" class="kopts">' + opts + '</div>' +
     (S.saved && S.saved.c > 0 ? '<div class="savedbox">🎉 Dit jaar bespaard met aanbiedingen: <b>' + money(S.saved.c) + '</b></div>' : '') +

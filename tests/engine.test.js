@@ -8,8 +8,8 @@ const vm = require('vm');
 const ctx = {};
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'web', 'engine.js'), 'utf8') +
-  '\nObject.assign(globalThis, {Engine, priceMatrix, plan, advise, lineCost, packsFor, perUnit, betterValue, muchCheaperElsewhere});', ctx);
-const {Engine, priceMatrix, plan, advise, lineCost, betterValue, muchCheaperElsewhere} = ctx;
+  '\nObject.assign(globalThis, {Engine, priceMatrix, plan, advise, lineCost, packsFor, perUnit, betterValue, muchCheaperElsewhere, fairSaving});', ctx);
+const {Engine, priceMatrix, plan, advise, lineCost, betterValue, muchCheaperElsewhere, fairSaving} = ctx;
 /* objecten uit de vm hebben een ander prototype; via JSON vergelijken we alleen de inhoud */
 const plain = x => JSON.parse(JSON.stringify(x));
 const perUnit = c => plain(ctx.perUnit(c));
@@ -174,4 +174,29 @@ test('waarschuwing als een product veel duurder is dan elders', () => {
   assert.strictEqual(muchCheaperElsewhere(row, 0).price, 258);
   assert.strictEqual(muchCheaperElsewhere(row, 2), null);
   assert.strictEqual(muchCheaperElsewhere(row, 1), null);
+});
+
+/* twee producten; winkel 0 heeft een verdacht dure "match" voor product 0 (1745 tegenover 258 bij winkel 1) */
+const fair = {
+  m: [[{price: 1745, mode: 'scaled'}, {price: 258, mode: 'scaled'}], [{price: 300, mode: 'exact'}, {price: 200, mode: 'exact'}]],
+  sel: [0, 1],
+  one: {total: 2045, assign: [[0, 0], [1, 0]]},
+  two: {total: 458, assign: [[0, 1], [1, 1]]}};
+
+test('besparing telt een regel met waarschuwing niet mee', () => {
+  /* eerlijk: alleen het tweede product scheelt echt, 300 - 200 */
+  assert.strictEqual(fairSaving(fair.one, fair.two, fair.m, fair.sel), 100);
+});
+
+test('besparing zonder waarschuwing is gewoon het verschil', () => {
+  const m = [[{price: 300, mode: 'exact'}, {price: 200, mode: 'exact'}]];
+  const a = {total: 300, assign: [[0, 0]]}, b = {total: 200, assign: [[0, 1]]};
+  assert.strictEqual(fairSaving(a, b, m, [0, 1]), 100);
+});
+
+test('advies: een verdachte regel is geen reden voor een extra winkel', () => {
+  const by = (a, b) => fairSaving(a, b, fair.m, fair.sel);
+  /* op het oog € 15,87 verschil, eerlijk maar € 1,00: bij een drempel van € 2 blijft het 1 winkel */
+  assert.strictEqual(advise([fair.one, fair.two], 200, by), 0);
+  assert.strictEqual(advise([fair.one, fair.two], 200), 1);
 });

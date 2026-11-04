@@ -355,10 +355,25 @@ function plan(m, storeIdxs, kmax){
   return {found, missing, result, avgSingle, singles: singles.length};
 }
 
-/* kies het aantal winkels: elke extra winkel moet minstens thresh centen opleveren */
-function advise(result, thresh){
+/* wat plan to echt oplevert ten opzichte van plan from: een regel uit from met een waarschuwing (waarschijnlijk
+   een ander product, zoals bananensoesjes bij "bananen") telt niet mee, anders lijkt de besparing veel te groot */
+function fairSaving(from, to, m, storeIdxs){
+  let saving = from.total - to.total;
+  from.assign.forEach(([i, s]) => {
+    const j = storeIdxs.indexOf(s);
+    if (!muchCheaperElsewhere(m[i], j)) return;
+    const a = to.assign.find(x => x[0] === i), other = a && m[i][storeIdxs.indexOf(a[1])];
+    if (other && m[i][j].price > other.price) saving -= m[i][j].price - other.price;
+  });
+  return saving;
+}
+
+/* kies het aantal winkels: elke extra winkel moet minstens thresh centen opleveren;
+   saving(a, b) bepaalt wat de overstap oplevert, standaard het verschil in totaal */
+function advise(result, thresh, saving){
+  const gain = saving || ((a, b) => a.total - b.total);
   let pick = result.findIndex(r => r);
   if (pick < 0) return -1;
-  while (pick + 1 < result.length && result[pick+1] && result[pick].total - result[pick+1].total >= thresh) pick++;
+  while (pick + 1 < result.length && result[pick+1] && gain(result[pick], result[pick+1]) >= thresh) pick++;
   return pick;
 }

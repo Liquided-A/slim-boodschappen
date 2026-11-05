@@ -276,6 +276,9 @@ function useDemo(){ S.items = DEMO.map(([q, qty]) => ({id:S.nextId++, q, qty}));
 function enabledStores(){ return STORES.map((s, i) => i).filter(i => !S.off.has(STORES[i].k)); }
 /* alle winkels op naam: overal dezelfde lijst, en een winkel verspringt niet als je hem aan- of uitzet */
 /* knop om alle winkels in één keer uit of weer aan te zetten */
+function storeChips(){
+  return storeOrder().map(s => { const on = !S.off.has(STORES[s].k); return '<button type="button" class="storechip" data-act="store" data-k="' + esc(STORES[s].k) + '" aria-pressed="' + on + '">' + (on ? '✓ ' : '') + esc(STORES[s].c) + '</button>'; }).join('');
+}
 function allStoresLabel(){ return enabledStores().length ? 'Alles uit' : 'Alles aan'; }
 function storeOrder(){ return STORES.map((s, i) => i).sort((a, b) => STORES[a].c.localeCompare(STORES[b].c, 'nl')); }
 function reanalyze(){ S.an = {}; S.pins = {}; S.items.forEach(it => { S.an[it.id] = ENG.analyze(it.q); }); }
@@ -283,7 +286,7 @@ function hasItem(q){ return S.items.some(it => it.q.toLowerCase() === q.toLowerC
 
 /* ---------- aanbiedingen ---------- */
 function buildDeals(){
-  DEALS = [];
+  DEALS = []; RANK = {q: null, map: null};
   STORES.forEach((st, s) => {
     for (let j = 0; j < st.n.length - st.r; j++){
       const i = st.r + j;
@@ -297,13 +300,19 @@ function buildDeals(){
     }
   });
 }
+/* zoekscores voor de huidige zoekopdracht, één keer per zoekopdracht uitgerekend */
+let RANK = {q: null, map: null};
+function rankMap(){
+  if (RANK.q !== S.q){ const t = S.q ? parseQuery(S.q).tokens : []; RANK = {q: S.q, map: t.length ? searchRank(t, DEALS) : null}; }
+  return RANK.map;
+}
 function baseFiltered(skip){
-  const words = norm(S.q).trim().split(' ').filter(Boolean);
+  const found = rankMap();
   return DEALS.filter(d =>
     (skip === 'cat' || S.cat === 'all' || d.cat === S.cat) &&
     (skip === 'store' || (S.fstores.size ? S.fstores.has(d.s) : !S.off.has(STORES[d.s].k))) &&
     (!S.fdisc || d.pct >= S.fdisc) && (!S.fmulti || d.multi) && (!S.fnow || !d.upcoming) && (!S.fphoto || !d.img.none) &&
-    (!words.length || words.every(w => d.norm.includes(' ' + w))));
+    (!found || found.has(d)));
 }
 function renderCatbar(){
   const cc = {}; baseFiltered('cat').forEach(d => { cc[d.cat] = (cc[d.cat] || 0) + 1; });
@@ -312,12 +321,11 @@ function renderCatbar(){
     esc(c === 'all' ? 'Alle aanbiedingen' : (CATLABEL[c] || c)) + '</button>').join('');
 }
 function renderFilters(){
-  const sc = {}; baseFiltered('store').forEach(d => { sc[d.s] = (sc[d.s] || 0) + 1; });
-  const mine = s => !S.off.has(STORES[s].k), top = $('filters').scrollTop;
+  const top = $('filters').scrollTop;
   const ck = (id, act, checked, label, n, extra) => '<label class="check"><input type="checkbox" data-act="' + act + '"' + (extra || '') + (checked ? ' checked' : '') + ' id="' + id + '"><span>' + label + '</span>' + (n !== undefined ? '<span class="n">' + n + '</span>' : '') + '</label>';
   const rd = (v, label) => '<label class="check"><input type="radio" name="fdisc" data-act="fdisc" value="' + v + '"' + (S.fdisc === v ? ' checked' : '') + ' id="fd' + v + '"><span>' + label + '</span></label>';
   $('filters').innerHTML =
-    '<div class="fgroup"><div class="fhead"><h3>Mijn winkels</h3><button type="button" class="linkbtn" data-act="storesall">' + allStoresLabel() + '</button></div>' + storeOrder().map(s => ck('fs' + s, 'fstore', mine(s), esc(STORES[s].c), sc[s] || 0, ' data-s="' + s + '"')).join('') + '</div>' +
+    '<div class="fgroup"><div class="fhead"><h3>Mijn winkels</h3><button type="button" class="linkbtn" data-act="storesall">' + allStoresLabel() + '</button></div>' + '<div class="storewrap">' + storeChips() + '</div></div>' +
     '<div class="fgroup"><h3>Korting</h3>' + rd(0, 'Alle kortingen') + rd(25, '25% of meer') + rd(40, '40% of meer') + '</div>' +
     '<div class="fgroup"><h3>Soort actie</h3>' + ck('fmulti', 'fmulti', S.fmulti, '1+1, 2e halve prijs, X voor €') +
     ck('fnow', 'fnow', S.fnow, 'Alleen acties die nu lopen') + (HASIMG ? ck('fphoto', 'fphoto', S.fphoto, 'Alleen met foto') : '') + '</div>';
@@ -326,7 +334,7 @@ function renderFilters(){
   $('filters').scrollTop = top;
   /* zonder zijbalk (telefoon, tablet): dezelfde keuze als knoppen boven de aanbiedingen */
   const bar = $('storebar'), left = bar.scrollLeft;
-  bar.innerHTML = '<button type="button" class="storechip all" data-act="storesall">' + allStoresLabel() + '</button>' + storeOrder().map(s => '<button type="button" class="storechip" data-act="store" data-k="' + esc(STORES[s].k) + '" aria-pressed="' + mine(s) + '">' + (mine(s) ? '✓ ' : '') + esc(STORES[s].c) + '</button>').join('');
+  bar.innerHTML = '<button type="button" class="storechip all" data-act="storesall">' + allStoresLabel() + '</button>' + storeChips();
   bar.scrollLeft = left;
 }
 function renderChips(){
@@ -343,7 +351,9 @@ function renderChips(){
 }
 function sortedDeals(){
   let list = baseFiltered();
-  if (S.sort === 'top') list.sort((a, b) => (a.upcoming - b.upcoming) || ((!b.img.none) - (!a.img.none)) || (Math.min(b.pct, 50) - Math.min(a.pct, 50)) || a.price - b.price);
+  const found = rankMap();
+  if (S.sort === 'top' && found) list.sort((a, b) => (a.upcoming - b.upcoming) || found.get(a) - found.get(b) || a.price - b.price);
+  else if (S.sort === 'top') list.sort((a, b) => (a.upcoming - b.upcoming) || ((!b.img.none) - (!a.img.none)) || (Math.min(b.pct, 50) - Math.min(a.pct, 50)) || a.price - b.price);
   else if (S.sort === 'pct') list.sort((a, b) => (a.upcoming - b.upcoming) || b.pct - a.pct || (!b.img.none) - (!a.img.none) || a.price - b.price);
   else if (S.sort === 'price') list.sort((a, b) => a.price - b.price);
   else if (S.sort === 'end') list.sort((a, b) => (a.until ? a.until.getTime() : 9e15) - (b.until ? b.until.getTime() : 9e15) || b.pct - a.pct);
@@ -1169,8 +1179,7 @@ document.addEventListener('change', e => {
   if (t.hasAttribute && t.hasAttribute('data-scanfile')){ const f = t.files && t.files[0]; closeSheet(); runScan(f); return; }
   if (act === 'scanon' && SCAN){ SCAN.rows[+t.dataset.k].on = t.checked; renderScan(); return; }
   if (act === 'pin'){ const id = +t.dataset.id; (S.pins[id] = S.pins[id] || {})[+t.dataset.s] = +t.value; renderList(); return; }
-  if (act === 'fstore'){ const k = STORES[+t.dataset.s].k; t.checked ? S.off.delete(k) : S.off.add(k); S.fstores.clear(); S.k = null; S.show = 36; save(); renderAll(); return; }
-  else if (act === 'fdisc') S.fdisc = +t.value;
+  if (act === 'fdisc') S.fdisc = +t.value;
   else if (act === 'fmulti' || act === 'fnow' || act === 'fphoto') S[act] = t.checked;
   else if (t.id === 'sort') S.sort = t.value;
   else return;

@@ -9,7 +9,7 @@ const PENALTY = new Set(['gesuikerde','gedroogde','gedroogd','gekonfijte','gepof
 const HOUSE = new Set(['ah','jumbo','plus','dirk','deka','dekamarkt','dekavers','hoogvliet','spar','lidl','poiesz','vomar','woon','beste','de','zuivelmeester','melkan','budget','huismerk','pcd','kwetters','vleeschmeesters','daily','chef','basic','bakkershart','soma','van','den']);
 const STOP = new Set(['van','de','het','een','met','en','of','voor']);
 /* samenstellingen die wél hetzelfde product zijn: roomboter = boter, scharreleieren = eieren */
-const GOODPRE = ['room','scharrel','vrijeuitloop','biologische','zilvervlies','volkoren','tarwe','meergranen','spelt','waldkorn','kristal','riet','basmati','jasmijn','pandan','filter','snel','hand','stoof','kruimig','vast','runder','varkens','kalkoen','kippen','braad','was','vaat','toilet','keuken','cherry','tros','vlees','roma','trostomaat','snoep','mini','grote','groene','rode','gele','witte','zoete','vers','verse','halfvolle','volle','magere','griekse','turkse','boeren'];
+const GOODPRE = ['room','ijsberg','mineraal','bron','krop','vloer','scharrel','vrijeuitloop','biologische','zilvervlies','volkoren','tarwe','meergranen','spelt','waldkorn','kristal','riet','basmati','jasmijn','pandan','filter','snel','hand','stoof','kruimig','vast','runder','varkens','kalkoen','kippen','braad','was','vaat','toilet','keuken','cherry','tros','vlees','roma','trostomaat','snoep','mini','grote','groene','rode','gele','witte','zoete','vers','verse','halfvolle','volle','magere','griekse','turkse','boeren'];
 /* korte, algemene woorden: zoek eerst naar het gangbare product */
 const GENERIC = {
   'melk':'halfvolle melk','kaas':'jong belegen kaas','brood':'volkoren brood','eieren':'scharreleieren','eiren':'scharreleieren','eitjes':'scharreleieren',
@@ -218,6 +218,104 @@ class Engine {
     const head = gen.slice(0, Math.min(3, limit));
     return head.concat(rest, gen.slice(head.length)).slice(0, limit);
   }
+}
+
+/* ---------- zoeken in de aanbiedingen ---------- */
+/* grondvorm: banaan en bananen, appel en appels, koek en koekjes zijn hetzelfde woord */
+const IRREGULAR = {eieren:'ei', eitjes:'ei', uien:'ui', uitje:'ui', uitjes:'ui', kazen:'kaas', kaasje:'kaas'};
+function stemNL(w){
+  if (IRREGULAR[w]) return IRREGULAR[w];
+  let s = w;
+  if (s.length > 5) s = s.replace(/(tje|tjes|je|jes)$/, '');
+  if (s.length > 4 && s.endsWith('en')) s = s.slice(0, -2);
+  else if (s.length > 3 && /[elrnk]s$/.test(s)) s = s.slice(0, -1);
+  s = s.replace(/([bdfgklmnprst])\1$/, '$1');              /* kippen -> kip */
+  return s.replace(/(aa|ee|oo|uu)([^aeiou])$/, (m, v, c) => v[0] + c);   /* banaan -> banan, zoals bananen */
+}
+/* woorden die zeggen dat het iets anders is dan het losse product: bananensap, appeltaart, drink met banaan */
+const OTHERTYPE = ['drink','drank','sap','nectar','smoothie','limonade','siroop','stroop','yoghurt','kwark','skyr','vla','pudding','toetje','dessert','ijs','roomijs','cake','koek','koekje','wafel','taart','gebak','reep','snoep','chips','chocolade','jam','moes','saus','soep','thee','ijsthee','shampoo','zeep','crème','creme','douche','mix','poeder','knijpfruit','fruit','hapje','ontbijtje','maaltijd','boost','split','aioli','hoemoes','boter','brood','pasta','gnocchi','chutney','azijn','bier','cider','wijn','likeur','geur','schijfjes','wrap','pizza','popcorn','dip','salade','hummus','jus','biscuit','middel','afwas','mnd','maanden','baby','kroket','tablet','dubbelfrisss','olvarit','ella','bonbebe','tuc','mcvitie','sandwich','soup'];
+const FLAVOUR = new Set(['met','smaak','geur','aroma']);
+/* zo kort dat begin-van-woord te veel treft: ui mag geen uit vinden, ei geen eigen */
+const EXACTONLY = new Set(['ui','ei']);
+/* kipfilet is gewoon kip */
+const GOODPOST = ['filet','filets','dij','dijen','dijfilet','bout','bouten','poot','poten','vleugels','gehakt','reepjes','haas'];
+const SEARCHALIAS = {'wc papier':'toiletpapier','wcpapier':'toiletpapier','closetpapier':'toiletpapier','wcrol':'toiletpapier','pleepapier':'toiletpapier','piepers':'aardappelen'};
+/* de afdeling van veelgezochte producten; bij andere woorden telt de app zelf waar ze het meest staan */
+const HOMECAT = {};
+[['groente-fruit','banaan appel peer sinaasappel mandarijn druif citroen tomaat paprika komkommer sla ui wortel aardappel broccoli bloemkool champignon spinazie'],
+ ['zuivel-eieren','melk boter yoghurt kwark vla eieren ei'],['kaas','kaas'],['vlees','kip gehakt worst biefstuk spek'],['vis','zalm tonijn kabeljauw'],
+ ['frisdrank','water cola'],['brood-bakkerij','brood']].forEach(([c, w]) => w.split(' ').forEach(x => { HOMECAT[stemNL(x)] = c; }));
+
+/* hoe goed past een productnaam bij de zoekwoorden: null = niet, anders hoe lager hoe beter */
+function searchScore(tokens, name){
+  const words = norm(name).trim().split(' ').filter(Boolean);
+  const stems = words.map(stemNL);
+  let score = 0, last = -1;
+  const asked = new Set();
+  for (const t of tokens){
+    const st = stemNL(t);
+    asked.add(st);
+    let k = stems.indexOf(st), tier = 0;
+    if (k < 0){
+      /* samenstelling die op het woord eindigt: handappels bij appel, ontbijtkoek bij koek */
+      k = words.findIndex((w, i) => (w.length > t.length && w.endsWith(t) && GOODPRE.includes(w.slice(0, w.length - t.length))) ||
+        (stems[i].length > st.length && stems[i].endsWith(st) && GOODPRE.includes(stems[i].slice(0, stems[i].length - st.length))) ||
+        (w.startsWith(t) && GOODPOST.includes(w.slice(t.length))));
+      tier = 1;
+    }
+    if (k < 0 && st.length >= 4){ k = stems.findIndex(w => w.length > st.length && w.endsWith(st)); tier = 7; }
+    if (k < 0 && !EXACTONLY.has(t)){ k = words.findIndex(w => w.startsWith(t) || (st.length >= 4 && w.startsWith(st))); tier = 4; }
+    if (k < 0) return null;
+    /* "0% suiker", "zonder suiker": juist niet wat je zoekt */
+    if (k > 0 && ['0','geen','zonder'].includes(words[k - 1])) tier += 8;
+    score += tier;
+    last = Math.max(last, k);
+  }
+  /* wat er na het zoekwoord staat of eromheen zegt iets over het soort product */
+  const core = words.filter(w => w.length > 1 && !/\d/.test(w) && !UNITWORDS.has(w));
+  const other = w => { const st = stemNL(w); return !asked.has(st) && ![...asked].some(a => a.length >= 3 && st.endsWith(a)) && OTHERTYPE.some(o => w === o || st === stemNL(o) || (o.length >= 3 && w.endsWith(o)) || (o.length >= 4 && st.endsWith(stemNL(o)))); };
+  if (words.some(other)) score += 6;
+  if (words.some(w => FLAVOUR.has(w))) score += 3;
+  score += Math.max(0, core.length - tokens.length) * 0.3;   /* hoe minder extra woorden hoe beter */
+  return score;
+}
+
+/* alle treffers met hun score; producten buiten de afdeling waar het zoekwoord thuishoort zakken
+   (melkpopcorn bij melk, ei-salade bij eieren). items: {name, cat}. Geeft een Map item -> score */
+function searchRank(tokens, items){
+  const alias = SEARCHALIAS[tokens.join(' ')];
+  if (alias) tokens = [alias];
+  let out = new Map(); const count = {};
+  items.forEach(d => {
+    const v = searchScore(tokens, d.name); if (v === null) return;
+    out.set(d, v);
+    if (v < 2) count[d.cat] = (count[d.cat] || 0) + 1;
+  });
+  /* niets gevonden: misschien een tikfout (tandpsta, komkomer) */
+  if (!out.size && tokens.some(t => t.length >= 5)){
+    const fixed = tokens.map(t => t.length >= 5 ? closestWord(t, items) || t : t);
+    if (fixed.join() !== tokens.join()) return searchRank(fixed, items);
+  }
+  const fixedHome = tokens.length === 1 ? HOMECAT[stemNL(tokens[0])] : null;
+  const home = fixedHome || Object.keys(count).sort((a, b) => count[b] - count[a])[0];
+  if (home) out.forEach((v, d) => { if (!(fixedHome ? [].concat(home) : [home]).includes(d.cat)) out.set(d, v + 3); });
+  return out;
+}
+
+/* het woord uit de productnamen dat één letter verschilt van w; bij meerdere het vaakst voorkomende */
+function closestWord(w, items){
+  const seen = new Map();
+  items.forEach(d => norm(d.name).trim().split(' ').forEach(x => { if (Math.abs(x.length - w.length) <= 1 && x.length >= 4) seen.set(x, (seen.get(x) || 0) + 1); }));
+  let best = null, n = 0;
+  seen.forEach((c, x) => { if (c > n && oneEdit(w, x)){ best = x; n = c; } });
+  return best;
+}
+function oneEdit(a, b){
+  if (a === b) return false;
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1) || (a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2));
+  return a.length < b.length ? a.slice(i) === b.slice(i + 1) : a.slice(i + 1) === b.slice(i);
 }
 
 /* productnaam zonder winkelmerk en formaat: "Jumbo Halfvolle Melk 1 L" -> "halfvolle melk" */

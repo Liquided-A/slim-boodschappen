@@ -8,8 +8,8 @@ const vm = require('vm');
 const ctx = {};
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'web', 'engine.js'), 'utf8') +
-  '\nObject.assign(globalThis, {Engine, priceMatrix, plan, advise, lineCost, packsFor, perUnit, betterValue, muchCheaperElsewhere, fairSaving});', ctx);
-const {Engine, priceMatrix, plan, advise, lineCost, betterValue, muchCheaperElsewhere, fairSaving} = ctx;
+  '\nObject.assign(globalThis, {Engine, priceMatrix, plan, advise, lineCost, packsFor, perUnit, betterValue, muchCheaperElsewhere, fairSaving, searchRank, stemNL});', ctx);
+const {Engine, priceMatrix, plan, advise, lineCost, betterValue, muchCheaperElsewhere, fairSaving, searchRank, stemNL} = ctx;
 /* objecten uit de vm hebben een ander prototype; via JSON vergelijken we alleen de inhoud */
 const plain = x => JSON.parse(JSON.stringify(x));
 const perUnit = c => plain(ctx.perUnit(c));
@@ -199,4 +199,50 @@ test('advies: een verdachte regel is geen reden voor een extra winkel', () => {
   /* op het oog € 15,87 verschil, eerlijk maar € 1,00: bij een drempel van € 2 blijft het 1 winkel */
   assert.strictEqual(advise([fair.one, fair.two], 200, by), 0);
   assert.strictEqual(advise([fair.one, fair.two], 200), 1);
+});
+
+const rank = (q, items) => { const r = searchRank(q.split(' '), items); return [...r].sort((a, b) => a[1] - b[1]).map(x => x[0].name); };
+
+test('zoeken: enkelvoud en meervoud zijn hetzelfde woord', () => {
+  for (const [a, b] of [['banaan', 'bananen'], ['appel', 'appels'], ['tomaat', 'tomaten'], ['peer', 'peren'], ['koek', 'koekjes'], ['ei', 'eieren'], ['kip', 'kippen']])
+    assert.strictEqual(stemNL(a), stemNL(b), a);
+  assert.notStrictEqual(stemNL('kip'), stemNL('kips'));
+});
+
+test('zoeken: echte bananen staan boven drinken en toetjes met banaan', () => {
+  const items = [{name: 'Alpro Sojadrink banaan', cat: 'zuivel-eieren'}, {name: 'AH Knijpfruit appel banaan 6m+', cat: 'groente-fruit'},
+    {name: 'Chiquita Groene bananen', cat: 'groente-fruit'}, {name: 'Bananenchips', cat: 'snoep-koek-chips'}, {name: 'Del Monte Bananen', cat: 'groente-fruit'}];
+  const r = rank('banaan', items);
+  assert.ok(r.slice(0, 2).every(n => /[Bb]ananen$/.test(n)), r.join());
+});
+
+test('zoeken: appels boven appelsap, appelmoes en appeltaart', () => {
+  const items = [{name: 'Hak Appelmoes extra kwaliteit', cat: 'soepen-conserven-sauzen'}, {name: 'Appeltaart', cat: 'brood-bakkerij'},
+    {name: 'AH Appelsap', cat: 'frisdrank'}, {name: 'Elstar appels', cat: 'groente-fruit'}];
+  assert.strictEqual(rank('appel', items)[0], 'Elstar appels');
+});
+
+test('zoeken: peer vindt geen perzik', () => {
+  assert.deepStrictEqual(plain(rank('peer', [{name: 'Perziken op sap', cat: 'x'}, {name: 'Conference peren', cat: 'x'}])), ['Conference peren']);
+});
+
+test('zoeken: alle woorden moeten passen', () => {
+  assert.deepStrictEqual(plain(rank('halfvolle melk', [{name: 'Campina Halfvolle melk', cat: 'z'}, {name: 'Volle melk', cat: 'z'}])), ['Campina Halfvolle melk']);
+});
+
+test('zoeken: roomboter is boter, kipfilet is kip, ijsbergsla is sla', () => {
+  assert.strictEqual(rank('boter', [{name: 'AH Boterkoeken', cat: 'snoep-koek-chips'}, {name: 'Campina Roomboter', cat: 'zuivel-eieren'}])[0], 'Campina Roomboter');
+  assert.strictEqual(rank('kip', [{name: 'AH Bapao kip', cat: 'maaltijden'}, {name: 'Kipfilet', cat: 'vlees'}])[0], 'Kipfilet');
+  assert.strictEqual(rank('sla', [{name: 'Slagers knakworst', cat: 'vlees'}, {name: 'IJsbergsla', cat: 'groente-fruit'}])[0], 'IJsbergsla');
+});
+
+test('zoeken: synoniem en tikfout', () => {
+  const items = [{name: 'Page toiletpapier', cat: 'huishouden'}, {name: 'Prodent tandpasta', cat: 'mondverzorging'}];
+  assert.deepStrictEqual(plain(rank('wc papier', items)), ['Page toiletpapier']);
+  assert.deepStrictEqual(plain(rank('tandpsta', items)), ['Prodent tandpasta']);
+});
+
+test('zoeken: 0% suiker staat onderaan bij suiker; ui vindt geen uit', () => {
+  assert.strictEqual(rank('suiker', [{name: 'Ginger ale 0% suiker', cat: 'frisdrank'}, {name: 'Van Gilse Suikerklontjes', cat: 'ontbijt'}])[0], 'Van Gilse Suikerklontjes');
+  assert.deepStrictEqual(plain(rank('ui', [{name: 'Uit de oven pizza', cat: 'x'}, {name: 'Rode uien', cat: 'x'}])), ['Rode uien']);
 });

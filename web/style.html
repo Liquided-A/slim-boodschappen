@@ -87,18 +87,19 @@ a{color:var(--cta)}
 
 /* aanbiedingen: filters + raster */
 .shop{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;align-items:start}
-@media (min-width:980px){.shop{grid-template-columns:250px minmax(0,1fr)}}
+@media (min-width:980px){.shop{grid-template-columns:290px minmax(0,1fr)}}
 .filters{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:6px 16px 14px;display:flex;flex-direction:column}
 .sidecol{display:flex;flex-direction:column;gap:12px;min-width:0}
 @media (min-width:980px){.sidecol{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--hdrh,64px) + 66px);max-height:calc(100vh - var(--hdr) - 90px)}.filters{overflow:auto;min-height:0}}
 @media (max-width:979px){.filters[data-open="false"]{display:none}}
 .fgroup{border-top:1px solid var(--line);padding-block:12px;display:flex;flex-direction:column;gap:6px}
 .fgroup:first-child{border-top:0}
-.fgroup h3{font-size:.9rem;margin-bottom:2px}
+.fgroup h3{font-size:1.02rem;margin-bottom:2px}
+.storewrap{display:flex;flex-wrap:wrap;gap:8px}
 .fhead{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .fhead .linkbtn{min-height:32px}
-.check{display:flex;align-items:center;gap:9px;font-size:.9rem;cursor:pointer;padding:2px 0}
-.check input{width:17px;height:17px;accent-color:var(--cta);margin:0;flex:none}
+.check{display:flex;align-items:center;gap:10px;font-size:1rem;cursor:pointer;padding:6px 0}
+.check input{width:22px;height:22px;accent-color:var(--cta);margin:0;flex:none}
 .check .n{margin-left:auto;color:var(--muted);font-size:.8rem}
 /* winkelkeuze als knoppen; alleen zonder zijbalk, anders staat dezelfde keuze links */
 .storebar{display:flex;gap:8px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px}

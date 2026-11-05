@@ -1189,6 +1189,19 @@ $('searchform').addEventListener('submit', e => {
   S.q = $('q').value.trim(); S.show = 36; updateQs(); renderShop(); $('q').blur();
 });
 $('more').addEventListener('click', () => { S.show += 36; renderShop(); });
+/* winkelknoppen met de muis verschuiven; na slepen telt het loslaten niet als klik op een winkel */
+(function(){
+  const bar = $('storebar'); let startX = null, startLeft = 0, moved = false;
+  bar.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button === 0){ startX = e.clientX; startLeft = bar.scrollLeft; moved = false; } });
+  window.addEventListener('pointermove', e => {
+    if (startX === null) return;
+    const dx = e.clientX - startX;
+    if (Math.abs(dx) > 5){ moved = true; bar.classList.add('drag'); }
+    if (moved) bar.scrollLeft = startLeft - dx;
+  });
+  window.addEventListener('pointerup', () => { startX = null; bar.classList.remove('drag'); });
+  bar.addEventListener('click', e => { if (moved){ e.stopPropagation(); moved = false; } }, true);
+})();
 $('filtertoggle').addEventListener('click', () => {
   const f = $('filters'), open = f.dataset.open !== 'true';
   f.dataset.open = String(open); $('filtertoggle').setAttribute('aria-expanded', String(open));

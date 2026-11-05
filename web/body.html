@@ -18,13 +18,9 @@
 
 <main>
   <section class="view inner" id="view-shop" aria-labelledby="h-shop">
-    <section class="hero" aria-labelledby="h-hero">
-      <h1 id="h-hero">Zet producten op je lijstje en zie bij welke winkels je het minst betaalt</h1>
-      <button type="button" class="herolink" data-act="scanmenu" id="herolink" hidden>📷 Briefje inlezen</button>
-    </section>
     <div class="storebar" id="storebar" role="group" aria-label="Mijn winkels"></div>
     <div class="crumbs">
-      <div><h2 class="h1like" id="h-shop">Aanbiedingen van deze week</h2><p class="muted small" id="shopsub">Folderacties van alle supermarkten.</p></div>
+      <div><h1 class="h1like" id="h-shop">Aanbiedingen van deze week</h1><p class="muted small" id="shopsub">Folderacties van alle supermarkten.</p></div>
     </div>
     <section class="scan" id="scan" aria-labelledby="h-scan" hidden>
       <div class="scanintro">
@@ -64,6 +60,7 @@
         <div class="grid" id="grid"></div>
         <section class="assort" id="assort" hidden></section>
         <div class="more"><button class="btn ghost" id="more" type="button" hidden>Toon meer</button></div>
+        <p class="qaddrow" id="qaddrow" hidden></p>
       </div>
     </div>
   </section>
@@ -77,20 +74,14 @@
 
   <section class="view inner" id="view-list" aria-labelledby="h-list" hidden>
     <div class="crumbs">
-      <div><h1 id="h-list">Mijn lijstje</h1><p class="muted small">Zet je boodschappen erop, typ ze in of lees een foto van je briefje in. In het overzicht zie je wat het kost en of het loont om meer winkels te combineren.</p></div>
+      <div><h1 id="h-list">Mijn lijstje</h1><p class="muted small">Hier zie je wat je boodschappen kosten, wat je waar haalt en of het loont om meer winkels te combineren.</p></div>
     </div>
     <aside class="summary" id="summary" aria-live="polite"></aside>
     <div class="basket">
       <div class="col">
         <section class="panel" aria-label="Producten">
           <header><h2>Producten</h2><button class="linkbtn" data-act="clear" type="button">Alles wissen</button></header>
-          <div class="addwrap">
-            <form class="add" id="addform" autocomplete="off">
-              <input id="newItem" type="text" placeholder="Product toevoegen, bijv. halfvolle melk 1 l" aria-label="Product toevoegen" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg" enterkeyhint="done">
-              <button type="submit" aria-label="Toevoegen"><span class="tl">Toevoegen</span></button>
-            </form>
-            <div class="sugg" id="sugg" role="listbox" hidden></div>
-          </div>
+          <button type="button" class="scanlink" data-act="scanmenu" id="herolink" hidden>📷 Briefje inlezen</button>
           <div class="often" id="often" hidden></div>
           <div class="often tpls" id="tpls"></div>
           <details class="quick" id="quick"><summary>Snel kiezen met plaatjes</summary><div class="qgrid" id="qgrid"></div></details>
@@ -118,7 +109,7 @@
       <p>Aanbiedingen via <a href="https://www.prijsprofeet.nl" target="_blank" rel="noopener">PrijsProfeet</a>, opgehaald op <span id="pfdate"></span>. Gewone prijzen uit de open data van <a href="https://github.com/supermarkt/checkjebon" target="_blank" rel="noopener">Checkjebon.nl</a>. Folders op <a href="https://www.folderz.nl" target="_blank" rel="noopener">Folderz</a>. Productfoto's van <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (CC BY-SA), voor zover beschikbaar. Deze app is onafhankelijk en heeft geen band met de supermarkten.</p>
       <p>De korting is berekend ten opzichte van de van-prijs die de supermarkt zelf noemt. Bij acties als "1+1 gratis" of "4 voor" rekent de app alleen met de actieprijs als je het hele aantal koopt. Acties met meer dan 70% korting zijn weggelaten, omdat dat bijna altijd een fout in de bron is.</p>
       <p>Van een aantal winkels worden de gewone prijzen niet meer bijgewerkt. Die doen standaard alleen mee met hun actuele aanbiedingen. Dit is een prototype: controleer prijzen en producten in de winkel.</p>
-      <p><a href="https://liquided-a.github.io/slim-boodschappen/privacy.html" target="_blank" rel="noopener">Privacyverklaring</a>: geen account, geen tracking, je lijstje blijft op je telefoon.</p>
+      <p><a href="https://liquided-a.github.io/slim-boodschappen/over.html" target="_blank" rel="noopener">Over Slim Boodschappen</a> · <a href="https://liquided-a.github.io/slim-boodschappen/privacy.html" target="_blank" rel="noopener">Privacyverklaring</a>: geen account, geen tracking, je lijstje blijft op je telefoon.</p>
     </div>
     <div class="tablewrap"><table class="fresh-table"><thead><tr><th>Winkel</th><th>Gewone prijzen</th><th>Aanbiedingen</th></tr></thead><tbody id="freshrows"></tbody></table></div>
   </div>
@@ -169,7 +160,7 @@ function sheetUrl(n){ return CFG && CFG.remote && n >= (CFG.localSheets || 0) ? 
 let ENG = null, STORES = [], CATS = [], DEALS = [], PFETCH = null, HASIMG = false;
 const S = {items:[], off:new Set(), k:null, pins:{}, an:{}, demo:true, nextId:1, oldReg:false, done:new Set(), hist:{},
   q:'', cat:'all', fstores:new Set(), fdisc:0, fmulti:false, fnow:false, fphoto:false, sort:'top', show:36,
-  sugg:[], suggSel:-1, tpl:[]};
+  tpl:[]};
 
 function mmddToDate(mmdd, start){
   if (!mmdd) return null;
@@ -522,20 +513,11 @@ function renderShop(){
     (S.q ? '<button type="button" class="btn primary" data-act="addq">Zet "' + esc(S.q) + '" op mijn lijstje</button>' : '') + '</div>';
   $('more').hidden = list.length <= S.show;
   renderAssort();
+  $('qaddrow').hidden = !S.q || !list.length;
+  if (S.q) $('qaddrow').innerHTML = 'Staat het er niet bij? <button type="button" class="linkbtn" data-act="addq">Zet "' + esc(S.q) + '" op mijn lijstje</button>, dan vergelijkt de app ook de gewone prijzen.';
 }
 
 /* ---------- suggesties ---------- */
-let suggTimer = 0;
-function updateSugg(){ const v = $('newItem').value; S.sugg = v.trim().length >= 3 ? ENG.suggest(v, enabledStores(), 7) : []; S.suggSel = -1; renderSugg(); }
-function renderSugg(){
-  const box = $('sugg'), inp = $('newItem');
-  if (!S.sugg.length){ box.hidden = true; inp.setAttribute('aria-expanded', 'false'); inp.removeAttribute('aria-activedescendant'); return; }
-  box.innerHTML = S.sugg.map((g, j) => '<button type="button" role="option" id="sg' + j + '" data-act="pick" data-j="' + j + '" aria-selected="' + (j === S.suggSel) + '">' + suggImg(g) +
-    '<span class="sq">' + esc(g.q) + '</span><span class="sm">' + g.stores.size + ' winkel' + (g.stores.size === 1 ? '' : 's') + ' · vanaf ' + money(g.min) + '</span></button>').join('');
-  box.hidden = false; inp.setAttribute('aria-expanded', 'true');
-  if (S.suggSel >= 0) inp.setAttribute('aria-activedescendant', 'sg' + S.suggSel); else inp.removeAttribute('aria-activedescendant');
-}
-function closeSugg(){ S.sugg = []; renderSugg(); }
 
 /* ---------- zoekbalk: suggesties uit het hele assortiment ---------- */
 S.qs = [];
@@ -569,7 +551,7 @@ function renderAssort(){
   if (!S.q || !S.qs.length || baseFiltered().length){ el.hidden = true; return; }
   el.hidden = false;
   el.innerHTML = '<header><h2>In het assortiment</h2><span class="small muted">Gewone prijzen, ook als het nergens in de aanbieding is</span></header><div class="arows">' +
-    S.qs.map((g, j) => '<div class="arow"><div><span class="sq">' + esc(g.q) + '</span><span class="sm">' + suggMeta(g) + '</span></div>' +
+    S.qs.map((g, j) => '<div class="arow">' + suggImg(g) + '<div><span class="sq">' + esc(g.q) + '</span><span class="sm">' + suggMeta(g) + '</span></div>' +
       '<button type="button" class="addbtn" data-act="qpick" data-j="' + j + '" aria-pressed="' + hasItem(g.q) + '">' + (hasItem(g.q) ? '✓ Op je lijstje' : '+ Op mijn lijstje') + '</button></div>').join('') + '</div>';
 }
 
@@ -636,7 +618,7 @@ function renderItems(){
       '<div class="stepper"><button type="button" data-act="dec" data-id="' + it.id + '" aria-label="Minder ' + esc(it.q) + '">−</button><span>' + it.qty + '</span>' +
       '<button type="button" data-act="inc" data-id="' + it.id + '" aria-label="Meer ' + esc(it.q) + '">+</button></div>' +
       '<button class="x" type="button" data-act="rm" data-id="' + it.id + '" aria-label="Verwijder ' + esc(it.q) + '">×</button></li>';
-  }).join('') : '<li class="emptyrow empty">Nog niets op je lijstje. Typ hierboven een product of kies een aanbieding.</li>';
+  }).join('') : '<li class="emptyrow empty">Nog niets op je lijstje. Zoek bij Aanbiedingen een product en zet het op je lijstje.</li>';
 }
 function renderStores(){
   $('stores').innerHTML = storeOrder().map(i => {
@@ -812,7 +794,6 @@ function enableScan(mode){
     '<button type="button" class="btn primary scanbtn" data-act="nscan" data-mode="camera">' + ICON_CAM + 'Foto maken</button>' +
     '<button type="button" class="btn ghost scanbtn" data-act="nscan" data-mode="gallery">' + ICON_PIC + 'Screenshot of afbeelding kiezen</button>' +
     (NATIVE.voice ? '<button type="button" class="btn ghost scanbtn" data-act="voice">' + ICON_MIC + 'Inspreken</button>' : '');
-  if (mode === 'native' && NATIVE.voice){ const f = $('addform'); if (!f.querySelector('.micbtn')) f.insertAdjacentHTML('beforeend', '<button type="button" class="micbtn" data-act="voice" aria-label="Boodschappen inspreken">' + ICON_MIC + '</button>'); }
 }
 async function initScan(){
   document.querySelector('.bnav').style.gridTemplateColumns = 'repeat(3,1fr)';
@@ -1093,7 +1074,6 @@ function addItem(q){
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
-  if (!e.target.closest('.addwrap')) closeSugg();
   if (!b || b.tagName === 'SELECT' || b.tagName === 'INPUT') return;
   const act = b.dataset.act, id = +b.dataset.id, it = S.items.find(x => x.id === id);
   if (act === 'inc' && it){ it.qty = Math.min(99, it.qty + 1); }
@@ -1234,7 +1214,6 @@ document.addEventListener('click', e => {
   }
   else if (act === 'openstore'){ S.fstores = new Set([+b.dataset.s]); S.cat = 'all'; S.q = ''; $('q').value = ''; S.show = 36; location.hash = 'aanbiedingen'; renderShop(); return; }
   else if (act === 'addq'){ addItem(S.q); location.hash = 'lijstje'; return; }
-  else if (act === 'pick'){ const g = S.sugg[+b.dataset.j]; closeSugg(); if (g){ addItem(g.q); $('newItem').value = ''; $('newItem').focus(); } return; }
   else return;
   save(); renderList();
 });
@@ -1266,18 +1245,6 @@ $('more').addEventListener('click', () => { S.show += 36; renderShop(); });
 $('filtertoggle').addEventListener('click', () => {
   const f = $('filters'), open = f.dataset.open !== 'true';
   f.dataset.open = String(open); $('filtertoggle').setAttribute('aria-expanded', String(open));
-});
-$('newItem').addEventListener('input', () => { clearTimeout(suggTimer); suggTimer = setTimeout(updateSugg, 140); });
-$('newItem').addEventListener('keydown', e => {
-  if (!S.sugg.length) return;
-  if (e.key === 'ArrowDown'){ e.preventDefault(); S.suggSel = (S.suggSel + 1) % S.sugg.length; renderSugg(); }
-  else if (e.key === 'ArrowUp'){ e.preventDefault(); S.suggSel = (S.suggSel - 1 + S.sugg.length) % S.sugg.length; renderSugg(); }
-  else if (e.key === 'Escape') closeSugg();
-});
-$('addform').addEventListener('submit', e => {
-  e.preventDefault();
-  const f = $('newItem'), q = S.suggSel >= 0 && S.sugg[S.suggSel] ? S.sugg[S.suggSel].q : f.value;
-  clearTimeout(suggTimer); closeSugg(); addItem(q); f.value = ''; f.focus();
 });
 
 /* ---------- opstarten ---------- */

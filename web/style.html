@@ -161,16 +161,6 @@ a{color:var(--cta)}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .panel>header{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 .linkbtn{background:none;border:0;color:var(--cta);padding:2px 0;font-size:.86rem;font-weight:600}
-.addwrap{position:relative}
-form.add{display:flex;gap:8px}
-form.add input{flex:1;min-width:0;padding:11px 14px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
-form.add input:focus{outline:none;border-color:var(--cta)}
-form.add button{border:0;background:var(--cta);color:var(--cta-ink);border-radius:10px;padding:0 18px;font-weight:700}
-.sugg{position:absolute;left:0;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px rgba(14,34,42,.16);z-index:15;padding:6px;display:flex;flex-direction:column;max-height:330px;overflow:auto}
-.sugg button{display:flex;justify-content:space-between;align-items:baseline;gap:12px;background:none;border:0;text-align:left;padding:9px 10px;border-radius:8px}
-.sugg button[aria-selected="true"],.sugg button:hover{background:var(--soft)}
-.sugg .sq{font-weight:600;overflow-wrap:anywhere}
-.sugg .sm{font-size:.78rem;color:var(--muted);white-space:nowrap}
 .hint{font-size:.84rem;color:var(--muted)}
 .scan{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-bottom:20px;box-shadow:var(--shadow)}
 @media (min-width:860px){.scan{grid-template-columns:minmax(0,1fr) auto;align-items:center}.scan #scanout{grid-column:1/-1}}
@@ -331,8 +321,6 @@ tr:last-child td{border-bottom:0}
 .onbstore[aria-pressed="true"]::before{content:"✓ "}
 
 /* inspreken */
-.micbtn{border:1px solid var(--line)!important;background:var(--surface)!important;color:var(--cta)!important;border-radius:10px;width:48px;padding:0!important;display:grid;place-items:center;flex:none}
-.micbtn svg{width:22px;height:22px}
 
 /* snel kiezen met plaatjes */
 details.quick{border:1px solid var(--line);border-radius:12px;background:var(--bg)}
@@ -371,17 +359,16 @@ details.quick[open] summary::after{content:"Sluiten"}
 @media (max-width:720px){.tick{width:40px;height:40px}.line{gap:10px}}
 
 /* zoek-suggesties en assortiment */
-/* mini-fototje bij zoeksuggesties, zodat je producten sneller herkent */
-.sugg .sthumb{width:40px;height:40px;flex:none;border-radius:8px;align-self:center}
-.sugg .sthumb .ph.emo{font-size:1.25rem}
-.sugg button{align-items:center}
-.sugg button .sq{flex:1;min-width:0}
 .assort{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:16px;display:flex;flex-direction:column;gap:8px}
 .assort>header{display:flex;flex-direction:column;gap:2px}
 .assort h2{font-size:1.05rem}
 .arows{display:flex;flex-direction:column}
-.arow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.arow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
 .arow:first-child{border-top:0}
+.sthumb{width:40px;height:40px;border-radius:8px}
+.sthumb .ph.emo{font-size:1.25rem}
+.scanlink{align-self:flex-start;background:var(--surface);border:1px solid var(--line);color:var(--sel);border-radius:9px;padding:0 12px;min-height:44px;font-weight:700;font-size:.9rem}
+.qaddrow{margin:14px 0 0;text-align:center;color:var(--muted);font-size:.92rem}
 .arow .sq{display:block;font-weight:700;overflow-wrap:anywhere}
 .arow .sm{display:block;font-size:.8rem;color:var(--muted)}
 .arow .addbtn{margin:0;padding:9px 12px;white-space:nowrap}
@@ -420,11 +407,6 @@ details.quick[open] summary::after{content:"Sluiten"}
   .toolbar .count{font-size:.82rem}
   .toolbar select{flex:none;max-width:128px;padding-inline:8px}
   .catbar button{padding:10px 14px}
-  form.add input{padding:13px 14px;font-size:1rem}
-  form.add button{padding:0 16px}
-  form.add .tl{display:none}
-  form.add button[type=submit]{width:52px;padding:0}
-  form.add button[type=submit]::before{content:"+";font-size:1.7rem;line-height:1;font-weight:700}
   .switch{width:48px;height:28px}.switch::after{width:22px;height:22px}.switch[aria-checked="true"]::after{left:23px}
   .scanbtns .btn{flex:1 1 100%;justify-content:center;min-height:50px;font-size:1rem}
   .foot .inner{padding-bottom:24px}
@@ -455,10 +437,6 @@ details.quick[open] summary::after{content:"Sluiten"}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:11px 16px;border-radius:12px;font-weight:600;font-size:.9rem;z-index:45;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
 @media (min-width:721px){.toast{bottom:24px}}
 .toastbtn{margin-left:10px;border:0;background:var(--cta);color:var(--cta-ink);border-radius:8px;padding:6px 10px;font-weight:800}
-/* startpagina: kleine banner, de aanbiedingen moeten meteen in beeld zijn */
-.hero{background:var(--sel-bg);color:var(--sel);border-radius:12px;padding:10px 14px;display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:14px}
-.hero h1{font-size:.92rem;line-height:1.35;font-weight:600;letter-spacing:0;margin:0}
-.herolink{flex:none;background:var(--surface);border:1px solid var(--line);color:var(--sel);border-radius:9px;padding:0 12px;min-height:44px;font-weight:700;font-size:.86rem;white-space:nowrap}
 .h1like{font-size:1.35rem;margin:0}
 .scan{padding:10px 14px;gap:10px}
 .scanicon{width:34px;height:34px;border-radius:10px}.scanicon svg{width:19px;height:19px}

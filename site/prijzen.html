@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0E6278">
+<title>Over de prijzen · Slim Boodschappen</title>
+<meta name="description" content="Hoe Slim Boodschappen aan prijzen komt, wanneer ze worden bijgewerkt en waarom ze kunnen afwijken van de prijs in de winkel.">
+<link rel="canonical" href="https://liquided-a.github.io/slim-boodschappen/prijzen.html">
+<link rel="icon" href="icon.png">
+<style>
+:root{--bg:#F2F7F8;--surface:#fff;--ink:#12222A;--muted:#54666D;--line:#DAE5E8;--brand:#0E6278;--cta:#0E7A94;--soft:#DCEEF3;--todo:#FFF6E0;--todoline:#B7791F}
+@media (prefers-color-scheme:dark){:root{--bg:#0D1518;--surface:#162227;--ink:#E8F1F3;--muted:#9BAFB6;--line:#293A41;--brand:#0B4152;--cta:#3DB8D4;--soft:#123540;--todo:#33290F;--todoline:#E0B050}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif}
+header{background:var(--brand);color:#fff;padding:24px 16px 56px;text-align:center}
+header a{color:#fff}
+h1{margin:6px 0 4px;font-size:1.7rem;letter-spacing:-.02em}
+main{max-width:640px;margin:-36px auto 40px;padding:0 16px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px;overflow-wrap:anywhere}
+h2{margin:0 0 8px;font-size:1.15rem}
+h3{margin:16px 0 4px;font-size:1rem}
+p,ul,ol,dl{margin:0 0 10px}
+ul,ol{padding-left:1.2em}
+li{margin-bottom:6px}
+dt{font-weight:700;margin-top:6px}
+dd{margin:0 0 4px}
+a{color:var(--cta)}
+.muted{color:var(--muted);font-size:.92rem}
+.key{background:var(--soft);border-radius:12px;padding:12px 14px;font-weight:600}
+.todo{background:var(--todo);border:2px dashed var(--todoline);border-radius:12px;padding:12px 14px;margin:0 0 10px}
+.links{text-align:center}
+.links a{color:inherit}
+</style>
+</head>
+<body>
+<header>
+  <p style="margin:0"><a href="./">← Slim Boodschappen</a></p>
+  <h1>Over de prijzen</h1>
+  <p style="margin:0;opacity:.9">Waar de prijzen vandaan komen en waarom ze kunnen afwijken.</p>
+</header>
+<main>
+  <section class="card">
+    <p class="key" style="margin:0">Prijzen en aanbiedingen zijn indicatief en kunnen afwijken van de actuele prijzen bij de supermarkt. Controleer de uiteindelijke prijs bij de aanbieder.</p>
+  </section>
+
+  <section class="card">
+    <h2>Waar komen de prijzen vandaan?</h2>
+    <ul>
+      <li><b>Aanbiedingen</b> komen van <a href="https://www.prijsprofeet.nl" rel="noopener">PrijsProfeet</a>.</li>
+      <li><b>Gewone prijzen</b> komen uit de open data van <a href="https://github.com/supermarkt/checkjebon" rel="noopener">Checkjebon</a>.</li>
+    </ul>
+    <p>Slim Boodschappen vraagt zelf geen prijzen op bij de kassa of in de winkel. Van veel kleinere winkels hebben we alleen aanbiedingen en geen gewone prijzen.</p>
+  </section>
+
+  <section class="card">
+    <h2>Wanneer wordt het bijgewerkt?</h2>
+    <ul>
+      <li>De ophaalronde voor aanbiedingen start elke ochtend rond 06:20 (winter) of 07:20 (zomer). Het duurt daarna nog even voordat de nieuwe prijzen online staan, en soms start de ronde later.</li>
+      <li>Lijkt de ronde half mislukt, dan blijven de prijzen van de dag ervoor staan. Liever iets ouder dan onvolledig.</li>
+      <li>De Android-app haalt de nieuwste prijzen op als je hem opent met internet. Zonder internet gebruikt hij de laatst opgehaalde prijzen.</li>
+      <li>Onderaan de app zie je wanneer de aanbiedingen zijn opgehaald. Zijn ze ouder dan anderhalve dag, dan staat er een melding bovenaan.</li>
+      <li>Hoe vaak gewone prijzen veranderen, hangt af van Checkjebon en verschilt per winkel. De tabel onderaan de app laat per winkel zien hoe actueel ze zijn.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Waarom kan een prijs afwijken?</h2>
+    <h3>Prijsverschillen</h3>
+    <p>Supermarkten veranderen hun prijzen regelmatig. Tussen het ophalen en jouw bezoek aan de winkel kan een prijs dus al anders zijn. Ook kan er een fout in de bron zitten.</p>
+    <h3>Online of in de winkel</h3>
+    <p>Prijzen, aanbod en acties kunnen online anders zijn dan in de winkel. Meldt de bron dat een actie alleen in de winkel geldt, dan zet de app dat erbij. Bij acties die alleen online gelden staat dat er nu nog niet bij. Bij gewone prijzen weten we niet altijd of ze uit de webwinkel of uit een filiaal komen.</p>
+    <h3>Tijdelijke aanbiedingen</h3>
+    <p>Een aanbieding geldt een beperkte tijd en zolang de voorraad strekt. Verlopen acties laat de app automatisch weg, en acties die nog moeten beginnen rekent de app niet mee op je lijstje. Soms heb je een klantenkaart nodig of moet je meerdere stuks kopen; als de bron dat meldt, staat het erbij. Bij "1+1 gratis" of "4 voor" rekent de app alleen met de actieprijs als je het hele aantal koopt.</p>
+    <h3>Regionale verschillen</h3>
+    <p>De app kent één prijs per supermarktketen. Er is geen prijs per regio of filiaal, en de app weet niet waar je bent. Vooral bij zelfstandige ondernemers kunnen prijzen, aanbod en acties per winkel anders zijn.</p>
+  </section>
+
+  <section class="card">
+    <h2>Hoe koppelt de app producten?</h2>
+    <p>Elke supermarkt noemt een product anders. Daarom zoekt de app op de woorden die je intypt en op de hoeveelheid, en kiest per winkel wat er het best bij past. Dat gaat automatisch en kan dus misgaan. Het kan een ander merk, formaat of soort zijn.</p>
+    <ul>
+      <li>Is een verpakking groter of kleiner dan gevraagd, dan rekent de app om naar de gevraagde hoeveelheid. Zijn regels omgerekend of is het formaat onbekend, dan zegt de app dat het totaal een schatting is.</li>
+      <li>Een product dat duidelijk niet vergelijkbaar is, bijvoorbeeld veel te duur voor dezelfde hoeveelheid, telt niet mee.</li>
+      <li>Klopt het niet? Kies zelf een ander product. Daar rekent de app dan mee.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Oude gewone prijzen staan standaard uit</h2>
+    <p>Van sommige winkels veranderen de gewone prijzen in Checkjebon al lange tijd niet meer. Zijn ze meer dan 92 dagen niet veranderd, dan tellen we ze als verouderd. Zulke winkels doen standaard alleen mee met hun actuele aanbiedingen.</p>
+    <p>Je kunt oude prijzen zelf aanzetten. Dan zie je bij die winkels duidelijk van welke maand ze zijn. Gebruik ze alleen als ruwe schatting.</p>
+  </section>
+
+  <section class="card">
+    <h2>Als een prijs onbekend is</h2>
+    <ul>
+      <li>We verzinnen geen prijs. Vindt de app niets passends, dan staat er "Niet gevonden" en telt het product niet mee in het totaal. Het echte bedrag kan dus hoger zijn.</li>
+      <li>Is het formaat onbekend, dan zie je de prijs per verpakking en geen prijs per kilo of liter.</li>
+      <li>Is de losse prijs bij een meerstuksactie onbekend, dan rekent de app met de hele actie.</li>
+      <li>Bij winkels zonder gewone prijzen kan een product dus ontbreken, ook als het daar wel ligt.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Wat we weglaten</h2>
+    <ul>
+      <li>Acties met 70% korting of meer: dat is bijna altijd een fout in de bron.</li>
+      <li>Acties zonder einddatum die al meer dan 60 dagen lopen: die zijn meestal blijven hangen.</li>
+      <li>Producten met een prijs die te laag is om te kloppen.</li>
+    </ul>
+    <p>De korting die je ziet, is berekend ten opzichte van de van-prijs die de bron noemt. Of die van-prijs ook echt eerder is gevraagd, controleren wij niet.</p>
+  </section>
+
+  <section class="card">
+    <h2>In welke volgorde zie je producten?</h2>
+    <p>Zoek je iets, dan staat wat het best bij je zoekwoorden past bovenaan. Zonder zoekwoord staan lopende acties met een foto en een hoge korting vooraan, waarbij de app dezelfde soort producten van één winkel wat verspreidt. Je kunt zelf sorteren, bijvoorbeeld op prijs of korting. Op dit moment krijgen we voor de volgorde geen geld van supermarkten of anderen.</p>
+  </section>
+
+  <section class="card">
+    <h2>Fout gezien?</h2>
+    <p>Klopt er iets niet? Laat het weten via <a href="contact.html">Contact</a>. Lees ook de <a href="voorwaarden.html">gebruiksvoorwaarden</a>.</p>
+    <p class="muted">Laatst bijgewerkt: 5 november 2026.</p>
+  </section>
+
+  <p class="muted links"><a href="app.html">Naar de app</a> · <a href="./">Downloaden</a> · <a href="over.html">Over</a> · <a href="prijzen.html">Over de prijzen</a> · <a href="privacy.html">Privacy</a> · <a href="cookies.html">Cookies</a> · <a href="voorwaarden.html">Voorwaarden</a> · <a href="contact.html">Contact</a></p>
+</main>
+</body>
+</html>

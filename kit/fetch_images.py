@@ -8,7 +8,7 @@ from PIL import Image
 
 promof, mapf, imgdir = sys.argv[1:4]
 max_new = int(sys.argv[4]) if len(sys.argv) > 4 else 100000
-UA = {'User-Agent': 'SlimBoodschappen/0.1 (westraarnold@gmail.com)'}
+UA = {'User-Agent': 'SlimBoodschappen/1.0 (+https://github.com/Liquided-A/slim-boodschappen/issues)'}
 NONFOOD = {'huishouden', 'huidverzorging', 'haarverzorging', 'mondverzorging', 'deodorant', 'drogisterij', 'gezondheid', 'huisdier'}
 TILE, GRID = 120, 10
 
@@ -55,7 +55,7 @@ for k, e in enumerate(wanted):
         url = None
     if url:
         try:
-            im = Image.open(io.BytesIO(get(url))).convert('RGB')
+            im = Image.open(io.BytesIO(get(url)), formats=['JPEG', 'PNG', 'WEBP']).convert('RGB')
             im.thumbnail((TILE - 8, TILE - 8))
             idx = state['next']; n, pos = divmod(idx, GRID * GRID)
             sh = sheet(n); x, y = (pos % GRID) * TILE, (pos // GRID) * TILE

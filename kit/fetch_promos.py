@@ -4,7 +4,7 @@ Gebruik: python3 -I fetch_promos.py uitvoer.json
 import json, sys, time, urllib.request, urllib.error
 
 BASE = 'https://www.prijsprofeet.nl/api/v1/products/promotional/all'
-UA = 'SlimBoodschappen/0.1 (prototype; westraarnold@gmail.com)'
+UA = 'SlimBoodschappen/1.0 (+https://github.com/Liquided-A/slim-boodschappen/issues)'
 KEEP = ['product_id', 'name', 'brand', 'ean', 'price', 'original_price', 'quantity', 'unit', 'unit_price',
         'product_url', 'image_url', 'retailer', 'unified_category', 'promotion_status', 'promotion_type',
         'promotional_keywords', 'savings_percentage', 'multi_buy_quantity', 'multi_buy_price',

@@ -8,8 +8,8 @@ const vm = require('vm');
 const ctx = {};
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'web', 'engine.js'), 'utf8') +
-  '\nObject.assign(globalThis, {Engine, priceMatrix, plan, advise, lineCost, packsFor, perUnit, betterValue, muchCheaperElsewhere, fairSaving, searchRank, stemNL});', ctx);
-const {Engine, priceMatrix, plan, advise, lineCost, betterValue, muchCheaperElsewhere, fairSaving, searchRank, stemNL} = ctx;
+  '\nObject.assign(globalThis, {Engine, priceMatrix, plan, advise, lineCost, packsFor, perUnit, betterValue, muchCheaperElsewhere, fairSaving, searchRank, stemNL, storeTotals, sortStoreTotals, guessCats});', ctx);
+const {Engine, priceMatrix, plan, advise, lineCost, betterValue, muchCheaperElsewhere, fairSaving, searchRank, stemNL, storeTotals, sortStoreTotals, guessCats} = ctx;
 /* objecten uit de vm hebben een ander prototype; via JSON vergelijken we alleen de inhoud */
 const plain = x => JSON.parse(JSON.stringify(x));
 const perUnit = c => plain(ctx.perUnit(c));
@@ -245,4 +245,162 @@ test('zoeken: synoniem en tikfout', () => {
 test('zoeken: 0% suiker staat onderaan bij suiker; ui vindt geen uit', () => {
   assert.strictEqual(rank('suiker', [{name: 'Ginger ale 0% suiker', cat: 'frisdrank'}, {name: 'Van Gilse Suikerklontjes', cat: 'ontbijt'}])[0], 'Van Gilse Suikerklontjes');
   assert.deepStrictEqual(plain(rank('ui', [{name: 'Uit de oven pizza', cat: 'x'}, {name: 'Rode uien', cat: 'x'}])), ['Rode uien']);
+});
+
+/* ---------- ontbrekende prijzen ---------- */
+const cell = price => ({price, mode: 'exact'});
+
+test('per winkel: totaal, aantal en welke producten ontbreken', () => {
+  const m = [[cell(100), cell(120)], [cell(200), null], [null, null]];
+  const t = plain(storeTotals(m, [4, 7]));
+  assert.deepStrictEqual(t[0], {store: 4, total: 300, count: 2, items: 3, missing: [2], complete: true, suspect: 0});
+  assert.deepStrictEqual(t[1], {store: 7, total: 120, count: 1, items: 3, missing: [1, 2], complete: false, suspect: 0});
+});
+
+test('per winkel: regels die veel duurder zijn dan elders worden geteld, het totaal blijft gelijk', () => {
+  /* bananensoesjes bij bananen: 3 keer zo duur of meer telt als mogelijk verkeerd product */
+  const m = [[cell(1745), cell(258)], [cell(100), cell(120)], [cell(900), cell(300)], [cell(500), null]];
+  const t = plain(storeTotals(m, [0, 1]));
+  assert.strictEqual(t[0].suspect, 2);
+  assert.strictEqual(t[0].total, 3245);
+  assert.strictEqual(t[1].suspect, 0);
+});
+
+test('per winkel: een regel met onbekend formaat of zonder vergelijking telt niet als mogelijk verkeerd', () => {
+  const m = [[{price: 1000, mode: 'unknown'}, cell(100)], [cell(1000), {price: 100, mode: 'other'}], [cell(1000), null]];
+  assert.ok(plain(storeTotals(m, [0, 1])).every(x => x.suspect === 0));
+});
+
+test('een product zonder prijs telt nooit als 0', () => {
+  /* winkel 0 lijkt met een lege of nul-prijs goedkoper, maar die regels tellen niet mee */
+  const m = [[cell(0), cell(150)], [{mode: 'exact'}, cell(250)], [cell(NaN), cell(80)]];
+  const t = plain(storeTotals(m, [0, 1]));
+  assert.strictEqual(t[0].count, 0);
+  assert.strictEqual(t[0].total, 0);
+  assert.strictEqual(t[0].complete, false);
+  assert.deepStrictEqual(t[0].missing, [0, 1, 2]);
+  const pl = plan(m, [0, 1], 2);
+  assert.deepStrictEqual(plain(pl.result[0].combo), [1]);
+  assert.strictEqual(pl.result[0].total, 480);
+});
+
+test('een regel met prijs 0 in de data wordt geen treffer', () => {
+  const A = store('A', [['A pindakaas 350 g', 0, 1, 350]]);
+  const B = store('B', [['B pindakaas 350 g', 249, 1, 350]]);
+  const {m, pl} = basket([A, B], [{id: 1, q: 'pindakaas 350 g', qty: 1}]);
+  assert.strictEqual(m[0][0], null);
+  assert.strictEqual(pl.result[0].total, 249);
+});
+
+test('een product dat nergens een prijs heeft blijft op de lijst en breekt de vergelijking niet', () => {
+  const A = store('A', [['A pindakaas 350 g', 249, 1, 350]]);
+  const B = store('B', [['B pindakaas 350 g', 199, 1, 350]]);
+  const items = [{id: 1, q: 'pindakaas 350 g', qty: 1}, {id: 2, q: 'xqzt', qty: 1}];
+  const {m, pl} = basket([A, B], items);
+  assert.strictEqual(m.length, 2);
+  assert.deepStrictEqual(plain(pl.missing), [1]);
+  assert.strictEqual(pl.result[0].total, 199);
+  const t = plain(storeTotals(m, [0, 1]));
+  assert.ok(t.every(x => x.complete && x.count === 1 && x.items === 2));
+});
+
+test('alleen producten zonder prijs: niets gevonden en geen advies', () => {
+  const pl = plan([[null, null]], [0, 1], 2);
+  assert.deepStrictEqual(plain(pl.found), []);
+  assert.deepStrictEqual(plain(pl.missing), [0]);
+  assert.strictEqual(plain(storeTotals([[null, null]], [0, 1]))[0].count, 0);
+});
+
+test('winkel met weinig producten staat niet bovenaan, ook al is hij het goedkoopst', () => {
+  const m = [[cell(100), cell(150), null], [null, cell(300), cell(250)], [null, cell(200), cell(190)]];
+  const t = plain(sortStoreTotals(storeTotals(m, [0, 1, 2])));
+  assert.deepStrictEqual(t.map(x => x.store), [1, 2, 0]);
+  assert.strictEqual(t[0].complete, true);
+  assert.strictEqual(t[1].complete, false);
+});
+
+test('gelijk aantal producten: laagste totaal eerst', () => {
+  const t = plain(sortStoreTotals(storeTotals([[cell(300), cell(200)]], [0, 1])));
+  assert.deepStrictEqual(t.map(x => x.store), [1, 0]);
+});
+
+test('complete winkel: totaal gelijk aan het plan voor 1 winkel', () => {
+  const m = [[cell(100), cell(120)], [cell(200), cell(150)]];
+  const pl = plan(m, [0, 1], 2), t = plain(sortStoreTotals(storeTotals(m, [0, 1])));
+  assert.strictEqual(t[0].total, pl.result[0].total);
+  assert.deepStrictEqual(plain(pl.result[0].combo), [t[0].store]);
+});
+
+test('geen enkele winkel heeft alles: advies blijft bij 2 winkels, 1 winkel toont de beste deeloplossing', () => {
+  const m = [[cell(100), null, cell(90)], [cell(200), cell(150), null], [null, cell(300), cell(320)]];
+  const pl = plan(m, [0, 1, 2], 2);
+  assert.strictEqual(pl.result[0], null);
+  assert.strictEqual(advise(pl.result, 200), 1);
+  /* elke winkel heeft er 2 van de 3: winkel 0 is dan het goedkoopst (300), en mist product 2 */
+  assert.deepStrictEqual(plain(pl.partial[0].combo), [0]);
+  assert.strictEqual(pl.partial[0].total, 300);
+  assert.deepStrictEqual(plain(pl.partial[0].lack), [2]);
+  assert.strictEqual(pl.partial[1], null);
+});
+
+test('deeloplossing: meeste producten gaat boven laagste totaal', () => {
+  const m = [[cell(100), cell(900)], [null, cell(900)], [null, cell(1)], [cell(5), null]];
+  const pl = plan(m, [0, 1], 1);
+  assert.deepStrictEqual(plain(pl.partial[0].combo), [1]);
+  assert.strictEqual(pl.partial[0].assign.length, 3);
+});
+
+test('te veel winkels nodig: geen resultaat, wel een deeloplossing', () => {
+  const m = [[cell(100), null, null], [null, cell(100), null], [null, null, cell(100)]];
+  const pl = plan(m, [0, 1, 2], 2);
+  assert.strictEqual(advise(pl.result, 200), -1);
+  assert.strictEqual(pl.partial[1].assign.length, 2);
+});
+
+/* ---------- zoeken in het gewone assortiment ---------- */
+test('assortiment: per naam gegroepeerd, zonder acties, zonder prijs 0 en zonder wat setMask uitzet', () => {
+  const A = store('A', [['A Bananen 1 kg', 199, 1, 1000], ['A Halfvolle melk 1 l', 0, 2, 1000]],
+    [{row: ['A Pindakaas 350 g', 199, 1, 350]}]);
+  const B = store('B', [['B Bananen 1 kg', 179, 1, 1000]]);
+  const eng = new Engine([A, B]);
+  /* winkel B heeft bijvoorbeeld oude gewone prijzen */
+  eng.setMask(s => s === 0);
+  assert.deepStrictEqual(plain(eng.assortment()).map(g => [g.name, g.rows]), [['Bananen', [[0, 0]]]]);
+  eng.setMask(() => true);
+  assert.deepStrictEqual(plain(eng.assortment()).map(g => g.rows), [[[0, 0], [1, 0]]]);
+});
+
+test('assortiment: laagste prijs van het gangbare formaat, alleen in je eigen winkels', () => {
+  const A = store('A', [['Bananen 1 kg', 199, 1, 1000], ['Bananen 1 st', 25, 3, 1]]);
+  const B = store('B', [['Bananen 1 kg', 179, 1, 1000]]);
+  const C = store('C', [['Bananen 1 kg', 149, 1, 1000]]);
+  const eng = new Engine([A, B, C]);
+  const g = eng.assortment()[0];
+  const o = eng.assortOffer(g, new Set([0, 1]));
+  assert.strictEqual(o.price, 179);
+  assert.strictEqual(o.s, 1);
+  assert.strictEqual(o.q, 'bananen 1 kg');
+  assert.strictEqual(eng.assortOffer(g, new Set([5])), null);
+});
+
+test('zoeken: een gewone banaan staat boven een drankje met banaan in de aanbieding', () => {
+  const items = [{name: 'Alpro Sojadrink banaan', cat: 'zuivel-eieren'}, {name: 'Bananen', cat: ''}, {name: 'Bananenbrood', cat: ''}];
+  const r = rank('banaan', items);
+  assert.strictEqual(r[0], 'Bananen');
+  assert.ok(r.indexOf('Alpro Sojadrink banaan') > 0);
+});
+
+test('zoeken: gewone producten zonder afdeling zakken niet en bepalen de afdeling niet', () => {
+  const items = [{name: 'Pindasaus', cat: 'soepen-conserven-sauzen'}, {name: 'Pindas gezouten', cat: ''}, {name: 'Pindas ongezouten', cat: ''}, {name: 'Pindas', cat: 'snoep-koek-chips'}];
+  const r = searchRank(['pindas'], items);
+  assert.strictEqual(r.get(items[1]), r.get(items[2]));
+  assert.strictEqual(rank('pindas', items)[0], 'Pindas');
+});
+
+test('afdeling van gewone producten: geleend van aanbiedingen, bij twijfel onbekend', () => {
+  const deals = [{name: 'AH Halfvolle melk', cat: 'zuivel-eieren'}, {name: 'Milka chocoladeletter', cat: 'snoep-koek-chips'}, {name: 'Verkade chocoladeletter', cat: 'snoep-koek-chips'},
+    {name: 'Dole bananen', cat: 'groente-fruit'}, {name: 'Chiquita bananen', cat: 'groente-fruit'}];
+  const groups = [{base: 'halfvolle melk'}, {base: 'chocoladeletter'}, {base: 'bananen'}, {base: 'bananen soesjes'}];
+  guessCats(groups, deals);
+  assert.deepStrictEqual(plain(groups.map(g => g.cat)), ['zuivel-eieren', 'snoep-koek-chips', 'groente-fruit', '']);
 });

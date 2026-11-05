@@ -20,17 +20,18 @@ concurrency:
 jobs:
   bijwerken:
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
 
-      - run: pip install pillow
+      - run: pip install pillow==13.0.0
 
       - name: Nieuwe prijzen en aanbiedingen ophalen
         if: github.event_name != 'push'
@@ -55,7 +56,13 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m "Nieuwe productfoto's $(date +%F)"
             # --autostash: data/data.b64 is hier gewijzigd maar wordt niet bewaard; zonder dit weigert git de pull
-            for i in 1 2 3; do git pull --rebase --autostash -X theirs origin main && git push && exit 0; sleep 5; done
+            # lukt de rebase niet, dan afbreken: anders blijft de repo halverwege staan en zit de nieuwe data.b64 nog in de autostash
+            for i in 1 2 3; do
+              if git pull --rebase --autostash origin main; then git push && exit 0
+              else git rebase --abort || true; fi
+              sleep 5
+            done
+            cp /tmp/data.b64 data/data.b64
             echo "::warning::Nieuwe foto's konden niet worden bewaard"
           fi
 
@@ -75,6 +82,8 @@ jobs:
 
       - name: Website samenstellen
         run: |
+          # de gecontroleerde prijzen van deze run gaan altijd voor, wat er bij het bewaren van de foto's ook gebeurde
+          if [ -f /tmp/data.b64 ]; then cp /tmp/data.b64 data/data.b64; fi
           mkdir -p _site/img
           cp data/data.b64 _site/
           cp data/img/s*.jpg _site/img/
@@ -82,9 +91,9 @@ jobs:
           python3 -I web/assemble.py --wrap web/style.html web/body.html web/engine.js data/data.b64 _site/app.html
           touch _site/.nojekyll
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: _site
 
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

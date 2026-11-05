@@ -2,77 +2,185 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E6278">
 <title>Privacyverklaring · Slim Boodschappen</title>
-<meta name="description" content="Slim Boodschappen werkt zonder account, zonder tracking en zonder reclame. Je boodschappenlijstje blijft op je eigen telefoon.">
+<meta name="description" content="Welke gegevens Slim Boodschappen gebruikt, waarvoor, hoe lang en welke rechten je hebt. Zonder account en zonder advertenties; je lijstje blijft op je eigen toestel.">
 <link rel="canonical" href="https://liquided-a.github.io/slim-boodschappen/privacy.html">
 <link rel="icon" href="icon.png">
 <style>
-:root{--bg:#F2F7F8;--surface:#fff;--ink:#12222A;--muted:#54666D;--line:#DAE5E8;--brand:#0E6278;--cta:#0E7A94}
-@media (prefers-color-scheme:dark){:root{--bg:#0D1518;--surface:#162227;--ink:#E8F1F3;--muted:#9BAFB6;--line:#293A41;--brand:#0B4152;--cta:#3DB8D4}}
+:root{--bg:#F2F7F8;--surface:#fff;--ink:#12222A;--muted:#54666D;--line:#DAE5E8;--brand:#0E6278;--cta:#0E7A94;--soft:#DCEEF3;--todo:#FFF6E0;--todoline:#B7791F}
+@media (prefers-color-scheme:dark){:root{--bg:#0D1518;--surface:#162227;--ink:#E8F1F3;--muted:#9BAFB6;--line:#293A41;--brand:#0B4152;--cta:#3DB8D4;--soft:#123540;--todo:#33290F;--todoline:#E0B050}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif}
 header{background:var(--brand);color:#fff;padding:24px 16px 56px;text-align:center}
 header a{color:#fff}
 h1{margin:6px 0 4px;font-size:1.7rem;letter-spacing:-.02em}
 main{max-width:640px;margin:-36px auto 40px;padding:0 16px;display:flex;flex-direction:column;gap:16px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px;overflow-wrap:anywhere}
 h2{margin:0 0 8px;font-size:1.15rem}
-p,ul{margin:0 0 10px}
-ul{padding-left:1.2em}
+h3{margin:16px 0 4px;font-size:1rem}
+p,ul,ol,dl{margin:0 0 10px}
+ul,ol{padding-left:1.2em}
 li{margin-bottom:6px}
+dt{font-weight:700;margin-top:6px}
+dd{margin:0 0 4px}
 a{color:var(--cta)}
 .muted{color:var(--muted);font-size:.92rem}
+.key{background:var(--soft);border-radius:12px;padding:12px 14px;font-weight:600}
+.todo{background:var(--todo);border:2px dashed var(--todoline);border-radius:12px;padding:12px 14px;margin:0 0 10px}
+.links{text-align:center}
+.links a{color:inherit}
 </style>
 </head>
 <body>
 <header>
   <p style="margin:0"><a href="./">← Slim Boodschappen</a></p>
   <h1>Privacyverklaring</h1>
-  <p style="margin:0;opacity:.9">Kort gezegd: geen account, geen tracking, geen reclame.</p>
+  <p style="margin:0;opacity:.9">Geen account, geen advertenties, en je lijstje blijft op je eigen toestel.</p>
 </header>
 <main>
   <section class="card">
-    <h2>Wat we níét doen</h2>
+    <h2>In het kort</h2>
     <ul>
-      <li>Je hoeft geen account te maken en we vragen geen naam, e-mailadres of telefoonnummer.</li>
-      <li>We volgen je niet: geen analyse- of advertentiediensten, geen trackingcookies.</li>
-      <li>We verkopen of delen geen gegevens, want we verzamelen ze niet.</li>
+      <li>Je hoeft geen account te maken. We vragen geen naam, e-mailadres of telefoonnummer.</li>
+      <li>Slim Boodschappen heeft geen eigen server en geen gebruikersdatabase. Je lijstje en je instellingen blijven op je eigen toestel. Wij kunnen er niet bij.</li>
+      <li>We gebruiken zelf geen analyse- of advertentiediensten en geen trackingcookies. We verkopen geen gegevens.</li>
+      <li>Toch zien andere partijen iets als je de app gebruikt: GitHub, de servers met productfoto's en, in de Android-app, Google. Hieronder lees je precies wat.</li>
     </ul>
   </section>
 
   <section class="card">
-    <h2>Wat er op je eigen telefoon blijft</h2>
+    <h2>Wie is verantwoordelijk?</h2>
+    <p>Slim Boodschappen is een gratis testproject.</p>
+    <p class="todo"><b>Nog niet ingevuld.</b> Naam en contactgegevens van de verantwoordelijke: <i>[nog in te vullen door de eigenaar]</i>. Zolang hier niets staat, is deze pagina nog niet compleet.</p>
+    <p>Voor vragen kun je voorlopig terecht op de pagina <a href="contact.html">Contact</a>.</p>
+  </section>
+
+  <section class="card">
+    <h2>Wat op je eigen toestel blijft</h2>
+    <p>Dit staat alleen in de opslag van je browser of de app. Het wordt niet naar ons gestuurd:</p>
     <ul>
-      <li>Je boodschappenlijstje, vaste lijstjes, gekozen winkels en instellingen worden alleen op je eigen toestel bewaard (in de opslag van de app of je browser). Wis je de app of de browsergegevens, dan zijn ze weg.</li>
-      <li>De Android-app kan deze gegevens meenemen in de back-up van je Google-account, als je die back-up op je telefoon hebt aangezet. Dat regel je zelf in de instellingen van je telefoon.</li>
-      <li>Een foto of screenshot van je boodschappenbriefje wordt in de Android-app op je telefoon zelf gelezen (met Google ML Kit). De foto wordt niet naar ons of naar een server gestuurd.</li>
-      <li>Kies je voor <b>inspreken</b>, dan gebruikt de app de spraakherkenning van je telefoon. Afhankelijk van je telefoon kan die je stem naar Google sturen om de tekst te herkennen; daarvoor gelden de voorwaarden van Google.</li>
-      <li>Deel je een lijstje, dan staat het in de link zelf. Je bepaalt zelf met wie je die link deelt.</li>
+      <li>je boodschappenlijstje met aantallen en wat je hebt afgevinkt;</li>
+      <li>je vaste lijstjes (maximaal 12) en hoeveel je dit jaar met aanbiedingen hebt bespaard;</li>
+      <li>welke producten je vaak toevoegt (maximaal 120), voor snellere suggesties;</li>
+      <li>je gekozen winkels en je instellingen, zoals tekstgrootte, thema en aantal personen;</li>
+      <li>in de Android-app ook de laatst opgehaalde prijzen en het moment van de laatste updatecheck.</li>
     </ul>
+    <p>Een boodschappenlijstje kan iets over je zeggen, bijvoorbeeld over je gezin, gezondheid of geloof. Daarom is het goed om te weten dat het je toestel niet verlaat, behalve als je het zelf deelt of een back-up gebruikt (zie hieronder).</p>
+    <p><b>Bewaartermijn:</b> tot je het zelf wist. Wis je de browsergegevens of verwijder je de app, dan is het weg.</p>
   </section>
 
   <section class="card">
-    <h2>Welke diensten je wel ziet</h2>
-    <p>Om te werken haalt de app gegevens op bij andere diensten. Die zien daarbij, zoals bij elke website, je IP-adres en het soort toestel:</p>
+    <h2>Welke gegevens, waarvoor en hoe lang</h2>
+
+    <h3>De website en de prijzen ophalen</h3>
+    <dl>
+      <dt>Gegevens</dt><dd>Je IP-adres, het tijdstip, wat er wordt opgevraagd en technische gegevens over je browser of toestel.</dd>
+      <dt>Doel</dt><dd>De pagina's, prijzen en de download leveren en de dienst beveiligen.</dd>
+      <dt>Grondslag</dt><dd>Gerechtvaardigd belang (artikel 6 lid 1 onder f AVG): zonder dit werkt een website niet.</dd>
+      <dt>Bewaartermijn</dt><dd>GitHub schrijft dat het het IP-adres van bezoekers logt en bewaart voor de beveiliging, ook als je niet bent ingelogd. Een vaste termijn voor deze logs noemt GitHub niet. Die kunnen we je dus niet geven. Wij krijgen deze logs niet.</dd>
+      <dt>Wie</dt><dd>GitHub, dat hiervoor zijn eigen <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener">privacyverklaring</a> heeft.</dd>
+    </dl>
+
+    <h3>Kijken of er een nieuwe app-versie is (Android)</h3>
+    <p>De Android-app vraagt ongeveer eens per zes uur aan GitHub of er een nieuwe versie is, en haalt daar de nieuwste prijzen en foto's op. GitHub ziet daarbij je IP-adres en technische gegevens. Doel, grondslag en bewaartermijn zijn gelijk aan die van de website.</p>
+
+    <h3>Productfoto's</h3>
+    <dl>
+      <dt>Gegevens</dt><dd>Veel foto's komen rechtstreeks van de servers van supermarkten en hun dienstverleners. Die zien je IP-adres, technische gegevens en welke foto wordt opgevraagd. De app stuurt daarbij niet mee op welke pagina je zit, en je lijstje gaat er niet heen.</dd>
+      <dt>Doel</dt><dd>Laten zien om welk product het gaat.</dd>
+      <dt>Grondslag</dt><dd>Gerechtvaardigd belang (artikel 6 lid 1 onder f AVG): een product herkenbaar tonen.</dd>
+      <dt>Bewaartermijn</dt><dd>Niet bekend. Dat bepalen die partijen zelf. Wij krijgen deze gegevens niet.</dd>
+      <dt>Wie</dt><dd>Op dit moment onder meer AH, Jumbo, Lidl, PLUS, ALDI, Dirk, Poiesz, DekaMarkt, Hoogvliet, Ekoplaza en Amazing Oriental, en dienstverleners zoals Contentful, Adobe (Scene7), jafolders en kinessoint.com. Foto's van Open Food Facts staan in onze eigen fotobladen bij GitHub; daarvoor maakt je toestel geen verbinding met Open Food Facts.</dd>
+    </dl>
+
+    <h3>Een briefje inlezen (Android)</h3>
+    <dl>
+      <dt>Gegevens</dt><dd>De foto of screenshot die je kiest en de tekst die erin staat.</dd>
+      <dt>Doel</dt><dd>Je briefje omzetten naar een lijstje, omdat jij daarom vraagt.</dd>
+      <dt>Waar</dt><dd>Op je telefoon, met Google ML Kit. Volgens Google gaan de foto en de herkende tekst niet naar de servers van Google. Ze gaan ook niet naar ons.</dd>
+      <dt>Bewaartermijn</dt><dd>Een foto die je in de app maakt, blijft in de tijdelijke map van de app staan tot de volgende foto, of tot je de cache of de app wist. Een foto uit je galerij wordt niet gekopieerd.</dd>
+    </dl>
+
+    <h3>Technische gegevens van ML Kit naar Google (Android)</h3>
+    <dl>
+      <dt>Gegevens</dt><dd>ML Kit stuurt wel technische gegevens naar Google: merk, model en Android-versie, de naam en versie van de app, een nummer per installatie, en cijfers over snelheid, gebruik en fouten. Google zegt dat dit geen foto's of herkende tekst zijn.</dd>
+      <dt>Doel</dt><dd>Volgens Google: de techniek meten, onderhouden, verbeteren en misbruik opsporen.</dd>
+      <dt>Grondslag</dt><dd>Gerechtvaardigd belang (artikel 6 lid 1 onder f AVG): de tekstherkenning kunnen aanbieden.</dd>
+      <dt>Bewaartermijn</dt><dd>Niet bekend. Dat bepaalt Google. Wij krijgen deze gegevens niet, en we vonden in de documentatie van Google geen uitknop. Wil je dit niet, gebruik dan de browserversie: daarin zit ML Kit niet.</dd>
+      <dt>Meer weten</dt><dd><a href="https://developers.google.com/ml-kit/android-data-disclosure" rel="noopener">Uitleg van Google over ML Kit</a>.</dd>
+    </dl>
+
+    <h3>Inspreken (Android)</h3>
+    <p>Kies je voor inspreken, dan opent de spraakherkenning van je telefoon. De app zelf neemt niets op en krijgt alleen de herkende tekst terug. Afhankelijk van je telefoon kan je stem naar Google of de fabrikant gaan. Daarvoor gelden hun voorwaarden; dat regel je zelf in je telefoon.</p>
+
+    <h3>Back-up (Android)</h3>
+    <p>De app staat Android-back-ups toe. Heb je de back-up van je telefoon aangezet, dan kan Android je lijstje en instellingen opslaan in een afgeschermd deel van je Google-account. Volgens Google is die back-up vanaf Android 9 versleuteld als je een schermvergrendeling gebruikt. De tijdelijke map met je laatste foto gaat niet mee. Wij kunnen niet bij deze back-up. Je zet hem aan of uit in de instellingen van je telefoon.</p>
+
+    <h3>Een lijstje delen</h3>
+    <p>Delen doe je zelf. De tekst en de link gaan naar de app of persoon die jij kiest, bijvoorbeeld WhatsApp. De link is niet beveiligd: wie hem heeft, kan het lijstje lezen. Het deel van de link met je lijstje wordt niet naar GitHub gestuurd als iemand hem opent.</p>
+
+    <h3>Een melding maken op GitHub</h3>
+    <dl>
+      <dt>Gegevens</dt><dd>Je GitHub-gebruikersnaam en alles wat je zelf in de melding schrijft. Dit is openbaar. Zet er dus geen persoonlijke gegevens in.</dd>
+      <dt>Doel</dt><dd>Je vraag of melding behandelen.</dd>
+      <dt>Grondslag</dt><dd>Gerechtvaardigd belang (artikel 6 lid 1 onder f AVG): vragen en fouten kunnen oppakken.</dd>
+      <dt>Bewaartermijn</dt><dd>De melding blijft zichtbaar tot die wordt verwijderd. Je kunt vragen om verwijdering.</dd>
+    </dl>
+
+    <h3>Links naar andere websites</h3>
+    <p>Tik je op een link naar een supermarkt, Folderz, WhatsApp, PrijsProfeet, Open Food Facts of GitHub, dan verlaat je Slim Boodschappen. Daar gelden hun eigen privacy- en cookieregels.</p>
+
+    <h3>De dagelijkse prijsimport</h3>
+    <p>Prijzen worden één keer per dag automatisch opgehaald via GitHub Actions. Daarbij worden geen gegevens van bezoekers gebruikt.</p>
+  </section>
+
+  <section class="card">
+    <h2>Wie ontvangt gegevens?</h2>
     <ul>
-      <li><b>GitHub</b> (van Microsoft): hier staan de website, de prijzen en de download van de app. De Android-app kijkt hier ook ongeveer eens per zes uur of er een nieuwe versie is.</li>
-      <li><b>Productfoto's</b> komen van de servers van de supermarkten en van Open Food Facts.</li>
-      <li>Tik je op <b>Bekijk</b> of een folder, dan opent de website van de supermarkt of Folderz in je browser; daar gelden hun eigen privacyregels.</li>
+      <li><b>GitHub</b> (van Microsoft): de website, prijzen, download, updatecheck en meldingen.</li>
+      <li><b>Google</b>: technische gegevens van ML Kit, en eventueel spraak en back-up als je die gebruikt.</li>
+      <li><b>Supermarkten en hun dienstverleners</b>: bij het laden van productfoto's.</li>
+      <li><b>Partijen die jij kiest</b>: als je een lijstje deelt of een link opent.</li>
     </ul>
+    <p>Wij verkopen geen gegevens. Deze partijen bepalen grotendeels zelf wat ze met de gegevens doen.</p>
   </section>
 
   <section class="card">
-    <h2>Prijzen en bronnen</h2>
-    <p>Aanbiedingen komen van PrijsProfeet, gewone prijzen uit de open data van Checkjebon. Slim Boodschappen heeft geen band met de supermarkten en krijgt geen geld voor de volgorde van producten. Controleer prijzen altijd in de winkel.</p>
+    <h2>Gegevens buiten de Europese Economische Ruimte</h2>
+    <p>GitHub en Google zijn Amerikaanse bedrijven, dus gegevens kunnen naar de Verenigde Staten gaan. GitHub schrijft dat het is aangesloten bij het EU-VS Data Privacy Framework, waarvoor de Europese Commissie een besluit over passende bescherming heeft genomen, en dat het verder standaardcontractbepalingen gebruikt.</p>
+    <p>Fotoservers maken vaak gebruik van wereldwijde netwerken, zoals die van Amazon en Cloudflare. Waar je gegevens daarbij precies terechtkomen en welke waarborgen gelden, hebben we niet kunnen vaststellen.</p>
   </section>
 
   <section class="card">
-    <h2>Vragen</h2>
-    <p>Heb je een vraag over privacy of wil je iets melden? Maak een melding aan op <a href="https://github.com/Liquided-A/slim-boodschappen/issues" rel="noopener">GitHub</a>. Omdat we geen persoonsgegevens van je bewaren, is er ook niets dat we kunnen inzien, aanpassen of verwijderen; dat doe je zelf door de app of je browsergegevens te wissen.</p>
-    <p class="muted">Laatst bijgewerkt: 3 november 2026.</p>
+    <h2>Je rechten</h2>
+    <p>Je mag vragen om inzage, correctie, verwijdering, beperking en overdracht van je persoonsgegevens, en je mag bezwaar maken tegen verwerking op basis van gerechtvaardigd belang. We reageren in principe binnen een maand.</p>
+    <ul>
+      <li><b>Gegevens op je toestel</b> beheer je zelf: wijzig of wis ze in de app, of wis de browser- of app-gegevens.</li>
+      <li><b>Een melding op GitHub</b>: vraag om aanpassing of verwijdering via de pagina <a href="contact.html">Contact</a>.</li>
+      <li><b>Logs van GitHub, Google en fotoservers</b> hebben wij niet. We kunnen je ook niet herkennen, want we weten niet wie je bent. Voor deze gegevens wend je je tot die partijen zelf.</li>
+    </ul>
+    <p class="todo"><b>Nog niet ingevuld.</b> Een niet-openbaar contactadres voor privacyverzoeken: <i>[nog in te vullen door de eigenaar]</i>. Meldingen op GitHub zijn openbaar en vragen een account, dus dat is voor een privacyverzoek geen goede route.</p>
   </section>
+
+  <section class="card">
+    <h2>Een klacht indienen</h2>
+    <p>Ben je niet tevreden over hoe wij met je gegevens omgaan? Laat het ons eerst weten. Je hebt daarnaast altijd het recht om een klacht in te dienen bij de <a href="https://www.autoriteitpersoonsgegevens.nl/jij-en-jouw-online-gegevens/zo-dien-jij-jouw-klacht-in-bij-de-ap" rel="noopener">Autoriteit Persoonsgegevens</a>.</p>
+  </section>
+
+  <section class="card">
+    <h2>Overig</h2>
+    <ul>
+      <li><b>Beveiliging:</b> de website en de app gebruiken versleutelde verbindingen (https). Je gegevens op je toestel worden beschermd door je toestel; een schermvergrendeling helpt daarbij.</li>
+      <li><b>Geen profielen:</b> we maken geen profielen en nemen geen automatische besluiten over je. Het goedkoopste mandje wordt op je eigen toestel uitgerekend.</li>
+      <li><b>Wijzigingen:</b> gaat de app iets anders doen met gegevens, bijvoorbeeld door advertenties, affiliate links of statistieken toe te voegen, dan passen we deze verklaring eerst aan. Waar toestemming nodig is, vragen we die vooraf.</li>
+    </ul>
+    <p class="muted">Lees ook de <a href="cookies.html">cookieverklaring</a>. Laatst bijgewerkt: 5 november 2026.</p>
+  </section>
+
+  <p class="muted links"><a href="app.html">Naar de app</a> · <a href="./">Downloaden</a> · <a href="over.html">Over</a> · <a href="prijzen.html">Over de prijzen</a> · <a href="privacy.html">Privacy</a> · <a href="cookies.html">Cookies</a> · <a href="voorwaarden.html">Voorwaarden</a> · <a href="contact.html">Contact</a></p>
 </main>
 </body>
 </html>

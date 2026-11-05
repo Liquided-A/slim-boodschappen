@@ -64,9 +64,9 @@ class Engine {
   /* alle producten in winkel s waarvan elk zoekwoord voorkomt; beste match-niveau wint */
   matchStore(s, tokens){
     if (!tokens.length) return [];
-    const N = this.norms[s], K = this.skip[s], tiers = [[],[],[]];
+    const N = this.norms[s], K = this.skip[s], P = this.stores[s].p, tiers = [[],[],[]];
     for (let i = 0; i < N.length; i++){
-      if (K[i]) continue;
+      if (K[i] || !(P[i] > 0)) continue;   /* zonder geldige prijs doet een regel niet mee */
       const n = N[i]; let worst = 0;
       for (let t = 0; t < tokens.length; t++){
         const w = tokens[t];
@@ -169,6 +169,32 @@ class Engine {
     });
     return {query, kind, amount, inferred, per};
   }
+  /* het gewone assortiment: producten zonder actie, per naam zonder merk en formaat; wat setMask uitzet doet niet mee */
+  assortment(){
+    const map = new Map();
+    this.stores.forEach((st, s) => {
+      for (let i = 0; i < st.r; i++){
+        if (this.skip[s][i] || !(st.p[i] > 0)) continue;
+        const base = cleanName(st.n[i]); if (!base) continue;
+        let g = map.get(base);
+        if (!g){ g = {reg: true, base, name: base[0].toUpperCase() + base.slice(1), cat: '', rows: []}; map.set(base, g); }
+        g.rows.push([s, i]);
+      }
+    });
+    return [...map.values()];
+  }
+  /* wat groep g kost in de winkels on (Set): het gangbare formaat en daarvan de laagste prijs; null als het daar niet te koop is */
+  assortOffer(g, on){
+    const rows = g.rows.filter(r => on.has(r[0]));
+    if (!rows.length) return null;
+    const sizeOf = ([s, i]) => { const st = this.stores[s]; return st.u[i] && st.q[i] ? fmtQty(st.u[i], st.q[i]) : ''; };
+    const sizes = new Map();
+    rows.forEach(r => { const k = sizeOf(r); if (k) sizes.set(k, (sizes.get(k) || 0) + 1); });
+    const size = sizes.size ? [...sizes.entries()].sort((x, y) => y[1] - x[1])[0][0] : '';
+    let best = null;
+    rows.forEach(r => { if (size && sizeOf(r) !== size) return; if (!best || this.stores[r[0]].p[r[1]] < this.stores[best[0]].p[best[1]]) best = r; });
+    return {s: best[0], i: best[1], price: this.stores[best[0]].p[best[1]], size, q: g.base + (size ? ' ' + size : ''), sold: rows};
+  }
   /* suggesties tijdens typen: precieze zoektermen die in meerdere winkels voorkomen */
   suggest(text, storeIdxs, limit){
     const p = parseQuery(text);
@@ -234,6 +260,7 @@ function stemNL(w){
 }
 /* woorden die zeggen dat het iets anders is dan het losse product: bananensap, appeltaart, drink met banaan */
 const OTHERTYPE = ['drink','drank','sap','nectar','smoothie','limonade','siroop','stroop','yoghurt','kwark','skyr','vla','pudding','toetje','dessert','ijs','roomijs','cake','koek','koekje','wafel','taart','gebak','reep','snoep','chips','chocolade','jam','moes','saus','soep','thee','ijsthee','shampoo','zeep','crème','creme','douche','mix','poeder','knijpfruit','fruit','hapje','ontbijtje','maaltijd','boost','split','aioli','hoemoes','boter','brood','pasta','gnocchi','chutney','azijn','bier','cider','wijn','likeur','geur','schijfjes','wrap','pizza','popcorn','dip','salade','hummus','jus','biscuit','middel','afwas','mnd','maanden','baby','kroket','tablet','dubbelfrisss','olvarit','ella','bonbebe','tuc','mcvitie','sandwich','soup'];
+const OTHERSTEM = OTHERTYPE.map(o => [o, stemNL(o)]);
 const FLAVOUR = new Set(['met','smaak','geur','aroma']);
 /* zo kort dat begin-van-woord te veel treft: ui mag geen uit vinden, ei geen eigen */
 const EXACTONLY = new Set(['ui','ei']);
@@ -246,10 +273,17 @@ const HOMECAT = {};
  ['zuivel-eieren','melk boter yoghurt kwark vla eieren ei'],['kaas','kaas'],['vlees','kip gehakt worst biefstuk spek'],['vis','zalm tonijn kabeljauw'],
  ['frisdrank','water cola'],['brood-bakkerij','brood']].forEach(([c, w]) => w.split(' ').forEach(x => { HOMECAT[stemNL(x)] = c; }));
 
+/* woorden en grondvormen van een naam, één keer uitgerekend: bij elke zoekopdracht gaan alle namen langs */
+const NAMEPARTS = new Map();
+function nameParts(name){
+  let p = NAMEPARTS.get(name);
+  if (!p){ const words = norm(name).trim().split(' ').filter(Boolean); p = {words, stems: words.map(stemNL)}; NAMEPARTS.set(name, p); }
+  return p;
+}
+
 /* hoe goed past een productnaam bij de zoekwoorden: null = niet, anders hoe lager hoe beter */
 function searchScore(tokens, name){
-  const words = norm(name).trim().split(' ').filter(Boolean);
-  const stems = words.map(stemNL);
+  const {words, stems} = nameParts(name);
   let score = 0, last = -1;
   const asked = new Set();
   for (const t of tokens){
@@ -273,7 +307,7 @@ function searchScore(tokens, name){
   }
   /* wat er na het zoekwoord staat of eromheen zegt iets over het soort product */
   const core = words.filter(w => w.length > 1 && !/\d/.test(w) && !UNITWORDS.has(w));
-  const other = w => { const st = stemNL(w); return !asked.has(st) && ![...asked].some(a => a.length >= 3 && st.endsWith(a)) && OTHERTYPE.some(o => w === o || st === stemNL(o) || (o.length >= 3 && w.endsWith(o)) || (o.length >= 4 && st.endsWith(stemNL(o)))); };
+  const other = w => { const st = stemNL(w); return !asked.has(st) && ![...asked].some(a => a.length >= 3 && st.endsWith(a)) && OTHERSTEM.some(([o, os]) => w === o || st === os || (o.length >= 3 && w.endsWith(o)) || (o.length >= 4 && st.endsWith(os))); };
   if (words.some(other)) score += 6;
   if (words.some(w => FLAVOUR.has(w))) score += 3;
   score += Math.max(0, core.length - tokens.length) * 0.3;   /* hoe minder extra woorden hoe beter */
@@ -281,7 +315,8 @@ function searchScore(tokens, name){
 }
 
 /* alle treffers met hun score; producten buiten de afdeling waar het zoekwoord thuishoort zakken
-   (melkpopcorn bij melk, ei-salade bij eieren). items: {name, cat}. Geeft een Map item -> score */
+   (melkpopcorn bij melk, ei-salade bij eieren). items: {name, cat}; zonder cat (gewoon assortiment) is de
+   afdeling onbekend: dat kost minder dan de verkeerde afdeling, en niets als de naam precies past. Geeft een Map item -> score */
 function searchRank(tokens, items){
   const alias = SEARCHALIAS[tokens.join(' ')];
   if (alias) tokens = [alias];
@@ -289,7 +324,7 @@ function searchRank(tokens, items){
   items.forEach(d => {
     const v = searchScore(tokens, d.name); if (v === null) return;
     out.set(d, v);
-    if (v < 2) count[d.cat] = (count[d.cat] || 0) + 1;
+    if (v < 2 && d.cat) count[d.cat] = (count[d.cat] || 0) + 1;
   });
   /* niets gevonden: misschien een tikfout (tandpsta, komkomer) */
   if (!out.size && tokens.some(t => t.length >= 5)){
@@ -298,8 +333,27 @@ function searchRank(tokens, items){
   }
   const fixedHome = tokens.length === 1 ? HOMECAT[stemNL(tokens[0])] : null;
   const home = fixedHome || Object.keys(count).sort((a, b) => count[b] - count[a])[0];
-  if (home) out.forEach((v, d) => { if (!(fixedHome ? [].concat(home) : [home]).includes(d.cat)) out.set(d, v + 3); });
+  if (home) out.forEach((v, d) => { if (d.cat !== home) out.set(d, v + (d.cat ? 3 : v > 0 ? 1 : 0)); });
   return out;
+}
+
+/* gewone producten hebben geen afdeling in de data: leen die van de aanbiedingen. Eerst dezelfde naam, anders
+   als alle woorden uit de naam vooral in één afdeling voorkomen. groups: {base, cat}, deals: {name, cat} */
+function guessCats(groups, deals){
+  const exact = new Map(), per = new Map();
+  deals.forEach(d => {
+    const base = cleanName(d.name); exact.set(base, d.cat);
+    base.split(' ').forEach(w => { const k = stemNL(w), c = per.get(k) || {}; c[d.cat] = (c[d.cat] || 0) + 1; per.set(k, c); });
+  });
+  const main = w => {
+    const c = per.get(stemNL(w)); if (!c) return '';
+    const best = Object.keys(c).sort((a, b) => c[b] - c[a])[0], n = Object.values(c).reduce((a, b) => a + b, 0);
+    return n >= 2 && c[best] / n >= 0.6 ? best : '';
+  };
+  groups.forEach(g => {
+    const cats = g.base.split(' ').map(main);
+    g.cat = exact.get(g.base) || (cats.every(c => c && c === cats[0]) ? cats[0] : '');
+  });
 }
 
 /* het woord uit de productnamen dat één letter verschilt van w; bij meerdere het vaakst voorkomende */
@@ -374,8 +428,8 @@ function priceRow(it, a, pins, storeIdxs){
         const v = lineCost(c, it.qty); if (v < best){ best = v; j = k; }
       });
     }
-    const c = e.cands[j];
-    return {price: lineCost(c, it.qty), c, mode: c.mode, j, pinned: pinned !== undefined};
+    const c = e.cands[j], price = lineCost(c, it.qty);
+    return price > 0 ? {price, c, mode: c.mode, j, pinned: pinned !== undefined} : null;
   });
 }
 
@@ -424,33 +478,56 @@ function combos(arr, k){
   return out;
 }
 
-/* m[item][pos in storeIdxs] ; geeft per k de goedkoopste set die alle vindbare producten dekt */
+/* een cel met een echte prijs; een ontbrekende prijs telt nooit als 0 */
+const priced = x => !!x && x.price > 0;
+
+/* per winkel: totaal van de producten met prijs, hoeveel dat er zijn en welke ontbreken.
+   complete: de winkel heeft alles wat ergens een prijs heeft, alleen die totalen zijn onderling te vergelijken.
+   suspect: regels die veel duurder zijn dan elders, dus waarschijnlijk een ander product (ze tellen wel mee in total) */
+function storeTotals(m, storeIdxs){
+  const found = m.map(row => row.some(priced));
+  return storeIdxs.map((store, j) => {
+    let total = 0, count = 0, suspect = 0, complete = true; const missing = [];
+    m.forEach((row, i) => {
+      if (priced(row[j])){ total += row[j].price; count++; if (muchCheaperElsewhere(row, j)) suspect++; }
+      else { missing.push(i); if (found[i]) complete = false; }
+    });
+    return {store, total, count, items: m.length, missing, complete, suspect};
+  });
+}
+/* eerst de winkels met de meeste producten, dan het laagste totaal: weinig producten is niet goedkoop */
+function sortStoreTotals(list){ return list.slice().sort((a, b) => b.count - a.count || a.total - b.total); }
+
+/* m[item][pos in storeIdxs] ; geeft per k de goedkoopste set die alle vindbare producten dekt (result, de basis
+   voor het advies). Lukt dat niet, dan staat in partial de set die de meeste producten dekt, met lack = wat ontbreekt */
 function plan(m, storeIdxs, kmax){
-  const found = m.map((row, i) => row.some(x => x) ? i : -1).filter(i => i >= 0);
-  const missing = m.map((row, i) => row.some(x => x) ? -1 : i).filter(i => i >= 0);
+  const found = m.map((row, i) => row.some(priced) ? i : -1).filter(i => i >= 0);
+  const missing = m.map((row, i) => row.some(priced) ? -1 : i).filter(i => i >= 0);
   const pos = storeIdxs.map((_, j) => j);
-  const result = [];
+  const result = [], partial = [];
   for (let k = 1; k <= Math.min(kmax, pos.length); k++){
-    let best = null;
+    let best = null, part = null;
     for (const c of combos(pos, k)){
-      let total = 0, ok = true; const assign = [];
+      let total = 0; const assign = [], lack = [];
       for (const i of found){
         let bj = -1, bp = Infinity;
-        for (const j of c){ const x = m[i][j]; if (x && x.price < bp){ bp = x.price; bj = j; } }
-        if (bj < 0){ ok = false; break; }
+        for (const j of c){ const x = m[i][j]; if (priced(x) && x.price < bp){ bp = x.price; bj = j; } }
+        if (bj < 0){ lack.push(i); continue; }
         total += bp; assign.push([i, bj]);
       }
-      if (ok && (!best || total < best.total)) best = {k, combo: c.map(j => storeIdxs[j]), total, assign: assign.map(([i,j]) => [i, storeIdxs[j]])};
+      const r = {k, combo: c.map(j => storeIdxs[j]), total, assign: assign.map(([i,j]) => [i, storeIdxs[j]])};
+      if (!lack.length){ if (!best || total < best.total) best = r; }
+      else if (assign.length && (!part || assign.length > part.assign.length || (assign.length === part.assign.length && total < part.total))) part = Object.assign(r, {lack});
     }
-    result.push(best);
+    result.push(best); partial.push(best ? null : part);
   }
   /* gemiddelde van winkels die alles hebben */
   const singles = [];
   for (const j of pos){
-    if (found.every(i => m[i][j])) singles.push(found.reduce((s,i) => s + m[i][j].price, 0));
+    if (found.every(i => priced(m[i][j]))) singles.push(found.reduce((s,i) => s + m[i][j].price, 0));
   }
   const avgSingle = singles.length ? Math.round(singles.reduce((a,b)=>a+b,0)/singles.length) : null;
-  return {found, missing, result, avgSingle, singles: singles.length};
+  return {found, missing, result, partial, avgSingle, singles: singles.length};
 }
 
 /* wat plan to echt oplevert ten opzichte van plan from: een regel uit from met een waarschuwing (waarschijnlijk

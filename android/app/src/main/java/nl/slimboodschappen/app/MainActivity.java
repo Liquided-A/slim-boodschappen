@@ -97,11 +97,14 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri u = request.getUrl();
-                if (HOST.equals(u.getHost())) return false;
-                // links naar supermarkten en folders openen in de gewone browser
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, u));
-                } catch (ActivityNotFoundException ignored) {
+                String scheme = u.getScheme();
+                if ("https".equals(scheme) && HOST.equals(u.getHost())) return false;
+                // links naar supermarkten en folders openen in de gewone browser; andere schema's negeren we
+                if ("https".equals(scheme) || "http".equals(scheme)) {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, u).addCategory(Intent.CATEGORY_BROWSABLE));
+                    } catch (ActivityNotFoundException ignored) {
+                    }
                 }
                 return true;
             }
@@ -278,7 +281,8 @@ public class MainActivity extends Activity {
             send(o);
         } else if (type.startsWith("image/")) {
             Uri uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
-            if (uri != null) recognize(uri);
+            // alleen content-adressen van andere apps: geen file:// en niet onze eigen bestanden
+            if (uri != null && "content".equals(uri.getScheme()) && !(getPackageName() + ".files").equals(uri.getAuthority())) recognize(uri);
         }
         intent.setAction(Intent.ACTION_MAIN); // niet nog eens verwerken na draaien van het scherm
     }

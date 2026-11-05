@@ -10,3 +10,7 @@ android/sleutel/
 *.jks
 *.p12
 *.keystore
+# alleen lokaal: deze repo is openbaar
+SECURITY_AUDIT.md
+PRIVACY_AUDIT.md
+OPENSTAANDE_PUNTEN.md

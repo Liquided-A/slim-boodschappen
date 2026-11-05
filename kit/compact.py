@@ -4,11 +4,36 @@ fotolinks.json onthoudt de productfoto's van de supermarkten (per winkel en prod
 nieuwe bij uit de aanbiedingen, zodat steeds meer producten uit het gewone assortiment ook een foto krijgen.
 """
 import json, re, gzip, base64, sys, os, datetime
+from urllib.parse import urlsplit
 
 src, promof, freshf, out = sys.argv[1:5]
 TILES = json.load(open(sys.argv[5]))['tiles'] if len(sys.argv) > 5 else {}
 LINKF = sys.argv[6] if len(sys.argv) > 6 else None
 LINKS = json.load(open(LINKF)) if LINKF and os.path.exists(LINKF) else {}   # winkel -> {productnummer: foto}
+
+# toegestane hosts, gemeten op de live data van 5 november 2026; een onbekende host geeft een lege link of foto, geen fout
+LINK_HOSTS = ('ah.nl', 'jumbo.com', 'lidl.nl', 'plus.nl', 'aldi.nl', 'dirk.nl', 'spar.nl', 'poiesz-supermarkten.nl', 'dekamarkt.nl',
+              'hoogvliet.com', 'hoogvliet.nl', 'vomar.nl', 'nettorama.nl', 'ekoplaza.nl', 'bonisupermarkt.nl', 'gewooncoop.nl',
+              'lekkermakkelijk.nl', 'boonsmarkt.nl', 'mcd-supermarkt.nl', 'amazingoriental.com', 'boodschaapje.nl')
+IMG_HOSTS = ('static.ah.nl', 'images.ctfassets.net', 'jumbo.com', 'poiesz-supermarkten.nl', 'dekamarkt.nl', 'hoogvliet.nl', 'dirk.nl',
+             'ekoplaza.nl', 'scene7.com', 'amazingoriental.com', 'jafolders.com', 'lidl.nl', 'kinessoint.com', 'prijsprofeet.nl')
+def safe(u, hosts):
+    """u als het een https-adres op een toegestane host is, anders ''"""
+    # een backslash of spatie lezen Python en de browser verschillend: https://kwaad.nl\@ah.nl is in de browser kwaad.nl
+    if not isinstance(u, str) or re.search(r'[\s\\]', u): return ''
+    try: p = urlsplit(u)
+    except ValueError: return ''
+    h = (p.hostname or '').lower()
+    return u if p.scheme == 'https' and any(h == x or h.endswith('.' + x) for x in hosts) else ''
+def safe_link(l):
+    """volledige link: host controleren; deel van een link (Checkjebon): alleen veilige tekens"""
+    if not isinstance(l, str): return ''
+    if re.match(r'[a-z]+:', l, re.I): return safe(l, LINK_HOSTS)
+    return l if re.fullmatch(r"[\w/.,~%+=&?#!'()-]*", l) else ''
+def date(v):
+    """JJJJ-MM-DD uit een datum van de bron, '' als die niet klopt"""
+    return v[:10] if isinstance(v, str) and re.match(r'\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])', v) else ''
+LINKS = {k: {i: u for i, u in v.items() if safe(u, IMG_HOSTS)} for k, v in LINKS.items()}   # een slechte link uit een eerdere run niet bewaren
 
 def small(u):
     """kleinere versie van de foto (ongeveer 200 pixels), zodat de app snel blijft"""
@@ -83,7 +108,7 @@ def store(k):
 # 0. foto's uit de aanbiedingen onthouden (productnummer en naam)
 NAMEIMG = {}
 for r in promos['rows']:
-    k = PPKEY.get(r['retailer'], r['retailer']); u = small(r.get('image_url') or '')
+    k = PPKEY.get(r['retailer'], r['retailer']); u = small(safe(r.get('image_url'), IMG_HOSTS))
     if not u: continue
     i = pid(k, r.get('product_url') or '')
     if i: LINKS.setdefault(k, {})[i] = u
@@ -92,14 +117,14 @@ for r in promos['rows']:
 # 1. gewone prijzen
 for s in cjb:
     if not s['d']: continue
-    st = store(s['n']); st['b'] = s['u']; seen = set()
+    st = store(s['n']); st['b'] = safe(s['u'], LINK_HOSTS); seen = set()
     for p in s['d']:
         if p['p'] is None or p['p'] < 0.10: continue
         key = (p['n'].strip().lower(), round(p['p'],2), p.get('s',''))
         if key in seen: continue
         seen.add(key)
         u, q = parse(p.get('s',''), p['n'])
-        st['n'].append(p['n'].strip()); st['p'].append(int(round(p['p']*100))); st['u'].append(u); st['q'].append(q); st['l'].append(p.get('l',''))
+        st['n'].append(p['n'].strip()); st['p'].append(int(round(p['p']*100))); st['u'].append(u); st['q'].append(q); st['l'].append(safe_link(p.get('l', '')))
         img = LINKS.get(s['n'], {}).get(pid(s['n'], p.get('l', ''))) or NAMEIMG.get(s['n'], {}).get(nkey(p['n']), '')
         if not img and s['n'] == 'poiesz' and str(p.get('l', '')).isdigit():
             img = f"https://images.poiesz-supermarkten.nl/artikelen/{p['l']}.png?width=200"
@@ -115,7 +140,7 @@ for r in promos['rows']:
     price, orig = r['price'], r['original_price']
     if price is None or price < 0.05 or not r['name']: skipped += 1; continue
     if r['savings_percentage'] is not None and r['savings_percentage'] >= 70: skipped += 1; continue   # boven 70% is vrijwel altijd een datafout
-    if not r['valid_until'] and (r['valid_from'] or '') < STALE_FROM: skipped += 1; continue
+    if not date(r['valid_until']) and date(r['valid_from']) < STALE_FROM: skipped += 1; continue
     st = store(k)
     u, q = parse(r['quantity'] or '', r['name'])
     kw = [w for w in (r['promotional_keywords'] or []) if w and w.upper() != 'ACTIE' and 'bezorging' not in w.lower()]
@@ -132,17 +157,17 @@ for r in promos['rows']:
     if r['brand'] and not name.lower().startswith(r['brand'].lower()) and r['brand'].lower() not in ('ah','jumbo','plus','dirk','aldi','lidl'):
         name = r['brand'] + ' ' + name
     st['n'].append(name); st['p'].append(int(round(price*100))); st['u'].append(u); st['q'].append(q)
-    st['l'].append(r['product_url'] or '')
+    st['l'].append(safe_link(r['product_url'] or ''))
     st['po'].append(int(round(orig*100)) if orig and orig > price else 0)
     st['pm'].append(mbq)
     st['pp'].append(int(round(mbp*100)) if mbp else 0)
     st['pl'].append(label)
-    st['pf'].append((r['valid_from'] or '')[5:].replace('-',''))
-    st['pv'].append((r['valid_until'] or '')[5:].replace('-',''))
+    st['pf'].append(date(r['valid_from'])[5:].replace('-',''))
+    st['pv'].append(date(r['valid_until'])[5:].replace('-',''))
     st['pc'].append(CI.get(r['unified_category'], CI['overig']))
     st['pt'].append(1 if r['promotion_status'] == 'upcoming' else 0)
     st['pi'].append(TILES.get(r.get('ean') or '', -1))
-    st['im'].append(small(r.get('image_url') or ''))
+    st['im'].append(small(safe(r.get('image_url'), IMG_HOSTS)))
 
 order = ['ah','jumbo','lidl','plus','aldi','dirk','coop','spar','poiesz','dekamarkt','hoogvliet','vomar','nettorama','ekoplaza','boni','dagwinkel','mcd','boons_markt','amazing_oriental']
 lst = [stores[k] for k in order if k in stores] + [v for k, v in stores.items() if k not in order]

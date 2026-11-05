@@ -45,7 +45,7 @@
         <div class="toolbar">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <button class="filtertoggle" id="filtertoggle" type="button" aria-controls="filters" aria-expanded="false">Filters <span id="fcount"></span></button>
-            <span class="count" id="rescount"></span>
+            <span class="count" id="rescount" role="status"></span>
           </div>
           <select id="sort" aria-label="Sorteren">
             <option value="top">Uitgelicht</option>
@@ -57,7 +57,6 @@
         </div>
         <div class="chips" id="chips"></div>
         <div class="grid" id="grid"></div>
-        <section class="assort" id="assort" hidden></section>
         <div class="more"><button class="btn ghost" id="more" type="button" hidden>Toon meer</button></div>
         <p class="qaddrow" id="qaddrow" hidden></p>
       </div>
@@ -107,7 +106,9 @@
       <p>Aanbiedingen via <a href="https://www.prijsprofeet.nl" target="_blank" rel="noopener">PrijsProfeet</a>, opgehaald op <span id="pfdate"></span>. Gewone prijzen uit de open data van <a href="https://github.com/supermarkt/checkjebon" target="_blank" rel="noopener">Checkjebon.nl</a>. Folders op <a href="https://www.folderz.nl" target="_blank" rel="noopener">Folderz</a>. Productfoto's van <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (CC BY-SA), voor zover beschikbaar. Deze app is onafhankelijk en heeft geen band met de supermarkten.</p>
       <p>De korting is berekend ten opzichte van de van-prijs die de supermarkt zelf noemt. Bij acties als "1+1 gratis" of "4 voor" rekent de app alleen met de actieprijs als je het hele aantal koopt. Acties met meer dan 70% korting zijn weggelaten, omdat dat bijna altijd een fout in de bron is.</p>
       <p>Van een aantal winkels worden de gewone prijzen niet meer bijgewerkt. Die doen standaard alleen mee met hun actuele aanbiedingen. Dit is een prototype: controleer prijzen en producten in de winkel.</p>
-      <p><a href="https://liquided-a.github.io/slim-boodschappen/over.html" target="_blank" rel="noopener">Over Slim Boodschappen</a> · <a href="https://liquided-a.github.io/slim-boodschappen/privacy.html" target="_blank" rel="noopener">Privacyverklaring</a>: geen account, geen tracking, je lijstje blijft op je telefoon.</p>
+      <p>Prijzen en aanbiedingen zijn indicatief en kunnen afwijken van de actuele prijzen bij de supermarkt. Controleer de uiteindelijke prijs bij de aanbieder.</p>
+      <p>Geen account, geen advertenties, je lijstje blijft op je eigen toestel.</p>
+      <nav class="footlinks" aria-label="Informatie"><a href="https://liquided-a.github.io/slim-boodschappen/over.html" target="_blank" rel="noopener">Over Slim Boodschappen</a><a href="https://liquided-a.github.io/slim-boodschappen/prijzen.html" target="_blank" rel="noopener">Over de prijzen</a><a href="https://liquided-a.github.io/slim-boodschappen/privacy.html" target="_blank" rel="noopener">Privacyverklaring</a><a href="https://liquided-a.github.io/slim-boodschappen/cookies.html" target="_blank" rel="noopener">Cookies</a><a href="https://liquided-a.github.io/slim-boodschappen/voorwaarden.html" target="_blank" rel="noopener">Voorwaarden</a><a href="https://liquided-a.github.io/slim-boodschappen/contact.html" target="_blank" rel="noopener">Contact</a></nav>
     </div>
     <div class="tablewrap"><table class="fresh-table"><thead><tr><th>Winkel</th><th>Gewone prijzen</th><th>Aanbiedingen</th></tr></thead><tbody id="freshrows"></tbody></table></div>
   </div>
@@ -160,12 +161,14 @@ const S = {items:[], off:new Set(), k:null, pins:{}, an:{}, demo:true, nextId:1,
   q:'', cat:'all', fstores:new Set(), fdisc:0, fmulti:false, fnow:false, fphoto:false, sort:'top', show:36,
   tpl:[]};
 
+/* null bij een lege of kapotte datum: een fout in de brondata mag de app nooit laten vastlopen */
 function mmddToDate(mmdd, start){
   if (!mmdd) return null;
-  const m = +mmdd.slice(0, 2) - 1, d = +mmdd.slice(2, 4);
+  const t = String(mmdd), m = +t.slice(0, 2) - 1, d = +t.slice(2, 4);
   let y = NOW.getFullYear();
   if (m - NOW.getMonth() > 6) y--; else if (NOW.getMonth() - m > 6) y++;
-  return start ? new Date(y, m, d, 0, 0) : new Date(y, m, d, 23, 59);
+  const dt = start ? new Date(y, m, d, 0, 0) : new Date(y, m, d, 23, 59);
+  return dt.getMonth() === m && dt.getDate() === d ? dt : null;   /* ook 1345 of 0231: Date schuift die stil door */
 }
 function initials(c){ return c.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase(); }
 function regFresh(s){ return s.f && (NOW - new Date(s.f + 'T12:00:00')) / 864e5 <= STALE_DAYS; }
@@ -177,7 +180,9 @@ function nActive(s){ let n = 0; for (let j = 0; j < s.n.length - s.r; j++) if (p
 function regLabel(s){ return !s.r ? 'alleen aanbiedingen' : regFresh(s) ? 'actueel' : 'van ' + monthFmt.format(new Date(s.f + 'T12:00:00')); }
 function keep(s, i){ const st = STORES[s]; return i < st.r ? (regFresh(st) || S.oldReg) : promoActive(st, i - st.r); }
 function usesOldPrices(s){ const st = STORES[s]; return S.oldReg && st.r && !regFresh(st); }
-function shopUrl(st, i){ const l = st.l[i]; if (!l) return ''; return /^https?:\/\//.test(l) ? l : (st.b ? st.b + l : ''); }
+/* alleen http(s): een javascript:-link uit de brondata wordt zo geen knop */
+function safeHttp(u){ try{ const x = new URL(u); return x.protocol === 'https:' || x.protocol === 'http:' ? x.href : ''; }catch(e){ return ''; } }
+function shopUrl(st, i){ const l = st.l[i]; if (!l) return ''; return safeHttp(/^https?:\/\//.test(l) ? l : (st.b ? st.b + l : '')); }
 /* foto van een product: eerst de foto van de supermarkt zelf, anders Open Food Facts, anders een plaatje bij het soort product */
 function imgRef(st, i){
   let u = st.im && st.im[i] ? (st.im[i][0] === '!' ? st.im[i].slice(1) : (st.ib || '') + st.im[i]) : '';
@@ -303,14 +308,31 @@ function buildDeals(){
 /* zoekscores voor de huidige zoekopdracht, één keer per zoekopdracht uitgerekend */
 let RANK = {q: null, map: null};
 function rankMap(){
-  if (RANK.q !== S.q){ const t = S.q ? parseQuery(S.q).tokens : []; RANK = {q: S.q, map: t.length ? searchRank(t, DEALS) : null}; }
+  if (RANK.q !== S.q){ const t = S.q ? parseQuery(S.q).tokens : []; RANK = {q: S.q, map: t.length ? searchRank(t, DEALS.concat(assortIndex())) : null}; }
   return RANK.map;
+}
+/* het gewone assortiment om in te zoeken; pas opgebouwd bij het eerste zoeken */
+let ASSORT = null;
+function assortIndex(){
+  if (!ASSORT){ ASSORT = ENG.assortment(); guessCats(ASSORT, DEALS); }
+  return ASSORT;
+}
+function resetAssort(){ ASSORT = null; RANK = {q: null, map: null}; }
+/* gewone producten bij de zoekopdracht die in de gekozen winkels te koop zijn, in dezelfde vorm als een aanbieding */
+function regFound(found){
+  const on = S.fstores.size ? S.fstores : new Set(enabledStores()), out = [];
+  found.forEach((v, g) => {
+    if (!g.reg) return;
+    const o = ENG.assortOffer(g, on); if (!o) return;
+    out.push(Object.assign(g, o, {pct: 0, upcoming: false, multi: false, until: null, img: groupRef(g, o.sold)}));
+  });
+  return out;
 }
 function baseFiltered(skip){
   const found = rankMap();
-  return DEALS.filter(d =>
+  return (found ? DEALS.concat(regFound(found)) : DEALS).filter(d =>
     (skip === 'cat' || S.cat === 'all' || d.cat === S.cat) &&
-    (skip === 'store' || (S.fstores.size ? S.fstores.has(d.s) : !S.off.has(STORES[d.s].k))) &&
+    (skip === 'store' || d.reg || (S.fstores.size ? S.fstores.has(d.s) : !S.off.has(STORES[d.s].k))) &&
     (!S.fdisc || d.pct >= S.fdisc) && (!S.fmulti || d.multi) && (!S.fnow || !d.upcoming) && (!S.fphoto || !d.img.none) &&
     (!found || found.has(d)));
 }
@@ -318,7 +340,7 @@ function renderCatbar(){
   const cc = {}; baseFiltered('cat').forEach(d => { cc[d.cat] = (cc[d.cat] || 0) + 1; });
   const cats = CATORDER.filter(c => cc[c]);
   $('catbar').innerHTML = ['all'].concat(cats).map(c => '<button type="button" data-act="cat" data-k="' + c + '" aria-pressed="' + (S.cat === c) + '">' +
-    esc(c === 'all' ? 'Alle aanbiedingen' : (CATLABEL[c] || c)) + '</button>').join('');
+    esc(c === 'all' ? (S.q ? 'Alles' : 'Alle aanbiedingen') : (CATLABEL[c] || c)) + '</button>').join('');
 }
 function renderFilters(){
   const top = $('filters').scrollTop;
@@ -474,31 +496,34 @@ function cardHtml(d){
     '<button type="button" class="addbtn" data-act="adddeal" data-q="' + esc(d.q) + '" aria-pressed="' + on + '">' + (on ? '✓ Op je lijstje' : '+ Op mijn lijstje') + '</button>' +
     (url ? '<a class="shoplink" href="' + esc(url) + '" target="_blank" rel="noopener">Bekijk bij ' + esc(st.c) + ' ↗</a>' : '') + '</div></article>';
 }
+/* gewoon product: dezelfde kaart, zonder actie */
+function regCardHtml(d){
+  const st = STORES[d.s], on = hasItem(d.q), open = 'data-act="detail" data-s="' + d.s + '" data-i="' + d.i + '"';
+  const unit = unitPrice(d.price, st.u[d.i], st.q[d.i]);
+  return '<article class="card"><div class="pic" ' + open + ' role="button" tabindex="0" aria-label="Meer over ' + esc(d.name) + '">' + imgHtml(d.img, '') + '</div>' +
+    '<div class="cbody"><div class="cname" ' + open + ' title="' + esc(st.n[d.i]) + '">' + esc(d.name) + '</div>' +
+    (d.size ? '<div class="csize">' + esc(d.size) + (unit ? ' · ' + unit : '') + '</div>' : '') +
+    '<div class="prow"><span class="from">vanaf <b>' + money(d.price) + '</b> bij ' + esc(st.c) + '</span></div>' +
+    '<button type="button" class="addbtn" data-act="adddeal" data-q="' + esc(d.q) + '" aria-pressed="' + on + '">' + (on ? '✓ Op je lijstje' : '+ Op mijn lijstje') + '</button></div></article>';
+}
 function renderShop(){
+  if (!ENG) return;
   renderCatbar(); renderFilters(); renderChips();
   const list = sortedDeals(), shown = list.slice(0, S.show);
-  $('rescount').textContent = list.length.toLocaleString('nl-NL') + ' aanbieding' + (list.length === 1 ? '' : 'en');
+  $('rescount').textContent = list.length.toLocaleString('nl-NL') + (S.q ? ' product' + (list.length === 1 ? '' : 'en') : ' aanbieding' + (list.length === 1 ? '' : 'en'));
   const mineDeals = DEALS.filter(d => !S.off.has(STORES[d.s].k)); const nMine = enabledStores().length;
   $('shopsub').textContent = mineDeals.length.toLocaleString('nl-NL') + ' folderacties van je ' + nMine + (nMine === 1 ? ' winkel' : ' winkels') + ', bijgewerkt op ' + dayFmt.format(PFETCH) + '.';
-  $('h-shop').textContent = S.cat === 'all' ? 'Aanbiedingen' : (CATLABEL[S.cat] || S.cat);
-  $('grid').innerHTML = shown.length ? shown.map(cardHtml).join('') :
-    '<div class="emptybox" style="grid-column:1/-1"><strong>Geen aanbiedingen gevonden' + (S.q ? ' voor "' + esc(S.q) + '"' : '') + '.</strong>' +
-    '<span class="muted">' + (enabledStores().length ? 'Misschien is het deze week nergens in de aanbieding. Op je lijstje vergelijkt de app ook de gewone prijzen.' : 'Je hebt geen winkels aangezet. Kies er minstens één bij Mijn winkels.') + '</span>' +
-    (S.q ? '<button type="button" class="btn primary" data-act="addq">Zet "' + esc(S.q) + '" op mijn lijstje</button>' : '') + '</div>';
+  $('h-shop').textContent = S.cat !== 'all' ? (CATLABEL[S.cat] || S.cat) : S.q ? 'Producten' : 'Aanbiedingen';
+  const filtered = S.cat !== 'all' || S.fstores.size || S.fdisc || S.fmulti || S.fnow || S.fphoto;
+  const none = !enabledStores().length ? 'Je hebt geen winkels aangezet. Kies er minstens één bij Mijn winkels.' : filtered ? 'Niets gevonden met deze filters.' : '';
+  $('grid').innerHTML = shown.length ? shown.map(d => d.reg ? regCardHtml(d) : cardHtml(d)).join('') :
+    none ? '<div class="emptybox" style="grid-column:1/-1"><span class="muted">' + none + '</span>' + (filtered ? '<button type="button" class="linkbtn" data-act="clearfilters">Filters wissen</button>' : '') + '</div>' : '';
   $('more').hidden = list.length <= S.show;
-  renderAssort();
-  $('qaddrow').hidden = !S.q || !list.length;
-  if (S.q) $('qaddrow').innerHTML = 'Staat het er niet bij? <button type="button" class="linkbtn" data-act="addq">Zet "' + esc(S.q) + '" op mijn lijstje</button>, dan vergelijkt de app ook de gewone prijzen.';
+  /* nergens gevonden: het mag gewoon op het lijstje, de prijs is dan onbekend */
+  $('qaddrow').hidden = !S.q || !!list.length;
+  if (S.q) $('qaddrow').innerHTML = '<button type="button" class="linkbtn" data-act="addq">Zet "' + esc(S.q) + '" op mijn lijstje</button>';
 }
 
-/* ---------- suggesties ---------- */
-
-/* ---------- zoekbalk: suggesties uit het hele assortiment ---------- */
-S.qs = [];
-function updateQs(){
-  const v = $('q').value.trim();
-  S.qs = v.length >= 2 && ENG ? ENG.suggest(v, enabledStores(), 6) : [];
-}
 /* alle producten met een foto, op hun naam zonder merk en formaat ("halfvolle melk"); pas opgebouwd bij het eerste zoeken */
 let PHOTOS = null;
 function photoIndex(){
@@ -507,26 +532,12 @@ function photoIndex(){
   STORES.forEach((st, s) => { for (let i = 0; i < st.n.length; i++){ if (imgRef(st, i).none) continue; const b = cleanName(st.n[i]); if (b && !PHOTOS.has(b)) PHOTOS.set(b, [s, i]); } });
   return PHOTOS;
 }
-/* mini-fototje bij een suggestie: een product uit die groep met een foto, anders een foto van hetzelfde soort
-   product uit een andere winkel, anders een plaatje */
-function suggImg(g){
-  const wrap = h => '<span class="thumb sthumb" aria-hidden="true">' + h + '</span>';
-  for (const [s, i] of g.refs || []){ const r = imgRef(STORES[s], i); if (!r.none) return wrap(imgHtml(r, '')); }
-  const idx = photoIndex(); let hit = idx.get(g.base);
-  if (!hit){
-    const words = g.base.split(' ');
-    for (const [b, ref] of idx){ const bw = b.split(' '); if (bw.length <= words.length + 1 && words.every(w => bw.includes(w))){ hit = ref; break; } }
-  }
-  return wrap(hit ? imgHtml(imgRef(STORES[hit[0]], hit[1]), '') : phHtml(g.base, ''));
-}
-function suggMeta(g){ return 'vanaf ' + money(g.min) + ' bij ' + esc(STORES[g.minStore].c) + ' · ' + g.stores.size + ' winkel' + (g.stores.size === 1 ? '' : 's'); }
-function renderAssort(){
-  const el = $('assort');
-  if (!S.q || !S.qs.length || baseFiltered().length){ el.hidden = true; return; }
-  el.hidden = false;
-  el.innerHTML = '<header><h2>In het assortiment</h2><span class="small muted">Gewone prijzen, ook als het nergens in de aanbieding is</span></header><div class="arows">' +
-    S.qs.map((g, j) => '<div class="arow">' + suggImg(g) + '<div><span class="sq">' + esc(g.q) + '</span><span class="sm">' + suggMeta(g) + '</span></div>' +
-      '<button type="button" class="addbtn" data-act="qpick" data-j="' + j + '" aria-pressed="' + hasItem(g.q) + '">' + (hasItem(g.q) ? '✓ Op je lijstje' : '+ Op mijn lijstje') + '</button></div>').join('') + '</div>';
+/* foto bij een groep gewone producten: een product uit de groep met een foto, anders hetzelfde product uit een
+   andere winkel, anders een plaatje */
+function groupRef(g, rows){
+  for (const [s, i] of rows){ const r = imgRef(STORES[s], i); if (!r.none) return r; }
+  const hit = photoIndex().get(g.base);
+  return hit ? imgRef(STORES[hit[0]], hit[1]) : {u: '', t: -1, n: g.base, none: true};
 }
 
 /* ---------- lijstje ---------- */
@@ -536,10 +547,14 @@ function compute(){
   if (!S.items.length || !sel.length) return LAST = {sel, empty: true};
   const m = priceMatrix(S.items, S.an, S.pins, sel);
   const pl = plan(m, sel, 4), adv = advise(pl.result, Math.round(parseFloat(PREFS.gain || '2') * 100), (a, b) => fairSaving(a, b, m, sel));
-  if (adv < 0 || !pl.found.length) return LAST = {sel, m, pl, none: true};
-  let ci = S.k ? S.k - 1 : adv; if (!pl.result[ci]) ci = adv;
-  return LAST = {sel, m, pl, adv, ci, cur: pl.result[ci], baseIdx: pl.result.findIndex(r => r)};
+  if (!pl.found.length) return LAST = {sel, m, pl, none: true};
+  /* geen set dekt alles: dan de grootste deeloplossing; zelf kiezen kan ook een deeloplossing zijn */
+  const fallback = adv < 0 ? pl.result.length - 1 : adv;
+  let ci = S.k ? S.k - 1 : fallback; if (!pl.result[ci] && !pl.partial[ci]) ci = fallback;
+  return LAST = {sel, m, pl, adv, ci, cur: pl.result[ci] || pl.partial[ci], whole: !!pl.result[ci], baseIdx: pl.result.findIndex(r => r)};
 }
+/* producten op het lijstje die in de gekozen winkels geen prijs hebben */
+function unpriced(L){ const got = new Set(L.cur.assign.map(a => a[0])); return S.items.map((it, i) => i).filter(i => !got.has(i)); }
 function itemImg(i){
   /* foto van het product dat in de gekozen winkel wordt gekocht */
   const none = {u: '', t: -1, n: S.items[i] ? S.items[i].q : '', none: true};
@@ -569,14 +584,10 @@ function renderItems(){
   $('demonote').hidden = !(S.demo && S.items.length);
   const sel = enabledStores();
   $('items').innerHTML = S.items.length ? S.items.map((it, idx) => {
-    const a = S.an[it.id]; let meta = '', bad = false;
-    if (a){
-      const n = sel.filter(s => a.per[s]).length;
-      if (!a.per.some(Boolean)){ meta = 'Niet gevonden. Probeer een ander woord.'; bad = true; }
-      else if (!n){ meta = 'Niet gevonden bij je gekozen winkels.'; bad = true; }
-      else meta = 'Gevonden bij ' + n + ' van je ' + sel.length + ' winkels';
-    }
-    return '<li><span class="thumb">' + imgHtml(itemImg(idx), '') + '</span><div class="iname">' + esc(it.q) + '<span class="imeta' + (bad ? ' bad' : '') + '">' + esc(meta) + '</span></div>' +
+    /* telt wat echt in de vergelijking zit, niet elke losse treffer */
+    const n = LAST && LAST.m ? LAST.m[idx].filter(Boolean).length : 0;
+    const meta = !sel.length ? '' : n ? 'Gevonden bij ' + n + ' van je ' + sel.length + ' winkels' : 'Prijs onbekend';
+    return '<li><span class="thumb">' + imgHtml(itemImg(idx), '') + '</span><div class="iname">' + esc(it.q) + '<span class="imeta">' + esc(meta) + '</span></div>' +
       '<div class="stepper"><button type="button" data-act="dec" data-id="' + it.id + '" aria-label="Minder ' + esc(it.q) + '">−</button><span>' + it.qty + '</span>' +
       '<button type="button" data-act="inc" data-id="' + it.id + '" aria-label="Meer ' + esc(it.q) + '">+</button></div>' +
       '<button class="x" type="button" data-act="rm" data-id="' + it.id + '" aria-label="Verwijder ' + esc(it.q) + '">×</button></li>';
@@ -618,32 +629,37 @@ function noteFor(c, a, qty){
 function renderCart(){
   $('cartcnt').textContent = S.items.length;
   $('bncnt').textContent = S.items.length; $('bncnt').hidden = !S.items.length;
-  $('carttotal').textContent = LAST && LAST.cur ? money(LAST.cur.total) : '€ 0,00';
+  $('carttotal').textContent = LAST && LAST.cur ? money(LAST.cur.total) : S.items.length ? '–' : money(0);
 }
 function renderBasket(){
   const L = LAST, sumEl = $('summary'), bonsEl = $('bons');
   if (L.empty || L.none){
-    sumEl.innerHTML = '<div class="sumcard"><h2>Overzicht</h2><div class="total">€ 0,00</div><p class="muted">' +
-      (!S.items.length ? 'Voeg producten toe om te vergelijken.' : !L.sel.length ? 'Zet minstens één winkel aan.' : 'Van deze producten is niets gevonden bij je winkels.') + '</p></div>';
+    sumEl.innerHTML = '<div class="sumcard"><h2>Overzicht</h2>' + (S.items.length ? '' : '<div class="total">' + money(0) + '</div>') + '<p class="muted">' +
+      (!S.items.length ? 'Voeg producten toe om te vergelijken.' : !L.sel.length ? 'Zet minstens één winkel aan.' : 'Van deze producten is de prijs bij je winkels onbekend. Ze blijven gewoon op je lijstje.') + '</p></div>';
     bonsEl.innerHTML = ''; return;
   }
-  const {m, pl, adv, ci, cur, baseIdx, sel} = L, base = pl.result[baseIdx];
+  const {m, pl, adv, ci, cur, whole, baseIdx, sel} = L, base = pl.result[baseIdx];
   const names = idxs => idxs.map(i => STORES[i].c).join(' + ');
-  const saved = ci > baseIdx ? fairSaving(base, cur, m, sel) : 0;
+  /* besparing alleen tussen twee sets met dezelfde producten */
+  const saved = whole && base && ci > baseIdx ? fairSaving(base, cur, m, sel) : 0;
+  const nItems = S.items.length, unk = unpriced(L);
+  const ofAll = n => n + ' van de ' + nItems + ' producten';
   const nDeals = cur.assign.filter(([i, s]) => m[i][sel.indexOf(s)].c.usual).length;
   const opts = pl.result.map((r, i) => {
-    if (!r) return '<button class="kopt" type="button" role="radio" aria-checked="false" disabled><span class="dot"></span><span class="kn">' + (i+1) + ' winkel' + (i ? 's' : '') + '<span class="ks">niet alles verkrijgbaar</span></span><span></span></button>';
+    const p = r || pl.partial[i];
     return '<button class="kopt" type="button" role="radio" data-act="k" data-k="' + (i+1) + '" aria-checked="' + (i === ci) + '"><span class="dot"></span>' +
-      '<span class="kn">' + (i+1) + ' winkel' + (i ? 's' : '') + (i === adv ? ' <span class="tag good">Advies</span>' : '') + '<span class="ks">' + esc(names(r.combo)) + '</span></span><span class="kt">' + money(r.total) + '</span></button>';
+      '<span class="kn">' + (i+1) + ' winkel' + (i ? 's' : '') + (i === adv ? ' <span class="tag good">Advies</span>' : '') + '<span class="ks">' + esc(names(p.combo)) + (r ? '' : ' · ' + ofAll(p.assign.length)) + '</span></span>' +
+      (r ? '<span class="kt">' + money(r.total) + '</span>' : '<span class="kt part">onvolledig</span>') + '</button>';
   }).join('');
-  sumEl.innerHTML = '<div class="sumcard has"><div class="sleft"><h2>Zo betaal je het minst</h2>' +
+  sumEl.innerHTML = '<div class="sumcard has"><div class="sleft"><h2>' + (whole ? 'Zo betaal je het minst' : 'Niet alles bij deze keuze') + '</h2>' +
     '<div><div class="total">' + money(cur.total) + '</div><div class="where">bij ' + esc(names(cur.combo)) + '</div></div>' +
+    (unk.length ? '<div class="small muted">Totaal van ' + ofAll(cur.assign.length) + '; ' + unk.length + (unk.length === 1 ? ' prijs' : ' prijzen') + ' onbekend: ' + unk.map(i => esc(S.items[i].q)).join(', ') + '.</div>' : '') +
     (saved > 0 ? '<div><span class="tag good">Je bespaart ' + money(saved) + '</span> <span class="small muted">t.o.v. alles bij ' + esc(names(base.combo)) + (saved < base.total - cur.total ? ', zonder producten met een waarschuwing' : '') + '</span></div>' : '') +
     (nDeals ? '<div class="small muted">' + nDeals + ' product' + (nDeals === 1 ? ' is' : 'en zijn') + ' deze week in de aanbieding.</div>' : '') +
     '</div><div class="sright"><div role="radiogroup" aria-label="Aantal winkels" class="kopts">' + opts + '</div>' +
     (S.saved && S.saved.c > 0 ? '<div class="savedbox">🎉 Dit jaar bespaard met aanbiedingen: <b>' + money(S.saved.c) + '</b></div>' : '') +
-    '<p class="hint">Het advies stopt waar een extra winkel minder dan ' + money(Math.round(parseFloat(PREFS.gain || '2') * 100)) + ' oplevert. Dit stel je in bij Instellingen.' + (baseIdx > 0 ? ' Geen enkele winkel heeft alles, daarom begint de vergelijking bij ' + (baseIdx + 1) + ' winkels.' : '') + '</p>' +
-    (pl.missing.length ? '<div class="warnbox">Niet gevonden en niet meegeteld: ' + pl.missing.map(i => esc(S.items[i].q)).join(', ') + '.</div>' : '') + '</div></div>';
+    '<p class="hint">' + (adv < 0 ? 'Ook met ' + pl.result.length + ' winkels is niet alles te krijgen, daarom is er geen advies.' :
+      'Het advies stopt waar een extra winkel minder dan ' + money(Math.round(parseFloat(PREFS.gain || '2') * 100)) + ' oplevert. Dit stel je in bij Instellingen.' + (baseIdx > 0 ? ' Geen enkele winkel heeft alles, daarom begint het advies bij ' + (baseIdx + 1) + ' winkels.' : '')) + '</p></div></div>';
 
   const by = {};
   cur.assign.forEach(([i, s]) => { (by[s] = by[s] || []).push(i); });
@@ -664,7 +680,7 @@ function renderBasket(){
       const ce = muchCheaperElsewhere(m[i], pos);
       const warnx = ce ? '<span class="note">⚠️ Veel duurder dan elders (' + money(ce.price) + ' bij ' + esc(STORES[sel[m[i].indexOf(ce)]].c) + '). Misschien is dit een ander product; kies zo nodig via "Ander product".</span>' : '';
       const tip = bvU ?'<span class="note">💡 Voordeliger per ' + esc(perUnit(bv).per) + ': ' + esc(bv.name) + (bv.q ? ' (' + esc(fmtQty(bv.u, bv.q)) + ')' : '') + ' voor ' + money(bv.price) + ', ' + bvU + '. Kies het via "Ander product".</span>' : '';
-      const deal = c.usual ? '<span class="tag sale">' + esc(c.label || ('−' + Math.round(100 * (1 - c.price / c.usual)) + '%')) + '</span>' + (c.until ? '<span class="small muted">t/m ' + esc(dayFmt.format(mmddToDate(c.until))) + '</span>' : '') : '';
+      const deal = c.usual ? '<span class="tag sale">' + esc(c.label || ('−' + Math.round(100 * (1 - c.price / c.usual)) + '%')) + '</span>' + (mmddToDate(c.until) ? '<span class="small muted">t/m ' + esc(dayFmt.format(mmddToDate(c.until))) + '</span>' : '') : '';
       const dn = S.done.has(doneKey(it));
       return head + '<div class="line' + (dn ? ' done' : '') + '"><button type="button" class="tick" data-act="tick" data-id="' + it.id + '" role="checkbox" aria-checked="' + dn + '" aria-label="' + esc(it.q) + ' in mijn mandje"></button><span class="thumb">' + imgHtml(imgRef(st, c.i), '') + '</span><div><div class="row"><span class="pn">' + (packsFor(it.qty, c.r) > 1 ? packsFor(it.qty, c.r) + ' × ' : '') + esc(c.name) +
         (c.q && !norm(c.name).includes(' ' + String(fmtQty(c.u, c.q)).split(' ')[0].replace(',', ' ')) ? ' <span class="muted">(' + esc(fmtQty(c.u, c.q)) + ')</span>' : '') + '</span><span class="pp">' + money(cell.price) + '</span></div>' +
@@ -679,6 +695,17 @@ function renderBasket(){
     const nb = (by[s] || []).length, nd = (by[s] || []).filter(i => S.done.has(doneKey(S.items[i]))).length;
     return '<article class="bon' + (nb && nd === nb ? ' alldone' : '') + '"><header><h3>' + esc(st.c) + '</h3><span class="small muted">' + (nd ? nd + ' van ' + nb + ' in je mandje · nog ' + money((by[s] || []).filter(i => !S.done.has(doneKey(S.items[i]))).reduce((t, i) => t + m[i][pos].price, 0)) : nb + ' product' + (nb === 1 ? '' : 'en')) + '</span><span class="sub">' + money(sub) + '</span></header>' + rows + warn + '</article>';
   }).join('');
+  /* producten zonder prijs horen er ook bij: in de winkel wil je ze net zo goed afvinken */
+  const unkBon = unk.length ? '<article class="bon"><header><h3>Prijs onbekend</h3><span class="small muted">' + unk.length + ' product' + (unk.length === 1 ? '' : 'en') + '</span></header>' + unk.map(i => {
+    const it = S.items[i], dn = S.done.has(doneKey(it));
+    return '<div class="line noprice' + (dn ? ' done' : '') + '"><button type="button" class="tick" data-act="tick" data-id="' + it.id + '" role="checkbox" aria-checked="' + dn + '" aria-label="' + esc(it.q) + ' in mijn mandje"></button><span class="pn">' + (it.qty > 1 ? it.qty + ' × ' : '') + esc(it.q) + '</span></div>';
+  }).join('') + '</article>' : '';
+  /* per winkel; bedragen van winkels die niet alles hebben zijn niet met de rest te vergelijken */
+  const totals = sortStoreTotals(storeTotals(m, sel)), withPrice = totals.filter(t => t.count), noPrice = totals.filter(t => !t.count);
+  const perStore = '<section class="panel" aria-labelledby="h-perstore"><header><h2 id="h-perstore">Per supermarkt</h2></header><ul class="perstore">' + withPrice.map(t =>
+    '<li' + (t.complete ? '' : ' class="part"') + '><span class="pn">' + esc(STORES[t.store].c) + '</span><span class="pa">' + money(t.total) + '</span><span class="pc">' + t.count + ' van ' + t.items + ' producten' + (t.complete ? '' : ', bedrag onvolledig') + (t.suspect ? ', ' + t.suspect + ' product' + (t.suspect === 1 ? '' : 'en') + ' mogelijk verkeerd' : '') + '</span></li>').join('') + '</ul>' +
+    (withPrice.some(t => !t.complete) ? '<p class="hint">Een onvolledig bedrag lijkt lager omdat er producten ontbreken. Vergelijk alleen winkels met evenveel producten.</p>' : '') +
+    (noPrice.length ? '<p class="hint">Geen prijzen bij: ' + esc(noPrice.map(t => STORES[t.store].c).join(', ')) + '.</p>' : '') + '</section>';
   const head = '<tr><th>Product</th>' + sel.map(s => '<th class="' + (cur.combo.includes(s) ? 'on' : '') + '">' + esc(STORES[s].c) + '</th>').join('') + '</tr>';
   const body = S.items.map((it, i) => {
     /* de laagste prijs markeren we alleen tussen vergelijkbare producten (exact of omgerekend) */
@@ -687,9 +714,9 @@ function renderBasket(){
     return '<tr><td>' + (it.qty > 1 ? it.qty + ' × ' : '') + esc(it.q) + '</td>' + row.map((x, j) => x ? '<td class="' + (x.price === mn && (!cmp.length || comparable(x)) ? 'min' : '') + '" title="' + esc(x.c.name) + '">' + (unsure(x, sel[j]) ? '~' : '') + money(x.price) + (x.c.usual ? ' •' : '') + '</td>' : '<td class="na">–</td>').join('') + '</tr>';
   }).join('');
   const anyDone = S.items.some(it => S.done.has(doneKey(it)));
-  bonsEl.innerHTML = '<div class="col"><div class="bonshead"><div><h2>Wat haal je waar</h2><p class="small muted">Tik in de winkel op het rondje om een product af te vinken.</p></div>' +
+  bonsEl.innerHTML = '<div class="col">' + perStore + '<div class="bonshead"><div><h2>Wat haal je waar</h2><p class="small muted">Tik in de winkel op het rondje om een product af te vinken.</p></div>' +
     '<div class="bonsbtns"><button type="button" class="btn ghost" data-act="share">' + ICON_SHARE + 'Lijstje delen</button>' +
-    (anyDone ? '<button type="button" class="btn primary" data-act="finish">Klaar: afgevinkte weghalen</button>' : '') + '</div></div><div class="bons">' + bons + '</div>' +
+    (anyDone ? '<button type="button" class="btn primary" data-act="finish">Klaar: afgevinkte weghalen</button>' : '') + '</div></div><div class="bons">' + bons + unkBon + '</div>' +
     '<section class="panel"><header><h2>Alle prijzen naast elkaar</h2><span class="small muted">groen = goedkoopst · ~ = omgerekend · • = aanbieding</span></header>' +
     '<div class="tablewrap"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div></section></div>';
 }
@@ -906,8 +933,9 @@ function listText(){
       out += '\n' + STORES[s].c + ' (' + money(sub) + ')\n';
       rows.forEach(i => { const it = S.items[i], c = L.m[i][pos].c, n = packsFor(it.qty, c.r); out += '- ' + (n > 1 ? n + ' × ' : '') + c.name + (c.usual ? ' (aanbieding)' : '') + '\n'; });
     });
-    if (L.pl.missing.length) out += '\nNiet gevonden:\n' + L.pl.missing.map(i => '- ' + S.items[i].q).join('\n') + '\n';
-    out += '\nTotaal ongeveer ' + money(L.cur.total) + '\n';
+    const unk = unpriced(L);
+    if (unk.length) out += '\nPrijs onbekend:\n' + unk.map(i => '- ' + S.items[i].q).join('\n') + '\n';
+    out += '\nTotaal ongeveer ' + money(L.cur.total) + (unk.length ? ' (zonder de producten met onbekende prijs)' : '') + '\n';
   } else out += S.items.map(it => '- ' + (it.qty > 1 ? it.qty + ' × ' : '') + it.q).join('\n') + '\n';
   return out + '\nOpen dit lijstje in de app: ' + listLink();
 }
@@ -1058,7 +1086,7 @@ document.addEventListener('click', e => {
     return;
   }
   else if (act === 'store'){ const k = b.dataset.k; S.off.has(k) ? S.off.delete(k) : S.off.add(k); S.fstores.clear(); S.k = null; save(); renderAll(); return; }
-  else if (act === 'oldreg'){ S.oldReg = !S.oldReg; ENG.setMask(keep); reanalyze(); S.k = null; }
+  else if (act === 'oldreg'){ S.oldReg = !S.oldReg; ENG.setMask(keep); reanalyze(); resetAssort(); S.k = null; renderShop(); }
   else if (act === 'k'){ S.k = +b.dataset.k; }
   else if (act === 'cat'){
     S.cat = b.dataset.k; S.show = 36; renderShop();
@@ -1070,11 +1098,11 @@ document.addEventListener('click', e => {
   }
   else if (act === 'unchip'){
     const k = b.dataset.k;
-    if (k === 'q'){ S.q = ''; $('q').value = ''; S.qs = []; } else if (k === 'cat') S.cat = 'all'; else if (k[0] === 's') S.fstores.delete(+k.slice(1));
+    if (k === 'q'){ S.q = ''; $('q').value = ''; } else if (k === 'cat') S.cat = 'all'; else if (k[0] === 's') S.fstores.delete(+k.slice(1));
     else if (k === 'fdisc') S.fdisc = 0; else S[k] = false;
     S.show = 36; renderShop(); return;
   }
-  else if (act === 'clearfilters' || act === 'home'){ S.q = ''; $('q').value = ''; S.qs = []; S.cat = 'all'; S.fstores.clear(); S.fdisc = 0; S.fmulti = S.fnow = S.fphoto = false; S.show = 36; renderShop(); if (act === 'home') window.scrollTo(0, 0); return; }
+  else if (act === 'clearfilters' || act === 'home'){ S.q = ''; $('q').value = ''; S.cat = 'all'; S.fstores.clear(); S.fdisc = 0; S.fmulti = S.fnow = S.fphoto = false; S.show = 36; renderShop(); if (act === 'home') window.scrollTo(0, 0); return; }
   else if (act === 'adddeal'){
     const q = b.dataset.q;
     if (hasItem(q)){ const x = S.items.find(y => y.q.toLowerCase() === q.toLowerCase()); S.items = S.items.filter(y => y !== x); delete S.an[x.id]; S.k = null; save(); renderAll(); }
@@ -1125,6 +1153,7 @@ document.addEventListener('click', e => {
     toast(n + ' product' + (n === 1 ? '' : 'en') + ' afgestreept.' + (saved > 0 ? ' Je bespaarde ' + money(saved) + ' met aanbiedingen; dit jaar al ' + money(S.saved.c) + '.' : ''));
   }
   else if (act === 'share'){ shareList(); return; }
+  else if (act === 'reload'){ location.reload(); return; }
   else if (act === 'tplsave'){
     openSheet('<h2>Lijstje bewaren</h2><p class="muted">Geef dit lijstje een naam. Je zet het later in één tik weer op je lijstje.</p><form data-tplform><input id="tplname" class="tplin" type="text" maxlength="30" placeholder="Bijvoorbeeld: Weekboodschappen" autocomplete="off" aria-label="Naam van het lijstje"><button type="submit" class="btn primary" style="justify-content:center;min-height:52px;margin-top:10px;width:100%">Bewaren</button></form>', 'Lijstje bewaren');
     setTimeout(() => { const i = $('tplname'); i && i.focus(); }, 60); return;
@@ -1133,11 +1162,6 @@ document.addEventListener('click', e => {
   else if (act === 'tplrm'){ const k = +b.dataset.k, t = S.tpl[k]; if (!t) return; S.tpl.splice(k, 1); save(); renderTpls(); toast('Lijstje "' + t.n + '" verwijderd', 'Ongedaan maken', () => { S.tpl.splice(k, 0, t); save(); renderTpls(); }); return; }
   else if (act === 'addoften'){ addItem(b.dataset.q); toast('"' + b.dataset.q + '" op je lijstje gezet'); return; }
   else if (act === 'copylist'){ copyText(b.dataset.text || listText()); return; }
-  else if (act === 'qpick'){
-    const g = S.qs[+b.dataset.j]; if (!g) return;
-    if (hasItem(g.q)){ toast('"' + g.q + '" staat al op je lijstje'); return; }
-    addItem(g.q); toast('"' + g.q + '" op je lijstje gezet'); renderAssort(); return;
-  }
   else if (act === 'closesheet'){ if (b.classList.contains('sheetbg') && e.target !== b) return; closeSheet(); return; }
   else if (act === 'settings'){ openSheet(settingsHtml(), 'Instellingen'); return; }
   else if (act === 'pref'){ PREFS[b.dataset.key] = b.dataset.v; applyPrefs(); if (b.dataset.key === 'gain'){ S.k = null; renderList(); } openSheet(settingsHtml(), 'Instellingen'); return; }
@@ -1186,7 +1210,7 @@ document.addEventListener('change', e => {
   S.show = 36; renderShop();
 });
 let qTimer = 0;
-$('q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value.trim(); S.show = 36; updateQs(); renderShop(); if (document.querySelector('.shop').getBoundingClientRect().top < 0) window.scrollTo(0, 0); }, 180); });
+$('q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value.trim(); S.show = 36; renderShop(); if (document.querySelector('.shop').getBoundingClientRect().top < 0) window.scrollTo(0, 0); }, 180); });
 document.addEventListener('submit', e => {
   if (!e.target.matches('[data-tplform]')) return; e.preventDefault();
   const n = ($('tplname').value || '').trim().slice(0, 30); if (!n) return;
@@ -1195,7 +1219,7 @@ document.addEventListener('submit', e => {
 });
 $('searchform').addEventListener('submit', e => {
   e.preventDefault();
-  S.q = $('q').value.trim(); S.show = 36; updateQs(); renderShop(); $('q').blur();
+  S.q = $('q').value.trim(); S.show = 36; renderShop(); $('q').blur();
 });
 $('more').addEventListener('click', () => { S.show += 36; renderShop(); });
 /* winkelknoppen met de muis verschuiven; na slepen telt het loslaten niet als klik op een winkel */
@@ -1229,7 +1253,7 @@ async function cachedData(){
 }
 function applyData(D){
   NOW = new Date();
-  STORES = D.stores; CATS = D.cats; PFETCH = new Date(D.promoFetched); PHOTOS = null;
+  STORES = D.stores; CATS = D.cats; PFETCH = new Date(D.promoFetched); PHOTOS = null; ASSORT = null;
   ENG = new Engine(STORES); HASIMG = false; S.fstores = new Set();
   ENG.setMask(keep); reanalyze(); buildDeals(); renderFresh();
   $('pfdate').textContent = dayFmt.format(PFETCH);
@@ -1275,7 +1299,10 @@ document.addEventListener('keydown', e => {
     checkAppUpdate();
     document.addEventListener('visibilitychange', () => { if (!document.hidden && (Date.now() - PFETCH) / 36e5 > 20) refreshRemote(); });
   }catch(err){
-    $('grid').innerHTML = '<div class="warnbox">De prijzen konden niet worden geladen in deze browser. Probeer een recente versie van Chrome, Safari of Firefox.</div>';
+    /* op elke pagina zichtbaar, en niet alleen als de browser te oud is: ook een halve download komt hier uit */
+    const msg = '<div class="warnbox" role="alert" style="grid-column:1/-1"><strong>De prijzen konden niet worden geladen.</strong> Je lijstje is niet weg. Laad de pagina opnieuw; lukt het dan nog niet, gebruik dan een recente versie van Chrome, Safari of Firefox.' +
+      ' <button type="button" class="linkbtn" data-act="reload">Opnieuw laden</button></div>';
+    $('grid').innerHTML = msg; $('summary').innerHTML = msg; $('folderlist').innerHTML = msg; console.error(err);
   }
 })();
 </script>

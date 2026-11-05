@@ -2,32 +2,96 @@ name: Android-app bouwen
 
 on:
   push:
-    branches: ['**']        # op een werkbranch: alleen testen, niet publiceren (zie onderaan)
+    branches: ['**']        # op een werkbranch: alleen testen, zonder sleutel (job testen); publiceren kan alleen vanaf main (job uitbrengen)
     paths: ['android/**', 'web/**', '.github/workflows/apk.yml']
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  bouwen:
+  # werkbranches: geen geheimen en geen schrijfrechten; build.gradle valt zonder sleutel terug op de debug-sleutel.
+  # Deze testversie kan daardoor niet over de echte app heen worden geïnstalleerd: verwijder die eerst op de testtelefoon.
+  testen:
+    if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - name: Rekentests (prijzen, acties, goedkoopste mandje)
         run: node --test tests/*.test.js
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Webapp en nieuwste prijzen in de app zetten
+        run: |
+          OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          REPO=${GITHUB_REPOSITORY#*/}
+          SITE="https://$OWNER.github.io/$REPO/"
+          # nieuwste prijzen van de website, anders die uit de opslagplaats
+          curl -fsSL "${SITE}data.b64" -o /tmp/data.b64 || cp data/data.b64 /tmp/data.b64
+          N=$(ls data/img/s*.jpg | wc -l)
+          FULL=$(( N > 0 ? N - 1 : 0 ))   # het laatste fotoblad kan nog groeien, dat komt van de website
+          echo "{\"remote\":\"$SITE\",\"localSheets\":$FULL,\"version\":\"1.$GITHUB_RUN_NUMBER\",\"repo\":\"$GITHUB_REPOSITORY\"}" > /tmp/cfg.json
+          mkdir -p android/app/src/main/assets/www/img
+          python3 -I web/assemble.py --wrap web/style.html web/body.html web/engine.js /tmp/data.b64 android/app/src/main/assets/www/index.html /tmp/cfg.json
+          cp data/img/s*.jpg android/app/src/main/assets/www/img/
+
+      - name: Android SDK controleren
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"; ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools" | tr '\n' ' ' | sed 's/^/::notice::/'
+
+      - name: APK bouwen (debug-sleutel)
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 1.${{ github.run_number }}
+        run: |
+          set -o pipefail
+          gradle -p android assembleRelease --no-daemon 2>&1 | tee /tmp/build.log || {
+            grep -E "error:|ERROR|FAILURE|What went wrong|Could not|> " /tmp/build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+            exit 1; }
+
+      - name: Testversie bewaren
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: SlimBoodschappen-test
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 7
+
+  # alleen main: de sleutel is hier nodig, dus deze job draait in de omgeving release
+  uitbrengen:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: release
+    permissions:
+      contents: write       # voor gh release
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Rekentests (prijzen, acties, goedkoopste mandje)
+        run: node --test tests/*.test.js
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: '8.7'
 
@@ -80,16 +144,7 @@ jobs:
           grep -q "SHA-256 digest: 53c4b0f0978eef5e0ed273f67a4ab794dde1ee98753ad4414e7eec6ec0e2693a" /tmp/cert.txt || {
             echo "::error::De app is niet met de sleutel van Slim Boodschappen ondertekend"; exit 1; }
 
-      - name: Testversie bewaren (werkbranch)
-        if: github.ref != 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: SlimBoodschappen-test
-          path: android/app/build/outputs/apk/release/app-release.apk
-          retention-days: 7
-
       - name: Publiceren als download
-        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -55,7 +55,6 @@
             <option value="name">Naam A-Z</option>
           </select>
         </div>
-        <section class="foryou" id="foryou" hidden></section>
         <div class="chips" id="chips"></div>
         <div class="grid" id="grid"></div>
         <section class="assort" id="assort" hidden></section>
@@ -84,7 +83,6 @@
           <button type="button" class="scanlink" data-act="scanmenu" id="herolink" hidden>📷 Briefje inlezen</button>
           <div class="often" id="often" hidden></div>
           <div class="often tpls" id="tpls"></div>
-          <details class="quick" id="quick"><summary>Snel kiezen met plaatjes</summary><div class="qgrid" id="qgrid"></div></details>
           <div class="notice" id="demonote" hidden>Dit is een voorbeeldlijstje. Voeg je eigen producten toe of wis het.</div>
           <ul class="items" id="items"></ul>
         </section>
@@ -466,42 +464,8 @@ function cardHtml(d){
     '<button type="button" class="addbtn" data-act="adddeal" data-q="' + esc(d.q) + '" aria-pressed="' + on + '">' + (on ? '✓ Op je lijstje' : '+ Op mijn lijstje') + '</button>' +
     (url ? '<a class="shoplink" href="' + esc(url) + '" target="_blank" rel="noopener">Bekijk bij ' + esc(st.c) + ' ↗</a>' : '') + '</div></article>';
 }
-/* aanbiedingen voor wat op je lijstje staat of wat je vaak koopt */
-function personalDeals(){
-  const idx = new Map(); DEALS.forEach((d, k) => idx.set(d.s + ':' + d.i, k));
-  const keys = [], seenK = new Set();
-  S.items.forEach(it => { const k = it.q.toLowerCase(); if (!seenK.has(k)){ seenK.add(k); keys.push([k, S.an[it.id]]); } });
-  Object.keys(S.hist).sort((a, b) => S.hist[b] - S.hist[a]).slice(0, 15).forEach(k => { if (!seenK.has(k)){ seenK.add(k); keys.push([k, null]); } });
-  const on = new Set(enabledStores()), out = [], used = new Set();
-  for (const [k, an0] of keys.slice(0, 30)){
-    const an = an0 || ENG.analyze(k, 15);
-    an.per.forEach((e, st) => {
-      if (!e || !on.has(st)) return;
-      const best = e.cands[0];
-      e.cands.forEach(c => {
-        if (!c.usual || c.score > best.score + 1) return;
-        const j = idx.get(st + ':' + c.i); if (j === undefined || used.has(j)) return;
-        const d = DEALS[j]; if (d.upcoming) return;
-        used.add(j); out.push(Object.assign({forq: k}, d));
-      });
-    });
-  }
-  return out.sort((a, b) => b.pct - a.pct).slice(0, 16);
-}
-let FY = {sig: '', list: []};
-function renderForYou(){
-  const el = $('foryou');
-  if (S.cat !== 'all' || S.q || S.fstores.size){ el.hidden = true; return; }
-  /* alleen opnieuw uitrekenen als je lijstje, je winkels of de prijzen veranderd zijn */
-  const sig = S.items.map(it => it.q).join('|') + '#' + Object.keys(S.hist).length + '#' + [...S.off].join(',') + '#' + DEALS.length + '#' + S.oldReg;
-  if (sig !== FY.sig) FY = {sig, list: personalDeals()};
-  const list = FY.list;
-  if (!list.length){ el.hidden = true; return; }
-  el.hidden = false;
-  el.innerHTML = '<header><h2>Voor jou in de aanbieding</h2><span class="small muted">Producten van je lijstje en wat je vaak koopt</span></header><div class="hscroll">' + list.map(cardHtml).join('') + '</div>';
-}
 function renderShop(){
-  renderCatbar(); renderFilters(); renderChips(); renderForYou();
+  renderCatbar(); renderFilters(); renderChips();
   const list = sortedDeals(), shown = list.slice(0, S.show);
   $('rescount').textContent = list.length.toLocaleString('nl-NL') + ' aanbieding' + (list.length === 1 ? '' : 'en');
   const mineDeals = DEALS.filter(d => !S.off.has(STORES[d.s].k)); const nMine = enabledStores().length;
@@ -580,18 +544,6 @@ function itemImg(i){
     for (const c of e.cands.slice(0, 4)){ if (c.score > e.cands[0].score + 0.5) break; const r = imgRef(STORES[s], c.i); if (!r.none) return r; } }
   return own;
 }
-/* veelgekochte boodschappen als tegels met een plaatje (zoals in Bring!) */
-const QUICK = [['🥛','Melk','halfvolle melk'],['🍞','Brood','volkoren brood'],['🥚','Eieren','scharreleieren'],['🧀','Kaas','jong belegen kaas'],['🧈','Boter','roomboter'],
-  ['🥣','Yoghurt','magere yoghurt'],['🍌','Bananen','bananen'],['🍎','Appels','appels'],['🥔','Aardappels','aardappelen'],['🧅','Uien','uien'],['🍅','Tomaten','tomaten'],
-  ['🥒','Komkommer','komkommer'],['🫑','Paprika','paprika'],['🥕','Wortels','winterpeen'],['🥬','Sla','ijsbergsla'],['🍗','Kipfilet','kipfilet'],['🥩','Gehakt','half om half gehakt'],
-  ['🐟','Vis','zalmfilet'],['🍝','Pasta','spaghetti'],['🍚','Rijst','zilvervliesrijst'],['🥜','Pindakaas','pindakaas'],['🍫','Hagelslag','hagelslag melk'],['🍓','Jam','aardbeienjam'],
-  ['☕','Koffie','filterkoffie'],['🍵','Thee','zwarte thee'],['🧃','Sap','sinaasappelsap'],['🥤','Cola','coca cola'],['💧','Water','mineraalwater'],['🍺','Bier','pils'],
-  ['🍪','Koekjes','biscuit'],['🍿','Chips','chips naturel'],['🍕','Pizza','pizza'],['🧻','Wc-papier','toiletpapier'],['🧼','Wasmiddel','wasmiddel'],['🫧','Afwasmiddel','afwasmiddel'],
-  ['🪥','Tandpasta','tandpasta'],['🧴','Douchegel','douchegel'],['🐱','Kattenvoer','kattenvoer'],['🐶','Hondenvoer','hondenvoer'],['👶','Luiers','luiers']];
-function renderQuick(){
-  const on = new Set(S.items.map(doneKey));
-  $('qgrid').innerHTML = QUICK.map(([e, l, q]) => '<button type="button" class="qtile" data-act="quick" data-q="' + esc(q) + '" aria-pressed="' + on.has(q) + '"><span class="qe" aria-hidden="true">' + e + '</span><span class="ql">' + esc(l) + '</span></button>').join('');
-}
 function renderOften(){
   const on = new Set(S.items.map(doneKey));
   const list = Object.keys(S.hist).filter(k => !on.has(k)).sort((a, b) => S.hist[b] - S.hist[a]).slice(0, 10);
@@ -603,7 +555,7 @@ function renderTpls(){
     (S.items.length && !S.demo ? '<button type="button" class="chip" data-act="tplsave">💾 Bewaar dit lijstje</button>' : (S.tpl.length ? '' : '<span class="small muted">Bewaar een lijstje dat je vaak nodig hebt, bijvoorbeeld de weekboodschappen.</span>'));
 }
 function renderItems(){
-  renderOften(); renderQuick(); renderTpls();
+  renderOften(); renderTpls();
   $('demonote').hidden = !(S.demo && S.items.length);
   const sel = enabledStores();
   $('items').innerHTML = S.items.length ? S.items.map((it, idx) => {
@@ -1142,11 +1094,6 @@ document.addEventListener('click', e => {
   else if (act === 'onbstore'){ const k = b.dataset.k; S.off.has(k) ? S.off.delete(k) : S.off.add(k); b.setAttribute('aria-pressed', String(!S.off.has(k))); save(); return; }
   else if (act === 'onbsize'){ PREFS.size = b.dataset.v; applyPrefs(); openSheet(onboardingHtml(), 'Welkom'); return; }
   else if (act === 'onbdone'){ S.onb = true; closeSheet(); S.k = null; save(); renderAll(); return; }
-  else if (act === 'quick'){
-    const q = b.dataset.q;
-    if (hasItem(q)){ const x = S.items.find(y => y.q.toLowerCase() === q); S.items = S.items.filter(y => y !== x); delete S.an[x.id]; delete S.pins[x.id]; S.k = null; }
-    else { addItem(q); return; }
-  }
   else if (act === 'tick'){
     if (!it) return; const k = doneKey(it); S.done.has(k) ? S.done.delete(k) : S.done.add(k);
     if (navigator.vibrate) try{ navigator.vibrate(12); }catch(err){}
@@ -1297,7 +1244,6 @@ document.addEventListener('keydown', e => {
     if (C && new Date(C.promoFetched) > new Date(D.promoFetched)) D = C;
     STORES = D.stores;
     const fresh = !load();
-    if (fresh || !S.items.length) $('quick').open = true;
     if (fresh || !S.items.length){ useDemo(); S.off = new Set(STORES.filter(s => !DEFAULT_ON.has(s.k)).map(s => s.k)); }
     applyData(D);
     computeMealDeals();

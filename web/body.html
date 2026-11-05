@@ -27,6 +27,7 @@
       <h1 id="h-hero">Zet producten op je lijstje en zie bij welke winkels je het minst betaalt</h1>
       <button type="button" class="herolink" data-act="scanmenu" id="herolink" hidden>📷 Briefje inlezen</button>
     </section>
+    <div class="storebar" id="storebar" role="group" aria-label="Mijn winkels"></div>
     <div class="crumbs">
       <div><h2 class="h1like" id="h-shop">Aanbiedingen van deze week</h2><p class="muted small" id="shopsub">Folderacties van alle supermarkten.</p></div>
       <p class="src">Aanbiedingen via <a href="https://www.prijsprofeet.nl" target="_blank" rel="noopener">PrijsProfeet</a> · Foto's: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a></p>
@@ -169,7 +170,7 @@ function sheetUrl(n){ return CFG && CFG.remote && n >= (CFG.localSheets || 0) ? 
 
 let ENG = null, STORES = [], CATS = [], DEALS = [], PFETCH = null, HASIMG = false;
 const S = {items:[], off:new Set(), k:null, pins:{}, an:{}, demo:true, nextId:1, oldReg:false, done:new Set(), hist:{},
-  q:'', cat:'all', fstores:new Set(), fdisc:0, fmulti:false, fnow:false, fphoto:false, sort:'top', show:36, moreStores:false,
+  q:'', cat:'all', fstores:new Set(), fdisc:0, fmulti:false, fnow:false, fphoto:false, sort:'top', show:36,
   sugg:[], suggSel:-1, tpl:[]};
 
 function mmddToDate(mmdd, start){
@@ -286,6 +287,8 @@ function remember(q){
 const doneKey = it => it.q.toLowerCase();
 function useDemo(){ S.items = DEMO.map(([q, qty]) => ({id:S.nextId++, q, qty})); S.demo = true; }
 function enabledStores(){ return STORES.map((s, i) => i).filter(i => !S.off.has(STORES[i].k)); }
+/* alle winkels op naam: overal dezelfde lijst, en een winkel verspringt niet als je hem aan- of uitzet */
+function storeOrder(){ return STORES.map((s, i) => i).sort((a, b) => STORES[a].c.localeCompare(STORES[b].c, 'nl')); }
 function reanalyze(){ S.an = {}; S.pins = {}; S.items.forEach(it => { S.an[it.id] = ENG.analyze(it.q); }); }
 function hasItem(q){ return S.items.some(it => it.q.toLowerCase() === q.toLowerCase()); }
 
@@ -321,19 +324,21 @@ function renderCatbar(){
 }
 function renderFilters(){
   const sc = {}; baseFiltered('store').forEach(d => { sc[d.s] = (sc[d.s] || 0) + 1; });
-  const mine = s => !S.off.has(STORES[s].k);
-  const order = STORES.map((st, s) => s).filter(s => sc[s] || mine(s)).sort((a, b) => mine(b) - mine(a) || (sc[b] || 0) - (sc[a] || 0));
-  const shown = S.moreStores ? order : order.slice(0, 8);
+  const mine = s => !S.off.has(STORES[s].k), top = $('filters').scrollTop;
   const ck = (id, act, checked, label, n, extra) => '<label class="check"><input type="checkbox" data-act="' + act + '"' + (extra || '') + (checked ? ' checked' : '') + ' id="' + id + '"><span>' + label + '</span>' + (n !== undefined ? '<span class="n">' + n + '</span>' : '') + '</label>';
   const rd = (v, label) => '<label class="check"><input type="radio" name="fdisc" data-act="fdisc" value="' + v + '"' + (S.fdisc === v ? ' checked' : '') + ' id="fd' + v + '"><span>' + label + '</span></label>';
   $('filters').innerHTML =
-    '<div class="fgroup"><h3>Mijn winkels</h3>' + shown.map(s => ck('fs' + s, 'fstore', mine(s), esc(STORES[s].c), sc[s] || 0, ' data-s="' + s + '"')).join('') +
-    (order.length > 8 ? '<button type="button" class="morebtn" data-act="morestores">' + (S.moreStores ? 'Minder winkels' : 'Alle ' + order.length + ' winkels') + '</button>' : '') + '</div>' +
+    '<div class="fgroup"><h3>Mijn winkels</h3>' + storeOrder().map(s => ck('fs' + s, 'fstore', mine(s), esc(STORES[s].c), sc[s] || 0, ' data-s="' + s + '"')).join('') + '</div>' +
     '<div class="fgroup"><h3>Korting</h3>' + rd(0, 'Alle kortingen') + rd(25, '25% of meer') + rd(40, '40% of meer') + '</div>' +
     '<div class="fgroup"><h3>Soort actie</h3>' + ck('fmulti', 'fmulti', S.fmulti, '1+1, 2e halve prijs, X voor €') +
     ck('fnow', 'fnow', S.fnow, 'Alleen acties die nu lopen') + (HASIMG ? ck('fphoto', 'fphoto', S.fphoto, 'Alleen met foto') : '') + '</div>';
   const n = S.fstores.size + (S.fdisc ? 1 : 0) + (S.fmulti ? 1 : 0) + (S.fnow ? 1 : 0) + (S.fphoto ? 1 : 0);
   $('fcount').textContent = n ? '(' + n + ')' : '';
+  $('filters').scrollTop = top;
+  /* zonder zijbalk (telefoon, tablet): dezelfde keuze als knoppen boven de aanbiedingen */
+  const bar = $('storebar'), left = bar.scrollLeft;
+  bar.innerHTML = storeOrder().map(s => '<button type="button" class="storechip" data-act="store" data-k="' + esc(STORES[s].k) + '" aria-pressed="' + mine(s) + '">' + (mine(s) ? '✓ ' : '') + esc(STORES[s].c) + '</button>').join('');
+  bar.scrollLeft = left;
 }
 function renderChips(){
   const c = [];
@@ -508,7 +513,7 @@ function renderShop(){
   renderCatbar(); renderFilters(); renderChips(); renderForYou();
   const list = sortedDeals(), shown = list.slice(0, S.show);
   $('rescount').textContent = list.length.toLocaleString('nl-NL') + ' aanbieding' + (list.length === 1 ? '' : 'en');
-  const mineDeals = DEALS.filter(d => !S.off.has(STORES[d.s].k)); const nMine = new Set(mineDeals.map(d => d.s)).size;
+  const mineDeals = DEALS.filter(d => !S.off.has(STORES[d.s].k)); const nMine = enabledStores().length;
   $('shopsub').textContent = mineDeals.length.toLocaleString('nl-NL') + ' folderacties van je ' + nMine + (nMine === 1 ? ' winkel' : ' winkels') + ', bijgewerkt op ' + dayFmt.format(PFETCH) + '.';
   $('h-shop').textContent = S.cat === 'all' ? 'Aanbiedingen' : (CATLABEL[S.cat] || S.cat);
   $('grid').innerHTML = shown.length ? shown.map(cardHtml).join('') :
@@ -643,8 +648,8 @@ function renderItems(){
   }).join('') : '<li class="emptyrow empty">Nog niets op je lijstje. Typ hierboven een product of kies een aanbieding.</li>';
 }
 function renderStores(){
-  $('stores').innerHTML = STORES.map(s => {
-    const on = !S.off.has(s.k);
+  $('stores').innerHTML = storeOrder().map(i => {
+    const s = STORES[i], on = !S.off.has(s.k);
     const reg = !s.r ? 'alleen aanbiedingen' : regFresh(s) ? 'gewone prijzen actueel' : (S.oldReg ? '<span class="tag warn">gewone prijzen ' + esc(regLabel(s)) + '</span>' : 'alleen aanbiedingen (gewone prijzen verouderd)');
     return '<div class="storerow"><div><span class="sn">' + esc(s.c) + '</span><span class="sf">' + reg + ' · ' + nActive(s).toLocaleString('nl-NL') + ' aanbiedingen</span></div>' +
       '<button type="button" class="switch" role="switch" data-act="store" data-k="' + esc(s.k) + '" aria-checked="' + on + '" aria-label="' + esc(s.c) + ' meenemen"></button></div>';
@@ -1071,9 +1076,8 @@ function settingsHtml(){
 }
 /* eerste keer: kies je supermarkten (zoals 'Mijn supermarkten' in andere apps) */
 function onboardingHtml(){
-  const big = STORES.map((st, i) => i).filter(i => STORES[i].n.length > 250).sort((a, b) => STORES[b].n.length - STORES[a].n.length);
   return '<h2>Welkom bij Slim Boodschappen</h2><p class="muted">Bij welke supermarkten doe je boodschappen? De app laat alleen die winkels zien en vergelijkt alleen die. Je kunt dit altijd aanpassen bij Mijn winkels.</p>' +
-    '<div class="onbgrid">' + big.map(i => '<button type="button" class="onbstore" data-act="onbstore" data-k="' + esc(STORES[i].k) + '" aria-pressed="' + !S.off.has(STORES[i].k) + '">' + esc(STORES[i].c) + '</button>').join('') + '</div>' +
+    '<div class="onbgrid">' + storeOrder().map(i => '<button type="button" class="onbstore" data-act="onbstore" data-k="' + esc(STORES[i].k) + '" aria-pressed="' + !S.off.has(STORES[i].k) + '">' + esc(STORES[i].c) + '</button>').join('') + '</div>' +
     '<div class="setrow"><h3>Tekstgrootte</h3><div class="seg">' + [['normaal', 'Normaal', 's1'], ['groot', 'Groot', 's2'], ['extra', 'Extra groot', 's3']].map(([v, l, c]) =>
       '<button type="button" data-act="onbsize" data-v="' + v + '" aria-pressed="' + (PREFS.size === v) + '" class="' + c + '">' + l + '</button>').join('') + '</div></div>' +
     '<button type="button" class="btn primary" data-act="onbdone" style="justify-content:center;min-height:52px">Aan de slag</button>';
@@ -1127,7 +1131,6 @@ document.addEventListener('click', e => {
     const nb = $('catbar').querySelector('[aria-pressed="true"]'); nb && nb.scrollIntoView({inline: 'center', block: 'nearest'});
     return;
   }
-  else if (act === 'morestores'){ S.moreStores = !S.moreStores; renderFilters(); return; }
   else if (act === 'unchip'){
     const k = b.dataset.k;
     if (k === 'q'){ S.q = ''; $('q').value = ''; S.qs = []; renderAssort(); } else if (k === 'cat') S.cat = 'all'; else if (k[0] === 's') S.fstores.delete(+k.slice(1));

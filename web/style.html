@@ -100,7 +100,13 @@ a{color:var(--cta)}
 .check{display:flex;align-items:center;gap:9px;font-size:.9rem;cursor:pointer;padding:2px 0}
 .check input{width:17px;height:17px;accent-color:var(--cta);margin:0;flex:none}
 .check .n{margin-left:auto;color:var(--muted);font-size:.8rem}
-.morebtn{background:none;border:0;padding:2px 0;color:var(--cta);font-weight:600;font-size:.85rem;text-align:left}
+/* winkelkeuze als knoppen; alleen zonder zijbalk, anders staat dezelfde keuze links */
+.storebar{display:flex;gap:8px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;scrollbar-width:none}
+.storebar::-webkit-scrollbar{display:none}
+.storechip{flex:none;min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);font-weight:600;font-size:.88rem}
+.storechip[aria-pressed="true"]{border-color:var(--cta);background:var(--sel-bg);color:var(--sel)}
+@media (min-width:980px){.storebar{display:none}}
+@media (max-width:979px){.filters .fgroup:first-child{display:none}}
 .toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}
 .toolbar .count{font-weight:700}
 .toolbar select{padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}

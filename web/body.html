@@ -30,7 +30,6 @@
     <div class="storebar" id="storebar" role="group" aria-label="Mijn winkels"></div>
     <div class="crumbs">
       <div><h2 class="h1like" id="h-shop">Aanbiedingen van deze week</h2><p class="muted small" id="shopsub">Folderacties van alle supermarkten.</p></div>
-      <p class="src">Aanbiedingen via <a href="https://www.prijsprofeet.nl" target="_blank" rel="noopener">PrijsProfeet</a> · Foto's: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a></p>
     </div>
     <section class="scan" id="scan" aria-labelledby="h-scan" hidden>
       <div class="scanintro">
@@ -71,7 +70,6 @@
   <section class="view inner" id="view-folders" aria-labelledby="h-folders" hidden>
     <div class="crumbs">
       <div><h1 id="h-folders">Folders van deze week</h1><p class="muted small">Per supermarkt de lopende folder. Bekijk de acties hier in de app, of open de folder zelf.</p></div>
-      <p class="src">Aanbiedingen via <a href="https://www.prijsprofeet.nl" target="_blank" rel="noopener">PrijsProfeet</a> · Folders op <a href="https://www.folderz.nl" target="_blank" rel="noopener">Folderz</a></p>
     </div>
     <div class="folders" id="folderlist"></div>
   </section>
@@ -79,7 +77,6 @@
   <section class="view inner" id="view-list" aria-labelledby="h-list" hidden>
     <div class="crumbs">
       <div><h1 id="h-list">Mijn lijstje</h1><p class="muted small">Zet je boodschappen erop, typ ze in of lees een foto van je briefje in. In het overzicht zie je wat het kost en of het loont om meer winkels te combineren.</p></div>
-      <p class="src">Gewone prijzen via <a href="https://github.com/supermarkt/checkjebon" target="_blank" rel="noopener">Checkjebon</a> · Aanbiedingen via <a href="https://www.prijsprofeet.nl" target="_blank" rel="noopener">PrijsProfeet</a></p>
     </div>
     <aside class="summary" id="summary" aria-live="polite"></aside>
     <div class="basket">
@@ -117,7 +114,7 @@
 <footer class="foot">
   <div class="inner">
     <div style="display:flex;flex-direction:column;gap:10px">
-      <p>Aanbiedingen via <a href="https://www.prijsprofeet.nl" target="_blank" rel="noopener">PrijsProfeet</a>, opgehaald op <span id="pfdate"></span>. Gewone prijzen uit de open data van <a href="https://github.com/supermarkt/checkjebon" target="_blank" rel="noopener">Checkjebon.nl</a>. Productfoto's van <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (CC BY-SA), voor zover beschikbaar. Deze app is onafhankelijk en heeft geen band met de supermarkten.</p>
+      <p>Aanbiedingen via <a href="https://www.prijsprofeet.nl" target="_blank" rel="noopener">PrijsProfeet</a>, opgehaald op <span id="pfdate"></span>. Gewone prijzen uit de open data van <a href="https://github.com/supermarkt/checkjebon" target="_blank" rel="noopener">Checkjebon.nl</a>. Folders op <a href="https://www.folderz.nl" target="_blank" rel="noopener">Folderz</a>. Productfoto's van <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (CC BY-SA), voor zover beschikbaar. Deze app is onafhankelijk en heeft geen band met de supermarkten.</p>
       <p>De korting is berekend ten opzichte van de van-prijs die de supermarkt zelf noemt. Bij acties als "1+1 gratis" of "4 voor" rekent de app alleen met de actieprijs als je het hele aantal koopt. Acties met meer dan 70% korting zijn weggelaten, omdat dat bijna altijd een fout in de bron is.</p>
       <p>Van een aantal winkels worden de gewone prijzen niet meer bijgewerkt. Die doen standaard alleen mee met hun actuele aanbiedingen. Dit is een prototype: controleer prijzen en producten in de winkel.</p>
       <p><a href="https://liquided-a.github.io/slim-boodschappen/privacy.html" target="_blank" rel="noopener">Privacyverklaring</a>: geen account, geen tracking, je lijstje blijft op je telefoon.</p>
@@ -288,6 +285,8 @@ const doneKey = it => it.q.toLowerCase();
 function useDemo(){ S.items = DEMO.map(([q, qty]) => ({id:S.nextId++, q, qty})); S.demo = true; }
 function enabledStores(){ return STORES.map((s, i) => i).filter(i => !S.off.has(STORES[i].k)); }
 /* alle winkels op naam: overal dezelfde lijst, en een winkel verspringt niet als je hem aan- of uitzet */
+/* knop om alle winkels in één keer uit of weer aan te zetten */
+function allStoresLabel(){ return enabledStores().length ? 'Alles uit' : 'Alles aan'; }
 function storeOrder(){ return STORES.map((s, i) => i).sort((a, b) => STORES[a].c.localeCompare(STORES[b].c, 'nl')); }
 function reanalyze(){ S.an = {}; S.pins = {}; S.items.forEach(it => { S.an[it.id] = ENG.analyze(it.q); }); }
 function hasItem(q){ return S.items.some(it => it.q.toLowerCase() === q.toLowerCase()); }
@@ -328,7 +327,7 @@ function renderFilters(){
   const ck = (id, act, checked, label, n, extra) => '<label class="check"><input type="checkbox" data-act="' + act + '"' + (extra || '') + (checked ? ' checked' : '') + ' id="' + id + '"><span>' + label + '</span>' + (n !== undefined ? '<span class="n">' + n + '</span>' : '') + '</label>';
   const rd = (v, label) => '<label class="check"><input type="radio" name="fdisc" data-act="fdisc" value="' + v + '"' + (S.fdisc === v ? ' checked' : '') + ' id="fd' + v + '"><span>' + label + '</span></label>';
   $('filters').innerHTML =
-    '<div class="fgroup"><h3>Mijn winkels</h3>' + storeOrder().map(s => ck('fs' + s, 'fstore', mine(s), esc(STORES[s].c), sc[s] || 0, ' data-s="' + s + '"')).join('') + '</div>' +
+    '<div class="fgroup"><div class="fhead"><h3>Mijn winkels</h3><button type="button" class="linkbtn" data-act="storesall">' + allStoresLabel() + '</button></div>' + storeOrder().map(s => ck('fs' + s, 'fstore', mine(s), esc(STORES[s].c), sc[s] || 0, ' data-s="' + s + '"')).join('') + '</div>' +
     '<div class="fgroup"><h3>Korting</h3>' + rd(0, 'Alle kortingen') + rd(25, '25% of meer') + rd(40, '40% of meer') + '</div>' +
     '<div class="fgroup"><h3>Soort actie</h3>' + ck('fmulti', 'fmulti', S.fmulti, '1+1, 2e halve prijs, X voor €') +
     ck('fnow', 'fnow', S.fnow, 'Alleen acties die nu lopen') + (HASIMG ? ck('fphoto', 'fphoto', S.fphoto, 'Alleen met foto') : '') + '</div>';
@@ -337,7 +336,7 @@ function renderFilters(){
   $('filters').scrollTop = top;
   /* zonder zijbalk (telefoon, tablet): dezelfde keuze als knoppen boven de aanbiedingen */
   const bar = $('storebar'), left = bar.scrollLeft;
-  bar.innerHTML = storeOrder().map(s => '<button type="button" class="storechip" data-act="store" data-k="' + esc(STORES[s].k) + '" aria-pressed="' + mine(s) + '">' + (mine(s) ? '✓ ' : '') + esc(STORES[s].c) + '</button>').join('');
+  bar.innerHTML = '<button type="button" class="storechip all" data-act="storesall">' + allStoresLabel() + '</button>' + storeOrder().map(s => '<button type="button" class="storechip" data-act="store" data-k="' + esc(STORES[s].k) + '" aria-pressed="' + mine(s) + '">' + (mine(s) ? '✓ ' : '') + esc(STORES[s].c) + '</button>').join('');
   bar.scrollLeft = left;
 }
 function renderChips(){
@@ -1077,7 +1076,7 @@ function settingsHtml(){
 /* eerste keer: kies je supermarkten (zoals 'Mijn supermarkten' in andere apps) */
 function onboardingHtml(){
   return '<h2>Welkom bij Slim Boodschappen</h2><p class="muted">Bij welke supermarkten doe je boodschappen? De app laat alleen die winkels zien en vergelijkt alleen die. Je kunt dit altijd aanpassen bij Mijn winkels.</p>' +
-    '<div class="onbgrid">' + storeOrder().map(i => '<button type="button" class="onbstore" data-act="onbstore" data-k="' + esc(STORES[i].k) + '" aria-pressed="' + !S.off.has(STORES[i].k) + '">' + esc(STORES[i].c) + '</button>').join('') + '</div>' +
+    '<div class="fhead"><h3>Jouw supermarkten</h3><button type="button" class="linkbtn" data-act="storesall">' + allStoresLabel() + '</button></div><div class="onbgrid">' + storeOrder().map(i => '<button type="button" class="onbstore" data-act="onbstore" data-k="' + esc(STORES[i].k) + '" aria-pressed="' + !S.off.has(STORES[i].k) + '">' + esc(STORES[i].c) + '</button>').join('') + '</div>' +
     '<div class="setrow"><h3>Tekstgrootte</h3><div class="seg">' + [['normaal', 'Normaal', 's1'], ['groot', 'Groot', 's2'], ['extra', 'Extra groot', 's3']].map(([v, l, c]) =>
       '<button type="button" data-act="onbsize" data-v="' + v + '" aria-pressed="' + (PREFS.size === v) + '" class="' + c + '">' + l + '</button>').join('') + '</div></div>' +
     '<button type="button" class="btn primary" data-act="onbdone" style="justify-content:center;min-height:52px">Aan de slag</button>';
@@ -1120,6 +1119,11 @@ document.addEventListener('click', e => {
     toast('Lijstje gewist', 'Ongedaan maken', () => { S.items = keepItems; reanalyze(); S.k = null; save(); renderAll(); });
   }
   else if (act === 'clear_old'){ S.items = []; S.an = {}; S.pins = {}; S.demo = false; S.k = null; }
+  else if (act === 'storesall'){
+    S.off = new Set(enabledStores().length ? STORES.map(s => s.k) : []); S.fstores.clear(); S.k = null; save(); renderAll();
+    if ($('sheetroot').innerHTML) openSheet(onboardingHtml(), 'Welkom');
+    return;
+  }
   else if (act === 'store'){ const k = b.dataset.k; S.off.has(k) ? S.off.delete(k) : S.off.add(k); S.fstores.clear(); S.k = null; save(); renderAll(); return; }
   else if (act === 'oldreg'){ S.oldReg = !S.oldReg; ENG.setMask(keep); reanalyze(); S.k = null; }
   else if (act === 'k'){ S.k = +b.dataset.k; }

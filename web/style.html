@@ -85,8 +85,6 @@ a{color:var(--cta)}
 /* weergaven */
 .view{padding-block:22px 48px}
 .crumbs{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}
-.crumbs .src{font-size:.82rem;color:var(--muted)}
-.crumbs .src a{font-weight:600}
 
 /* aanbiedingen: filters + raster */
 .shop{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;align-items:start}
@@ -97,6 +95,8 @@ a{color:var(--cta)}
 .fgroup{border-top:1px solid var(--line);padding-block:12px;display:flex;flex-direction:column;gap:6px}
 .fgroup:first-child{border-top:0}
 .fgroup h3{font-size:.9rem;margin-bottom:2px}
+.fhead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.fhead .linkbtn{min-height:32px}
 .check{display:flex;align-items:center;gap:9px;font-size:.9rem;cursor:pointer;padding:2px 0}
 .check input{width:17px;height:17px;accent-color:var(--cta);margin:0;flex:none}
 .check .n{margin-left:auto;color:var(--muted);font-size:.8rem}
@@ -104,6 +104,7 @@ a{color:var(--cta)}
 .storebar{display:flex;gap:8px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;scrollbar-width:none}
 .storebar::-webkit-scrollbar{display:none}
 .storechip{flex:none;min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);font-weight:600;font-size:.88rem}
+.storechip.all{color:var(--cta);border-style:dashed}
 .storechip[aria-pressed="true"]{border-color:var(--cta);background:var(--sel-bg);color:var(--sel)}
 @media (min-width:980px){.storebar{display:none}}
 @media (max-width:979px){.filters .fgroup:first-child{display:none}}
@@ -415,7 +416,6 @@ details.quick[open] summary::after{content:"Sluiten"}
   body{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}
   .view{padding-block:16px 28px}
   h1{font-size:1.4rem}
-  .crumbs .src{display:none}
   /* grotere vingervriendelijke knoppen */
   .addbtn{padding:12px 10px;font-size:.92rem}
   .stepper button{width:42px;height:42px;font-size:1.2rem}

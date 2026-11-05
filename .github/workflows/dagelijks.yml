@@ -54,7 +54,9 @@ jobs:
           git add data/images.json data/img data/fotolinks.json
           if ! git diff --cached --quiet; then
             git commit -m "Nieuwe productfoto's $(date +%F)"
-            for i in 1 2 3; do git pull --rebase -X theirs origin main && git push && break; sleep 5; done
+            # --autostash: data/data.b64 is hier gewijzigd maar wordt niet bewaard; zonder dit weigert git de pull
+            for i in 1 2 3; do git pull --rebase --autostash -X theirs origin main && git push && exit 0; sleep 5; done
+            echo "::warning::Nieuwe foto's konden niet worden bewaard"
           fi
 
       - name: Laatste prijzen van de website gebruiken (bij een wijziging in de app)

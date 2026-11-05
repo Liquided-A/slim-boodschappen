@@ -309,7 +309,7 @@ function baseFiltered(skip){
   const words = norm(S.q).trim().split(' ').filter(Boolean);
   return DEALS.filter(d =>
     (skip === 'cat' || S.cat === 'all' || d.cat === S.cat) &&
-    (skip === 'store' || !S.fstores.size || S.fstores.has(d.s)) &&
+    (skip === 'store' || (S.fstores.size ? S.fstores.has(d.s) : !S.off.has(STORES[d.s].k))) &&
     (!S.fdisc || d.pct >= S.fdisc) && (!S.fmulti || d.multi) && (!S.fnow || !d.upcoming) && (!S.fphoto || !d.img.none) &&
     (!words.length || words.every(w => d.norm.includes(' ' + w))));
 }
@@ -321,12 +321,13 @@ function renderCatbar(){
 }
 function renderFilters(){
   const sc = {}; baseFiltered('store').forEach(d => { sc[d.s] = (sc[d.s] || 0) + 1; });
-  const order = STORES.map((st, s) => s).filter(s => sc[s] || S.fstores.has(s)).sort((a, b) => (sc[b] || 0) - (sc[a] || 0));
+  const mine = s => !S.off.has(STORES[s].k);
+  const order = STORES.map((st, s) => s).filter(s => sc[s] || mine(s)).sort((a, b) => mine(b) - mine(a) || (sc[b] || 0) - (sc[a] || 0));
   const shown = S.moreStores ? order : order.slice(0, 8);
   const ck = (id, act, checked, label, n, extra) => '<label class="check"><input type="checkbox" data-act="' + act + '"' + (extra || '') + (checked ? ' checked' : '') + ' id="' + id + '"><span>' + label + '</span>' + (n !== undefined ? '<span class="n">' + n + '</span>' : '') + '</label>';
   const rd = (v, label) => '<label class="check"><input type="radio" name="fdisc" data-act="fdisc" value="' + v + '"' + (S.fdisc === v ? ' checked' : '') + ' id="fd' + v + '"><span>' + label + '</span></label>';
   $('filters').innerHTML =
-    '<div class="fgroup"><h3>Winkel</h3>' + shown.map(s => ck('fs' + s, 'fstore', S.fstores.has(s), esc(STORES[s].c), sc[s] || 0, ' data-s="' + s + '"')).join('') +
+    '<div class="fgroup"><h3>Mijn winkels</h3>' + shown.map(s => ck('fs' + s, 'fstore', mine(s), esc(STORES[s].c), sc[s] || 0, ' data-s="' + s + '"')).join('') +
     (order.length > 8 ? '<button type="button" class="morebtn" data-act="morestores">' + (S.moreStores ? 'Minder winkels' : 'Alle ' + order.length + ' winkels') + '</button>' : '') + '</div>' +
     '<div class="fgroup"><h3>Korting</h3>' + rd(0, 'Alle kortingen') + rd(25, '25% of meer') + rd(40, '40% of meer') + '</div>' +
     '<div class="fgroup"><h3>Soort actie</h3>' + ck('fmulti', 'fmulti', S.fmulti, '1+1, 2e halve prijs, X voor €') +
@@ -507,10 +508,12 @@ function renderShop(){
   renderCatbar(); renderFilters(); renderChips(); renderForYou();
   const list = sortedDeals(), shown = list.slice(0, S.show);
   $('rescount').textContent = list.length.toLocaleString('nl-NL') + ' aanbieding' + (list.length === 1 ? '' : 'en');
+  const mineDeals = DEALS.filter(d => !S.off.has(STORES[d.s].k)); const nMine = new Set(mineDeals.map(d => d.s)).size;
+  $('shopsub').textContent = mineDeals.length.toLocaleString('nl-NL') + ' folderacties van je ' + nMine + (nMine === 1 ? ' winkel' : ' winkels') + ', bijgewerkt op ' + dayFmt.format(PFETCH) + '.';
   $('h-shop').textContent = S.cat === 'all' ? 'Aanbiedingen' : (CATLABEL[S.cat] || S.cat);
   $('grid').innerHTML = shown.length ? shown.map(cardHtml).join('') :
     '<div class="emptybox" style="grid-column:1/-1"><strong>Geen aanbiedingen gevonden' + (S.q ? ' voor "' + esc(S.q) + '"' : '') + '.</strong>' +
-    '<span class="muted">Misschien is het deze week nergens in de aanbieding. Op je lijstje vergelijkt de app ook de gewone prijzen.</span>' +
+    '<span class="muted">' + (enabledStores().length ? 'Misschien is het deze week nergens in de aanbieding. Op je lijstje vergelijkt de app ook de gewone prijzen.' : 'Je hebt geen winkels aangezet. Kies er minstens één bij Mijn winkels.') + '</span>' +
     (S.q ? '<button type="button" class="btn primary" data-act="addq">Zet "' + esc(S.q) + '" op mijn lijstje</button>' : '') + '</div>';
   $('more').hidden = list.length <= S.show;
 }
@@ -759,7 +762,7 @@ const FOLDERZ = {ah:'albert-heijn', jumbo:'jumbo', lidl:'lidl', plus:'plus', ald
   mcd:'mcd-supermarkt', boons_markt:'boon-s-markt', amazing_oriental:'amazing-oriental'};
 function renderFolders(){
   const per = {};
-  DEALS.forEach(d => { if (!d.upcoming) (per[d.s] = per[d.s] || []).push(d); });
+  DEALS.forEach(d => { if (!d.upcoming && !S.off.has(STORES[d.s].k)) (per[d.s] = per[d.s] || []).push(d); });
   const order = Object.keys(per).map(Number).sort((a, b) => per[b].length - per[a].length);
   const fmtShort = new Intl.DateTimeFormat('nl-NL', {weekday:'short', day:'numeric', month:'short'});
   $('folderlist').innerHTML = order.map(s => {
@@ -1069,7 +1072,7 @@ function settingsHtml(){
 /* eerste keer: kies je supermarkten (zoals 'Mijn supermarkten' in andere apps) */
 function onboardingHtml(){
   const big = STORES.map((st, i) => i).filter(i => STORES[i].n.length > 250).sort((a, b) => STORES[b].n.length - STORES[a].n.length);
-  return '<h2>Welkom bij Slim Boodschappen</h2><p class="muted">Bij welke supermarkten doe je boodschappen? De app vergelijkt alleen die winkels. Je kunt dit later altijd aanpassen bij Mijn lijstje.</p>' +
+  return '<h2>Welkom bij Slim Boodschappen</h2><p class="muted">Bij welke supermarkten doe je boodschappen? De app laat alleen die winkels zien en vergelijkt alleen die. Je kunt dit altijd aanpassen bij Mijn winkels.</p>' +
     '<div class="onbgrid">' + big.map(i => '<button type="button" class="onbstore" data-act="onbstore" data-k="' + esc(STORES[i].k) + '" aria-pressed="' + !S.off.has(STORES[i].k) + '">' + esc(STORES[i].c) + '</button>').join('') + '</div>' +
     '<div class="setrow"><h3>Tekstgrootte</h3><div class="seg">' + [['normaal', 'Normaal', 's1'], ['groot', 'Groot', 's2'], ['extra', 'Extra groot', 's3']].map(([v, l, c]) =>
       '<button type="button" data-act="onbsize" data-v="' + v + '" aria-pressed="' + (PREFS.size === v) + '" class="' + c + '">' + l + '</button>').join('') + '</div></div>' +
@@ -1113,7 +1116,7 @@ document.addEventListener('click', e => {
     toast('Lijstje gewist', 'Ongedaan maken', () => { S.items = keepItems; reanalyze(); S.k = null; save(); renderAll(); });
   }
   else if (act === 'clear_old'){ S.items = []; S.an = {}; S.pins = {}; S.demo = false; S.k = null; }
-  else if (act === 'store'){ const k = b.dataset.k; S.off.has(k) ? S.off.delete(k) : S.off.add(k); S.k = null; }
+  else if (act === 'store'){ const k = b.dataset.k; S.off.has(k) ? S.off.delete(k) : S.off.add(k); S.fstores.clear(); S.k = null; save(); renderAll(); return; }
   else if (act === 'oldreg'){ S.oldReg = !S.oldReg; ENG.setMask(keep); reanalyze(); S.k = null; }
   else if (act === 'k'){ S.k = +b.dataset.k; }
   else if (act === 'cat'){
@@ -1243,7 +1246,7 @@ document.addEventListener('change', e => {
   if (t.hasAttribute && t.hasAttribute('data-scanfile')){ const f = t.files && t.files[0]; closeSheet(); runScan(f); return; }
   if (act === 'scanon' && SCAN){ SCAN.rows[+t.dataset.k].on = t.checked; renderScan(); return; }
   if (act === 'pin'){ const id = +t.dataset.id; (S.pins[id] = S.pins[id] || {})[+t.dataset.s] = +t.value; renderList(); return; }
-  if (act === 'fstore'){ const s = +t.dataset.s; t.checked ? S.fstores.add(s) : S.fstores.delete(s); }
+  if (act === 'fstore'){ const k = STORES[+t.dataset.s].k; t.checked ? S.off.delete(k) : S.off.add(k); S.fstores.clear(); S.k = null; S.show = 36; save(); renderAll(); return; }
   else if (act === 'fdisc') S.fdisc = +t.value;
   else if (act === 'fmulti' || act === 'fnow' || act === 'fphoto') S[act] = t.checked;
   else if (t.id === 'sort') S.sort = t.value;
@@ -1305,7 +1308,6 @@ function applyData(D){
   ENG = new Engine(STORES); HASIMG = false; S.fstores = new Set();
   ENG.setMask(keep); reanalyze(); buildDeals(); renderFresh();
   $('pfdate').textContent = dayFmt.format(PFETCH);
-  $('shopsub').textContent = DEALS.length.toLocaleString('nl-NL') + ' folderacties van ' + new Set(DEALS.map(d => d.s)).size + ' supermarkten, bijgewerkt op ' + dayFmt.format(PFETCH) + '.';
   const old = (NOW - PFETCH) / 36e5 > 36;
   $('staletext').textContent = old ? 'De aanbiedingen zijn opgehaald op ' + dayFmt.format(PFETCH) + '. Verlopen acties worden automatisch weggelaten.' + (CFG ? ' Met internet haalt de app de nieuwste prijzen op.' : '') : '';
   $('staleband').hidden = !old;

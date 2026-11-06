@@ -114,7 +114,7 @@ test('notitie zegt wat het is en wat er gevraagd is', () => {
 
 test('bon, totaal, winkelkeuze en per supermarkt laten de schatting zien; groen volgt de bon', () => {
   assert.ok(body.includes("(estimated(cell) ? '~' : '')"), 'bonregel');
-  assert.ok(body.includes('Dit totaal is een schatting, '), 'totaal');
+  assert.ok(body.includes('dus dit totaal is een benadering'), 'totaal');
   assert.ok(body.includes("(nEst(p) ? ' · ' + estText(nEst(p)) : '')"), 'winkelkeuze');
   assert.ok(body.includes("(estIn(t.store) ? ', ' + estText(estIn(t.store)) : '')"), 'per supermarkt');
   assert.ok(body.includes('row.filter(priced).map(x => x.price)'), 'groen');

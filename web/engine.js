@@ -72,9 +72,11 @@ class Engine {
     if (!tokens.length) return [];
     const forms = tokens.map(wordForms);
     const N = this.norms[s], K = this.skip[s], P = this.stores[s].p, tiers = [[],[],[]];
+    const friends = !tokens.some(t => FALSEFRIEND.test(t));
     for (let i = 0; i < N.length; i++){
       if (K[i] || !(P[i] > 0)) continue;   /* zonder geldige prijs doet een regel niet mee */
-      const n = N[i]; let worst = 0;
+      /* aardappelen zijn geen appels, boterhamworst is geen boter */
+      const n = friends && FALSEFRIEND.test(N[i]) ? N[i].replace(FALSEFRIENDS, ' ') : N[i]; let worst = 0;
       for (let t = 0; t < tokens.length; t++){
         const f = forms[t];
         let lvl = 0;
@@ -289,6 +291,8 @@ function stemNL(w){
 }
 /* enkelvoud en meervoud van een zoekwoord: banaan en bananen, peer en peren, kip en kippen. Alleen vormen met
    dezelfde grondvorm tellen; zo ontstaan er geen woorden die niets met het zoekwoord te maken hebben */
+const FALSEFRIEND = /aardappel|sinaasappel|granaatappel|boterham|boterkoek/;
+const FALSEFRIENDS = /[a-z]*(aardappel|sinaasappel|granaatappel|boterham|boterkoek)[a-z]*/g;
 function wordForms(w){
   const st = stemNL(w), out = new Set([w]), weak = /[aeiou][^aeiou]+e[lrn]$/.test(st);   /* appel, boter: geen lange klinker */
   const m = st.match(/^(.*[^aeiou])([aeou])([^aeiou])$/);

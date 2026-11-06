@@ -709,3 +709,14 @@ test('macaroni zoeken vindt gewoon macaroni', () => {
   const {m} = cheapest([A], 'macaroni');
   assert.ok(m[0][0] && !m[0][0].c.other);
 });
+
+test('appels vindt geen aardappelen of sinaasappels; boter geen boterhamworst', () => {
+  const A = store('A', [['A aardappelen kruimig 1 kg', 99, 1, 1000], ['A boterhamworst 150 g', 120, 1, 150]]);
+  const B = store('B', [['B appels 1 kg', 179, 1, 1000], ['B roomboter 250 g', 229, 1, 250]]);
+  const {m} = basket([A, B], [{id: 1, q: 'appels 1 kg', qty: 1}, {id: 2, q: 'boter 250 g', qty: 1}]);
+  assert.strictEqual(m[0][0], null);
+  assert.strictEqual(m[1][0], null);
+  assert.strictEqual(m[0][1].price, 179);
+  const C = store('C', [['C aardappelen 1 kg', 149, 1, 1000]]);
+  assert.strictEqual(basket([C], [{id: 1, q: 'aardappelen 1 kg', qty: 1}]).m[0][0].price, 149);
+});

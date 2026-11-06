@@ -247,7 +247,7 @@ function spriteHtml(ref){
 }
 function imgHtml(ref, fallback){
   if (!ref || ref.none) return phHtml(ref && ref.n, fallback);
-  if (ref.u) return '<img class="img pimg" src="' + esc(ref.u) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-t="' + ref.t + '" data-n="' + esc(ref.n || '') + '">';
+  if (ref.u) return '<img class="img pimg" src="' + esc(ref.u) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-t="' + (+ref.t || 0) + '" data-n="' + esc(ref.n || '') + '">';
   return spriteHtml(ref.t);
 }
 /* foto niet te laden (of geblokkeerd): val terug op de reservefoto of het plaatje */
@@ -691,7 +691,7 @@ function renderBasket(){
   }).join('');
   sumEl.innerHTML = '<div class="sumcard has"><div class="sleft"><h2>' + (whole ? 'Zo betaal je het minst' : 'Niet alles bij deze keuze') + '</h2>' +
     '<div><div class="total">' + money(cur.total) + '</div><div class="where">bij ' + esc(names(cur.combo)) + '</div></div>' +
-    (nEst(cur) ? '<div class="small muted">Dit totaal is een schatting, ' + estText(nEst(cur)) + ' (~).</div>' : '') +
+    (nEst(cur) ? '<div class="small muted">' + nEst(cur) + (nEst(cur) === 1 ? ' prijs is' : ' prijzen zijn') + ' geschat (~), dus dit totaal is een benadering.</div>' : '') +
     (unk.length ? '<div class="small muted">Totaal van ' + ofAll(cur.assign.length) + '; ' + unk.length + (unk.length === 1 ? ' prijs' : ' prijzen') + ' onbekend: ' + unk.map(i => esc(S.items[i].q)).join(', ') + '.</div>' : '') +
     (saved > 0 ? '<div><span class="tag good">Je bespaart ' + money(saved) + '</span> <span class="small muted">t.o.v. alles bij ' + esc(names(base.combo)) + (saved < base.total - cur.total ? ', zonder producten met een waarschuwing of schatting' : '') + '</span></div>' : '') +
     (nDeals ? '<div class="small muted">' + nDeals + ' product' + (nDeals === 1 ? ' is' : 'en zijn') + ' deze week in de aanbieding.</div>' : '') +

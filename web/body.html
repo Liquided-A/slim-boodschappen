@@ -615,8 +615,8 @@ function renderItems(){
   const sel = enabledStores();
   $('items').innerHTML = S.items.length ? S.items.map((it, idx) => {
     /* telt wat echt in de vergelijking zit, niet elke losse treffer */
-    const n = LAST && LAST.m ? LAST.m[idx].filter(Boolean).length : 0;
-    const meta = !sel.length ? '' : n ? 'Gevonden bij ' + n + ' van je ' + sel.length + ' winkels' : 'Prijs onbekend';
+    const row = LAST && LAST.m ? LAST.m[idx] : [], n = row.filter(priced).length;
+    const meta = !sel.length ? '' : n ? 'Gevonden bij ' + n + ' van je ' + sel.length + ' winkels' : row.some(Boolean) ? 'Prijs onbekend: alleen een ander formaat gevonden' : 'Prijs onbekend';
     return '<li><span class="thumb">' + imgHtml(itemImg(idx), '') + '</span><div class="iname">' + esc(it.q) + '<span class="imeta">' + esc(meta) + '</span></div>' +
       '<div class="stepper"><button type="button" data-act="dec" data-id="' + it.id + '" aria-label="Minder ' + esc(it.q) + '">−</button><span>' + it.qty + '</span>' +
       '<button type="button" data-act="inc" data-id="' + it.id + '" aria-label="Meer ' + esc(it.q) + '">+</button></div>' +
@@ -650,10 +650,16 @@ function noteFor(c, a, qty){
   if (c.mbq > 1 && c.mbp && !c.usual && packs % c.mbq) out.push('De losse prijs is onbekend, daarom is gerekend met de hele actie van ' + c.mbq + ' stuks.');
   if (c.mbq > 1 && c.usual && packs % c.mbq) out.push(packs < c.mbq ? 'De actie geldt bij ' + c.mbq + ' stuks. Bij ' + packs + ' betaal je de gewone prijs van ' + money(c.usual) + '.'
     : 'De actie geldt per ' + c.mbq + ' stuks. De rest betaal je tegen de gewone prijs.');
-  if (c.mode === 'scaled') out.push(c.r > 1 ? 'Je neemt ' + packs + ' pakken van ' + fmtQty(c.u, c.q) + ' (je vroeg ' + (qty > 1 ? qty + ' × ' : '') + fmtQty(a.kind, a.amount) + ').'
-    : 'Alleen een groter pak te koop: ' + fmtQty(c.u, c.q) + (packs > 1 ? ', ' + packs + ' pakken' : '') + ' (je vroeg ' + (qty > 1 ? qty + ' × ' : '') + fmtQty(a.kind, a.amount) + ').');
-  if (c.mode === 'unknown') out.push('Formaat onbekend, prijs per verpakking.');
-  if (c.mode === 'other') out.push('Ander formaat dan gevraagd.');
+  /* zonder eigen hoeveelheid is het formaat door de app gekozen: dan heb je er niet om gevraagd */
+  const wanted = () => (a.inferred ? 'gangbaar is ' : 'je vroeg ') + (qty > 1 ? qty + ' × ' : '') + fmtQty(a.kind, a.amount);
+  if (c.mode === 'scaled') out.push(c.r > 1 ? 'Je neemt ' + packs + ' pakken van ' + fmtQty(c.u, c.q) + ' (' + wanted() + ').'
+    : 'Alleen een groter pak te koop: ' + fmtQty(c.u, c.q) + (packs > 1 ? ', ' + packs + ' pakken' : '') + ' (' + wanted() + ').');
+  if (c.mode === 'unknown' || c.mode === 'other'){
+    /* zeg wat het is en wat er gevraagd is; bij een eigen hoeveelheid staat die erbij */
+    const have = c.u && c.q ? fmtQty(c.u, c.q) : '', want = a.kind && !a.inferred ? (qty > 1 ? qty + ' × ' : '') + fmtQty(a.kind, a.amount) : '';
+    if (c.mode === 'other' && packs > 1 && have) out.push('Schatting: ' + packs + ' pakken van ' + have + (want ? ' (je vroeg ' + want + ')' : '') + '.');
+    else out.push('Schatting: ' + (have ? 'dit is ' + have : 'formaat onbekend') + (want ? ', je vroeg ' + want : '') + '. Dit is de prijs per verpakking.');
+  }
   return out.join(' ');
 }
 function renderCart(){
@@ -675,16 +681,19 @@ function renderBasket(){
   const nItems = S.items.length, unk = unpriced(L);
   const ofAll = n => n + ' van de ' + nItems + ' producten';
   const nDeals = cur.assign.filter(([i, s]) => m[i][sel.indexOf(s)].c.usual).length;
+  const nEst = p => p.assign.filter(([i, s]) => estimated(m[i][sel.indexOf(s)])).length;
+  const estText = n => n ? 'waarvan ' + n + ' geschat' : '';
   const opts = pl.result.map((r, i) => {
     const p = r || pl.partial[i];
     return '<button class="kopt" type="button" role="radio" data-act="k" data-k="' + (i+1) + '" aria-checked="' + (i === ci) + '"><span class="dot"></span>' +
-      '<span class="kn">' + (i+1) + ' winkel' + (i ? 's' : '') + (i === adv ? ' <span class="tag good">Advies</span>' : '') + '<span class="ks">' + esc(names(p.combo)) + (r ? '' : ' · ' + ofAll(p.assign.length)) + '</span></span>' +
+      '<span class="kn">' + (i+1) + ' winkel' + (i ? 's' : '') + (i === adv ? ' <span class="tag good">Advies</span>' : '') + '<span class="ks">' + esc(names(p.combo)) + (r ? '' : ' · ' + ofAll(p.assign.length)) + (nEst(p) ? ' · ' + estText(nEst(p)) : '') + '</span></span>' +
       (r ? '<span class="kt">' + money(r.total) + '</span>' : '<span class="kt part">onvolledig</span>') + '</button>';
   }).join('');
   sumEl.innerHTML = '<div class="sumcard has"><div class="sleft"><h2>' + (whole ? 'Zo betaal je het minst' : 'Niet alles bij deze keuze') + '</h2>' +
     '<div><div class="total">' + money(cur.total) + '</div><div class="where">bij ' + esc(names(cur.combo)) + '</div></div>' +
+    (nEst(cur) ? '<div class="small muted">Dit totaal is een schatting, ' + estText(nEst(cur)) + ' (~).</div>' : '') +
     (unk.length ? '<div class="small muted">Totaal van ' + ofAll(cur.assign.length) + '; ' + unk.length + (unk.length === 1 ? ' prijs' : ' prijzen') + ' onbekend: ' + unk.map(i => esc(S.items[i].q)).join(', ') + '.</div>' : '') +
-    (saved > 0 ? '<div><span class="tag good">Je bespaart ' + money(saved) + '</span> <span class="small muted">t.o.v. alles bij ' + esc(names(base.combo)) + (saved < base.total - cur.total ? ', zonder producten met een waarschuwing' : '') + '</span></div>' : '') +
+    (saved > 0 ? '<div><span class="tag good">Je bespaart ' + money(saved) + '</span> <span class="small muted">t.o.v. alles bij ' + esc(names(base.combo)) + (saved < base.total - cur.total ? ', zonder producten met een waarschuwing of schatting' : '') + '</span></div>' : '') +
     (nDeals ? '<div class="small muted">' + nDeals + ' product' + (nDeals === 1 ? ' is' : 'en zijn') + ' deze week in de aanbieding.</div>' : '') +
     '</div><div class="sright"><div role="radiogroup" aria-label="Aantal winkels" class="kopts">' + opts + '</div>' +
     (S.saved && S.saved.c > 0 ? '<div class="savedbox">🎉 Dit jaar bespaard met aanbiedingen: <b>' + money(S.saved.c) + '</b></div>' : '') +
@@ -713,7 +722,7 @@ function renderBasket(){
       const deal = c.usual ? '<span class="tag sale">' + esc(c.label || ('−' + Math.round(100 * (1 - c.price / c.usual)) + '%')) + '</span>' + (mmddToDate(c.until) ? '<span class="small muted">t/m ' + esc(dayFmt.format(mmddToDate(c.until))) + '</span>' : '') : '';
       const dn = S.done.has(doneKey(it));
       return head + '<div class="line' + (dn ? ' done' : '') + '"><button type="button" class="tick" data-act="tick" data-id="' + it.id + '" role="checkbox" aria-checked="' + dn + '" aria-label="' + esc(it.q) + ' in mijn mandje"></button><span class="thumb">' + imgHtml(imgRef(st, c.i), '') + '</span><div><div class="row"><span class="pn">' + (packsFor(it.qty, c.r) > 1 ? packsFor(it.qty, c.r) + ' × ' : '') + esc(c.name) +
-        (c.q && !norm(c.name).includes(' ' + String(fmtQty(c.u, c.q)).split(' ')[0].replace(',', ' ')) ? ' <span class="muted">(' + esc(fmtQty(c.u, c.q)) + ')</span>' : '') + '</span><span class="pp">' + money(cell.price) + '</span></div>' +
+        (c.q && !norm(c.name).includes(' ' + String(fmtQty(c.u, c.q)).split(' ')[0].replace(',', ' ')) ? ' <span class="muted">(' + esc(fmtQty(c.u, c.q)) + ')</span>' : '') + '</span><span class="pp">' + (estimated(cell) ? '~' : '') + money(cell.price) + '</span></div>' +
         '<div class="meta">' + deal + oldTag(st, c) + (unitText(c) ? '<span class="small muted">' + unitText(c) + '</span>' : '') + '</div>' + (nt ? '<span class="note">' + esc(nt) + '</span>' : '') + warnx + tip +
         '<div class="meta"><details class="swap"><summary>Ander product</summary><select data-act="pin" data-id="' + it.id + '" data-s="' + s + '" aria-label="Kies product voor ' + esc(it.q) + '">' + opts + '</select></details>' +
         (url ? '<a class="shoplink" href="' + esc(url) + '" target="_blank" rel="noopener">Bekijk ↗</a>' : '') + '</div></div></div>';
@@ -731,23 +740,24 @@ function renderBasket(){
     return '<div class="line noprice' + (dn ? ' done' : '') + '"><button type="button" class="tick" data-act="tick" data-id="' + it.id + '" role="checkbox" aria-checked="' + dn + '" aria-label="' + esc(it.q) + ' in mijn mandje"></button><span class="pn">' + (it.qty > 1 ? it.qty + ' × ' : '') + esc(it.q) + '</span></div>';
   }).join('') + '</article>' : '';
   /* per winkel; bedragen van winkels die niet alles hebben zijn niet met de rest te vergelijken */
+  const estIn = s => m.filter(row => estimated(row[sel.indexOf(s)])).length;
   const totals = sortStoreTotals(storeTotals(m, sel)), withPrice = totals.filter(t => t.count), noPrice = totals.filter(t => !t.count);
   const perStore = '<section class="panel" aria-labelledby="h-perstore"><header><h2 id="h-perstore">Per supermarkt</h2></header><ul class="perstore">' + withPrice.map(t =>
-    '<li' + (t.complete ? '' : ' class="part"') + '><span class="pn">' + esc(STORES[t.store].c) + '</span><span class="pa">' + money(t.total) + '</span><span class="pc">' + t.count + ' van ' + t.items + ' producten' + (t.complete ? '' : ', bedrag onvolledig') + (t.suspect ? ', ' + t.suspect + ' product' + (t.suspect === 1 ? '' : 'en') + ' mogelijk verkeerd' : '') + '</span></li>').join('') + '</ul>' +
+    '<li' + (t.complete ? '' : ' class="part"') + '><span class="pn">' + esc(STORES[t.store].c) + '</span><span class="pa">' + money(t.total) + '</span><span class="pc">' + t.count + ' van ' + t.items + ' producten' + (estIn(t.store) ? ', ' + estText(estIn(t.store)) : '') + (t.complete ? '' : ', bedrag onvolledig') + (t.suspect ? ', ' + t.suspect + ' product' + (t.suspect === 1 ? '' : 'en') + ' mogelijk verkeerd' : '') + '</span></li>').join('') + '</ul>' +
     (withPrice.some(t => !t.complete) ? '<p class="hint">Een onvolledig bedrag lijkt lager omdat er producten ontbreken. Vergelijk alleen winkels met evenveel producten.</p>' : '') +
     (noPrice.length ? '<p class="hint">Geen prijzen bij: ' + esc(noPrice.map(t => STORES[t.store].c).join(', ')) + '.</p>' : '') + '</section>';
   const head = '<tr><th>Product</th>' + sel.map(s => '<th class="' + (cur.combo.includes(s) ? 'on' : '') + '">' + esc(STORES[s].c) + '</th>').join('') + '</tr>';
   const body = S.items.map((it, i) => {
-    /* de laagste prijs markeren we alleen tussen vergelijkbare producten (exact of omgerekend) */
-    const row = m[i], cmp = row.filter(comparable), vals = (cmp.length ? cmp : row.filter(Boolean)).map(x => x.price), mn = vals.length ? Math.min(...vals) : null;
+    /* groen volgt de bon: alleen wat meetelt kan de laagste prijs zijn; de rest is grijs en telt niet mee */
+    const row = m[i], vals = row.filter(priced).map(x => x.price), mn = vals.length ? Math.min(...vals) : null;
     const unsure = (x, s) => x.mode !== 'exact' || (x.c.i < STORES[s].r && !regFresh(STORES[s]));
-    return '<tr><td>' + (it.qty > 1 ? it.qty + ' × ' : '') + esc(it.q) + '</td>' + row.map((x, j) => x ? '<td class="' + (x.price === mn && (!cmp.length || comparable(x)) ? 'min' : '') + '" title="' + esc(x.c.name) + '">' + (unsure(x, sel[j]) ? '~' : '') + money(x.price) + (x.c.usual ? ' •' : '') + '</td>' : '<td class="na">–</td>').join('') + '</tr>';
+    return '<tr><td>' + (it.qty > 1 ? it.qty + ' × ' : '') + esc(it.q) + '</td>' + row.map((x, j) => x ? '<td class="' + (x.info ? 'na' : x.price === mn ? 'min' : '') + '" title="' + esc(x.c.name) + (x.info ? ' (telt niet mee)' : '') + '">' + (unsure(x, sel[j]) ? '~' : '') + money(x.price) + (x.c.usual ? ' •' : '') + '</td>' : '<td class="na">–</td>').join('') + '</tr>';
   }).join('');
   const anyDone = S.items.some(it => S.done.has(doneKey(it)));
   bonsEl.innerHTML = '<div class="col">' + perStore + '<div class="bonshead"><div><h2>Wat haal je waar</h2><p class="small muted">Tik in de winkel op het rondje om een product af te vinken.</p></div>' +
     '<div class="bonsbtns"><button type="button" class="btn ghost" data-act="share">' + ICON_SHARE + 'Lijstje delen</button>' +
     (anyDone ? '<button type="button" class="btn primary" data-act="finish">Klaar: afgevinkte weghalen</button>' : '') + '</div></div><div class="bons">' + bons + unkBon + '</div>' +
-    '<section class="panel"><header><h2>Alle prijzen naast elkaar</h2><span class="small muted">groen = goedkoopst · ~ = omgerekend of formaat onbekend · • = aanbieding</span></header>' +
+    '<section class="panel"><header><h2>Alle prijzen naast elkaar</h2><span class="small muted">groen = goedkoopst · ~ = omgerekend of geschat · grijs = telt niet mee · • = aanbieding</span></header>' +
     '<div class="tablewrap"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div></section></div>';
 }
 function renderList(){ compute(); renderItems(); renderStores(); renderBasket(); renderCart(); renderMeals(); }
@@ -961,7 +971,7 @@ function listText(){
       const pos = L.sel.indexOf(s), rows = by[s] || [];
       const sub = rows.reduce((t, i) => t + L.m[i][pos].price, 0);
       out += '\n' + STORES[s].c + ' (' + money(sub) + ')\n';
-      rows.forEach(i => { const it = S.items[i], c = L.m[i][pos].c, n = packsFor(it.qty, c.r); out += '- ' + (n > 1 ? n + ' × ' : '') + c.name + (c.usual ? ' (aanbieding)' : '') + '\n'; });
+      rows.forEach(i => { const it = S.items[i], c = L.m[i][pos].c, n = packsFor(it.qty, c.r); out += '- ' + (n > 1 ? n + ' × ' : '') + c.name + (c.usual ? ' (aanbieding)' : '') + (estimated(L.m[i][pos]) ? ' (geschat)' : '') + '\n'; });
     });
     const unk = unpriced(L);
     if (unk.length) out += '\nPrijs onbekend:\n' + unk.map(i => '- ' + S.items[i].q).join('\n') + '\n';

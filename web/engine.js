@@ -70,16 +70,17 @@ class Engine {
   /* alle producten in winkel s waarvan elk zoekwoord voorkomt; beste match-niveau wint */
   matchStore(s, tokens){
     if (!tokens.length) return [];
+    const forms = tokens.map(wordForms);
     const N = this.norms[s], K = this.skip[s], P = this.stores[s].p, tiers = [[],[],[]];
     for (let i = 0; i < N.length; i++){
       if (K[i] || !(P[i] > 0)) continue;   /* zonder geldige prijs doet een regel niet mee */
       const n = N[i]; let worst = 0;
       for (let t = 0; t < tokens.length; t++){
-        const w = tokens[t];
-        let lvl;
-        if (n.includes(' ' + w + ' ')) lvl = 1;
-        else if (n.includes(' ' + w)) lvl = 2;
-        else if (w.length >= 4 && n.includes(w)) lvl = 3;
+        const f = forms[t];
+        let lvl = 0;
+        if (f.some(w => n.includes(' ' + w + ' '))) lvl = 1;
+        else if (f.some(w => n.includes(' ' + w))) lvl = 2;
+        else if (f.some(w => w.length >= 4 && n.includes(w))) lvl = 3;
         else { worst = 0; break; }
         if (lvl > worst) worst = lvl;
       }
@@ -91,16 +92,17 @@ class Engine {
     const g = genericFor(query);
     if (g && g !== String(query).toLowerCase().trim()){
       /* "melk" -> eerst halfvolle melk; winkels zonder treffer vallen terug op het gewone zoekwoord */
-      const a = this._analyze(g, limit, true), b = this._analyze(query, limit, true);
+      /* de terugval rekent met het formaat van het gangbare product: anders is Maggi Jus 29 g "exact" bij 1 liter jus */
+      const a = this._analyze(g, limit, true), b = this._analyze(query, limit, true, a.kind ? a : null);
       a.per = a.per.map((e, s) => e || b.per[s]); a.query = query;
       return a;
     }
     return this._analyze(query, limit);
   }
-  /* known: het zoekwoord is zeker een soort product en geen merk */
-  _analyze(query, limit, known){
+  /* known: het zoekwoord is zeker een soort product en geen merk; size: {kind, amount} als het formaat al vaststaat */
+  _analyze(query, limit, known, size){
     const p = parseQuery(query);
-    const qset = new Set(p.tokens), asked = new Set(p.tokens.map(stemNL));
+    const qset = new Set(p.tokens.flatMap(wordForms)), asked = new Set(p.tokens.map(stemNL));
     const joined = ' ' + p.tokens.join(' ') + ' ';
     /* 1. relevantie: hoe weinig extra woorden heeft de productnaam */
     const scoredAll = this.stores.map((st, s) => {
@@ -121,10 +123,10 @@ class Engine {
           if (c === null){
             let related = false;
             for (const t of qset){ if (w.includes(t)) { related = true; break; } }
-            /* ravioli met kaas is geen kaas, boterhamworst geen boter */
             c = related ? 3 : (PENALTY.has(w) ? 4 : (HOUSE.has(w) ? 0 : 1));
-            if (otherType(w, asked)){ pen += 4 - c; c = 4; other = true; }
           }
+          /* ravioli met kaas is geen kaas, boterhamworst geen boter */
+          if (otherType(w, asked)){ pen += 4 - c; c = 4; other = true; }
           extra += c;
         }
         if (p.tokens.length > 1 && !N[i].includes(joined)) extra += 2;
@@ -133,10 +135,11 @@ class Engine {
     });
     /* nergens het kale product (ariel, optimel, dove): dan is het zoekwoord een merk en hoort wasmiddel of yoghurt
        gewoon bij wat je zoekt. De soortwoorden kosten dan niets extra, zodat merkproducten niet wegzakken */
-    if (!known && !scoredAll.some(l => l.some(x => !x.other && x.score <= 0.5)))
+    if (!known && !(p.tokens.length === 1 && HOMECAT[stemNL(p.tokens[0])]) && !scoredAll.some(l => l.some(x => !x.other && x.score <= 0.5)))
       scoredAll.forEach(l => l.forEach(x => { x.score -= x.pen; x.other = false; }));
     let kind = p.kind, amount = p.amount, inferred = false;
-    if (!kind){
+    if (size){ kind = size.kind; amount = size.amount; inferred = true; }
+    else if (!kind){
       /* geen formaat opgegeven: neem het gangbare formaat van de best passende producten */
       let gmin = Infinity;
       scoredAll.forEach(l => l.forEach(x => { if (x.score < gmin) gmin = x.score; }));
@@ -164,7 +167,12 @@ class Engine {
         if (!kind) mode = 'exact';
         else if (u === kind && q > 0){
           if (Math.abs(q - amount) / amount <= tol) mode = 'exact';
-          else { const rr = amount / q; if (rr >= 0.25 && rr <= 10){ r = rr; mode = 'scaled'; eff = price * packsFor(1, r); } }
+          else {
+            const rr = amount / q;
+            if (rr >= 0.25 && rr <= 10){ r = rr; mode = 'scaled'; eff = price * packsFor(1, r); }
+            /* te ver van de gevraagde hoeveelheid om eerlijk te vergelijken, maar de prijs klopt wel voor die hoeveelheid */
+            else if (!inferred){ r = rr; eff = price * packsFor(1, r); }
+          }
         } else if (u === 0) mode = 'unknown';
         /* je koopt hele pakken: kleiner pak = meer pakken, groter pak = je betaalt het hele pak */
         const c = {i, name: st.n[i], price, eff, r, q, u, mode, score: x.score, other: x.other, usual: 0, mbq: 0, mbp: 0, label: '', until: ''};
@@ -279,10 +287,22 @@ function stemNL(w){
   s = s.replace(/([bdfgklmnprst])\1$/, '$1');              /* kippen -> kip */
   return s.replace(/(aa|ee|oo|uu)([^aeiou])$/, (m, v, c) => v[0] + c);   /* banaan -> banan, zoals bananen */
 }
+/* enkelvoud en meervoud van een zoekwoord: banaan en bananen, peer en peren, kip en kippen. Alleen vormen met
+   dezelfde grondvorm tellen; zo ontstaan er geen woorden die niets met het zoekwoord te maken hebben */
+function wordForms(w){
+  const st = stemNL(w), out = new Set([w]), weak = /[aeiou][^aeiou]+e[lrn]$/.test(st);   /* appel, boter: geen lange klinker */
+  const m = st.match(/^(.*[^aeiou])([aeou])([^aeiou])$/);
+  if (m && !weak) out.add(m[1] + m[2] + m[2] + m[3]);   /* peren -> peer, bananen -> banaan */
+  /* niet de grondvorm zelf bij peer of kaas: per en kas zijn andere woorden */
+  if (!m || weak || /([^aeiou])\1en$/.test(w)) out.add(st);
+  out.add(st + 'en'); out.add(st + st.slice(-1) + 'en');
+  if (weak || /[aeiou]$/.test(st)) out.add(st + 's');
+  return [...out].filter(f => stemNL(f) === st);
+}
 /* woorden die zeggen dat het iets anders is dan het losse product: bananensap, appeltaart, drink met banaan */
-const OTHERTYPE = ['drink','drank','sap','nectar','smoothie','limonade','siroop','stroop','yoghurt','kwark','skyr','vla','pudding','toetje','dessert','ijs','roomijs','cake','koek','koekje','wafel','taart','gebak','reep','snoep','chips','chocolade','jam','moes','saus','soep','thee','ijsthee','shampoo','zeep','crème','creme','douche','mix','poeder','knijpfruit','fruit','hapje','ontbijtje','maaltijd','boost','split','aioli','hoemoes','boter','brood','pasta','gnocchi','chutney','azijn','bier','cider','wijn','likeur','geur','schijfjes','wrap','pizza','popcorn','dip','salade','hummus','jus','biscuit','middel','afwas','mnd','maanden','baby','kroket','tablet','dubbelfrisss','olvarit','ella','bonbebe','tuc','mcvitie','sandwich','soup','ravioli','tortellini','soes','soesjes','stamppot','bolognese','spritsen','burger','quiche','wraps','ketchup','haribo'];
+const OTHERTYPE = ['drink','drank','sap','nectar','smoothie','limonade','siroop','stroop','yoghurt','kwark','skyr','vla','pudding','toetje','dessert','ijs','roomijs','cake','koek','koekje','wafel','taart','gebak','reep','snoep','chips','chocolade','jam','moes','saus','soep','thee','ijsthee','shampoo','zeep','crème','creme','douche','mix','poeder','knijpfruit','fruit','hapje','ontbijtje','maaltijd','boost','split','aioli','hoemoes','boter','brood','pasta','gnocchi','chutney','azijn','bier','cider','wijn','likeur','geur','schijfjes','wrap','pizza','popcorn','dip','salade','hummus','jus','biscuit','middel','afwas','mnd','maanden','baby','kroket','tablet','dubbelfrisss','olvarit','ella','bonbebe','tuc','mcvitie','sandwich','soup','ravioli','tortellini','soes','soesjes','stamppot','bolognese','spritsen','burger','quiche','wraps','ketchup','haribo','macaroni','lasagne','penne','nasi','bami','ovenschotel','risotto','curry','nuggets','tapenade','pesto','sardines','sardientjes','tonijn','makreel','ansjovis','zuurkool','ijskoffie','radlerwijn','bananenbrood','suikerbrood','krentenbrood','worstenbroodje','worstenbroodjes','roomkaas','smeerkaas','gezeefde','gepelde','frito','reiniger','vaatwas','spread','rings','gehaktbal','gehaktballen','maaza','taksi','snack','chevre','mineraalwater','radler','pepermunt','mosterd','gourmet','kattenvoer','hondenvoer','snijworst','drop','crystal'];
 const OTHERSTEM = OTHERTYPE.map(o => [o, stemNL(o)]);
-const OTHERWORD = new Map();
+const OTHERWORD = new Map(), OTHERWHOLE = new Set(OTHERTYPE);
 /* staat dit woord (of het einde ervan) in OTHERTYPE? Eén keer per woord uitgerekend */
 function otherWord(w){
   let v = OTHERWORD.get(w);
@@ -298,6 +318,7 @@ function otherType(w, asked){
   if (!otherWord(w)) return false;
   const st = stemNL(w);
   if (asked.has(st)) return false;
+  if (OTHERWHOLE.has(w)) return true;   /* ijskoffie is geen koffie, ook al eindigt het erop */
   for (const a of asked) if (a.length >= 3 && st.endsWith(a)) return false;
   return true;
 }
@@ -309,9 +330,9 @@ const GOODPOST = ['filet','filets','dij','dijen','dijfilet','bout','bouten','poo
 const SEARCHALIAS = dict({'wc papier':'toiletpapier','wcpapier':'toiletpapier','closetpapier':'toiletpapier','wcrol':'toiletpapier','pleepapier':'toiletpapier','piepers':'aardappelen'});
 /* de afdeling van veelgezochte producten; bij andere woorden telt de app zelf waar ze het meest staan */
 const HOMECAT = Object.create(null);
-[['groente-fruit','banaan appel peer sinaasappel mandarijn druif citroen tomaat paprika komkommer sla ui wortel aardappel broccoli bloemkool champignon spinazie'],
+[['groente-fruit','banaan appel peer sinaasappel mandarijn druif citroen tomaat paprika komkommer sla ui wortel aardappel broccoli bloemkool champignon spinazie knoflook prei courgette avocado'],
  ['zuivel-eieren','melk boter yoghurt kwark vla eieren ei'],['kaas','kaas'],['vlees','kip gehakt worst biefstuk spek'],['vis','zalm tonijn kabeljauw'],
- ['frisdrank','water cola'],['brood-bakkerij','brood']].forEach(([c, w]) => w.split(' ').forEach(x => { HOMECAT[stemNL(x)] = c; }));
+ ['frisdrank','water cola'],['brood-bakkerij','brood'],['soepen-conserven-sauzen','peper zout olie azijn mosterd'],['ontbijt','honing jam'],['wijn','wijn']].forEach(([c, w]) => w.split(' ').forEach(x => { HOMECAT[stemNL(x)] = c; }));
 
 /* woorden en grondvormen van een naam, één keer uitgerekend: bij elke zoekopdracht gaan alle namen langs */
 const NAMEPARTS = new Map();
@@ -438,11 +459,14 @@ function priceMatrix(items, analyses, pins, storeIdxs){
     /* een ander soort product (ravioli bij kaas, bananensoesjes bij bananen) doet niet mee zodra een andere winkel
        het echte product heeft; bij een merk als zoekwoord staat c.other nooit aan (zie _analyze) */
     if (row.some(x => x && !x.c.other)) row = row.map(x => x && x.c.other && !x.pinned ? null : x);
-    /* zodra een andere winkel een vergelijkbaar product heeft, tellen niet mee: een ander soort product
-       (per stuk in plaats van per kilo, of veel te klein/groot) en een product met onbekend formaat dat ook
-       slechter bij de zoekterm past (bananenbrood bij "bananen"); zelf gekozen producten blijven staan */
-    const cmp = row.filter(comparable);
-    if (!cmp.length) return row;
+    const cmp = row.filter(comparable), asked = !!a && !!a.kind && !a.inferred;   /* asked: de gebruiker noemde zelf een hoeveelheid */
+    /* wat alleen te zien is (~ in de tabel) maar niet meetelt: geen winkelkeuze, geen totaal, geen besparing */
+    const info = x => Object.assign({}, x, {mode: 'unknown', info: true, c: Object.assign({}, x.c, {mode: 'unknown'})});
+    if (!cmp.length){
+      /* nergens iets vergelijkbaars: dan telt de prijs als schatting, maar alleen als hij klopt voor de gevraagde
+         hoeveelheid. Een pak in stuks of zonder formaat is niet om te rekenen naar 3 kilo: die prijs zou gelijk blijven */
+      return row.map(x => !x || x.pinned || !asked || x.c.u === a.kind ? x : info(x));
+    }
     const best = Math.min(...cmp.map(x => x.c.score));
     /* voor dezelfde hoeveelheid meer dan 8 keer zo duur als het goedkoopste product dat minstens even goed
        bij de zoekterm past, én zelf slechter passend: vrijwel altijd een ander product (bananensoesjes bij
@@ -452,15 +476,16 @@ function priceMatrix(items, analyses, pins, storeIdxs){
       const better = cmp.filter(y => y !== x && y.c.score + 0.5 < x.c.score);
       return better.length > 0 && x.price > OUTLIER * Math.min(...better.map(y => y.price));
     };
-    /* niet om te rekenen maar wel het gevraagde product: dat verdwijnt niet, het telt als onbekend formaat (~).
-       Beter passend dan alles wat wel te rekenen is, of ongeveer even goed passend als er geen formaat is gevraagd
-       (dat is dan een schatting) of als het een pak van meer stuks is (5 bananen) bij een vraag in kilo's.
-       Eén los stuk zegt niets over een kilo; dat valt af zolang er een even goed vergelijkbaar product is */
+    /* niet om te rekenen maar wel het gevraagde product: dat verdwijnt niet uit beeld. Beter passend dan alles wat
+       wel te rekenen is, of ongeveer even goed passend als er geen formaat is gevraagd of als het een pak van meer
+       stuks is (5 bananen) bij een vraag in kilo's. Eén los stuk zegt niets over een kilo */
     const loose = x => x.mode === 'other' && !x.c.other && (x.c.score + 0.5 < best || (x.c.score <= best + LOOSEFIT &&
-      (a.inferred || (x.c.u === 3 && a.kind !== 3 && x.c.q > 1))));
+      (!asked || (x.c.u === 3 && a.kind !== 3 && x.c.q > 1))));
     return row.map(x => {
-      if (!x || x.pinned || (comparable(x) && !suspect(x)) || (x.mode === 'unknown' && x.c.score <= best + 1)) return x;
-      return loose(x) ? Object.assign({}, x, {mode: 'unknown', c: Object.assign({}, x.c, {mode: 'unknown'})}) : null;
+      if (!x || x.pinned || (comparable(x) && !suspect(x))) return x;
+      /* onbekend formaat dat goed past: zonder gevraagde hoeveelheid is één verpakking gewoon wat je koopt */
+      if (x.mode === 'unknown' && x.c.score <= best + 1) return asked ? info(x) : x;
+      return loose(x) ? info(x) : null;
     });
   });
 }
@@ -541,7 +566,9 @@ function combos(arr, k){
 }
 
 /* een cel met een echte prijs; een ontbrekende prijs telt nooit als 0 */
-const priced = x => !!x && x.price > 0;
+const priced = x => !!x && x.price > 0 && !x.info;
+/* telt mee, maar is niet exact of omgerekend te vergelijken: krijgt overal een ~ */
+const estimated = x => priced(x) && !comparable(x);
 
 /* per winkel: totaal van de producten met prijs, hoeveel dat er zijn en welke ontbreken.
    complete: de winkel heeft alles wat ergens een prijs heeft, alleen die totalen zijn onderling te vergelijken.
@@ -618,9 +645,11 @@ function fairSaving(from, to, m, storeIdxs){
   let saving = from.total - to.total;
   from.assign.forEach(([i, s]) => {
     const j = storeIdxs.indexOf(s);
-    if (!muchCheaperElsewhere(m[i], j)) return;
     const a = to.assign.find(x => x[0] === i), other = a && m[i][storeIdxs.indexOf(a[1])];
-    if (other && m[i][j].price > other.price) saving -= m[i][j].price - other.price;
+    if (!other) return;
+    /* tussen twee schattingen of een schatting en een echte prijs valt niets te besparen */
+    if (estimated(m[i][j]) || estimated(other)) saving -= m[i][j].price - other.price;
+    else if (muchCheaperElsewhere(m[i], j) && m[i][j].price > other.price) saving -= m[i][j].price - other.price;
   });
   return saving;
 }

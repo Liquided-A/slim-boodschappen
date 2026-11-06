@@ -82,7 +82,9 @@ a{color:var(--cta)}
     <p>Elke supermarkt noemt een product anders. Daarom zoekt de app op de woorden die je intypt en op de hoeveelheid, en kiest per winkel wat er het best bij past. Dat gaat automatisch en kan dus misgaan. Het kan een ander merk, formaat of soort zijn.</p>
     <ul>
       <li>Is een verpakking groter of kleiner dan gevraagd, dan rekent de app om naar de gevraagde hoeveelheid. Zijn regels omgerekend of is het formaat onbekend, dan zegt de app dat het totaal een schatting is.</li>
-      <li>Past een product goed maar is het niet om te rekenen, bijvoorbeeld bananen per stuk terwijl je een kilo vraagt, dan blijft het staan met een ~ als onbekend formaat. Zo'n prijs is niet echt vergelijkbaar: je ziet de prijs per verpakking. Een los stuk telt alleen mee als geen enkele winkel iets beters heeft dat wel te rekenen is.</li>
+      <li>Past een product goed maar is het niet om te rekenen, bijvoorbeeld 5 bananen terwijl je een kilo vraagt, dan zie je het grijs met een ~ in de prijzentabel. Zo'n prijs telt niet mee voor de winkelkeuze, het totaal of de besparing. Die winkel heeft het product voor het advies dus niet, ook al ligt het er misschien wel.</li>
+      <li>Heeft geen enkele winkel iets vergelijkbaars, dan telt een ~-prijs alleen mee als schatting, en alleen als hij klopt voor wat je vroeg. De app zegt dan bij het totaal en per winkel hoeveel prijzen geschat zijn.</li>
+      <li>Vraag je geen hoeveelheid, dan rekent de app met één verpakking. Staat er bij een product geen formaat in de bron, dan telt die verpakking mee als schatting, met een ~.</li>
       <li>Een product dat duidelijk niet vergelijkbaar is, telt niet mee. Bijvoorbeeld veel te duur voor dezelfde hoeveelheid, of een ander soort product, zoals ravioli als je kaas zoekt of bananensoesjes als je bananen zoekt.</li>
       <li>Klopt het niet? Kies zelf een ander product. Daar rekent de app dan mee.</li>
     </ul>

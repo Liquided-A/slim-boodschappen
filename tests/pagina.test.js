@@ -98,3 +98,24 @@ test('zoeken op alleen een stopwoord of formaat is geen zoekopdracht', () => {
   for (const q of ['de', '500 g', '  ', 'een', '%%%']) assert.strictEqual(c.searchText(q), '', q);
   assert.strictEqual(c.searchText(' kaas 500 g '), 'kaas 500 g');
 });
+
+/* ---------- wat er op de bon staat over een schatting ---------- */
+test('notitie zegt wat het is en wat er gevraagd is', () => {
+  const c = {packsFor: (n, r) => Math.max(1, Math.ceil(n * (r || 1) - 0.05)), money: x => '€ ' + x};
+  vm.createContext(c);
+  vm.runInContext(engine + '\nconst money = x => String(x);\n' + grab('noteFor') + '\nglobalThis.noteFor = noteFor;', c);
+  const a = {kind: 1, amount: 1000, inferred: false};
+  const stuks = c.noteFor({mode: 'unknown', u: 3, q: 5, r: 1}, a, 1);
+  assert.ok(stuks.includes('dit is 5 st') && stuks.includes('je vroeg 1 kg'), stuks);
+  const g = c.noteFor({mode: 'unknown', u: 1, q: 125, r: 1}, {kind: 2, amount: 1000, inferred: true}, 1);
+  assert.ok(g.includes('dit is 125 g') && !g.includes('Formaat onbekend'), g);
+  assert.ok(c.noteFor({mode: 'unknown', u: 0, q: 0, r: 1}, a, 2).includes('formaat onbekend, je vroeg 2 × 1 kg'));
+});
+
+test('bon, totaal, winkelkeuze en per supermarkt laten de schatting zien; groen volgt de bon', () => {
+  assert.ok(body.includes("(estimated(cell) ? '~' : '')"), 'bonregel');
+  assert.ok(body.includes('Dit totaal is een schatting, '), 'totaal');
+  assert.ok(body.includes("(nEst(p) ? ' · ' + estText(nEst(p)) : '')"), 'winkelkeuze');
+  assert.ok(body.includes("(estIn(t.store) ? ', ' + estText(estIn(t.store)) : '')"), 'per supermarkt');
+  assert.ok(body.includes('row.filter(priced).map(x => x.price)'), 'groen');
+});

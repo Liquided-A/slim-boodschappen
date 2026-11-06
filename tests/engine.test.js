@@ -8,8 +8,8 @@ const vm = require('vm');
 const ctx = {};
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'web', 'engine.js'), 'utf8') +
-  '\nObject.assign(globalThis, {Engine, priceMatrix, plan, advise, lineCost, packsFor, perUnit, betterValue, muchCheaperElsewhere, fairSaving, searchRank, stemNL, storeTotals, sortStoreTotals, guessCats});', ctx);
-const {Engine, priceMatrix, plan, advise, lineCost, betterValue, muchCheaperElsewhere, fairSaving, searchRank, stemNL, storeTotals, sortStoreTotals, guessCats} = ctx;
+  '\nObject.assign(globalThis, {Engine, priceMatrix, plan, advise, lineCost, packsFor, perUnit, betterValue, muchCheaperElsewhere, fairSaving, searchRank, stemNL, storeTotals, sortStoreTotals, guessCats, parseQuery, cleanList, cleanCounts, comparable, Map});', ctx);
+const {Engine, priceMatrix, plan, advise, lineCost, betterValue, muchCheaperElsewhere, fairSaving, searchRank, stemNL, storeTotals, sortStoreTotals, guessCats, parseQuery, cleanList, cleanCounts} = ctx;
 /* objecten uit de vm hebben een ander prototype; via JSON vergelijken we alleen de inhoud */
 const plain = x => JSON.parse(JSON.stringify(x));
 const perUnit = c => plain(ctx.perUnit(c));
@@ -403,4 +403,170 @@ test('afdeling van gewone producten: geleend van aanbiedingen, bij twijfel onbek
   const groups = [{base: 'halfvolle melk'}, {base: 'chocoladeletter'}, {base: 'bananen'}, {base: 'bananen soesjes'}];
   guessCats(groups, deals);
   assert.deepStrictEqual(plain(groups.map(g => g.cat)), ['zuivel-eieren', 'snoep-koek-chips', 'groente-fruit', '']);
+});
+
+/* ---------- zoeken mag nooit vastlopen ---------- */
+const within = (ms, fn) => { const t = Date.now(); const r = fn(); assert.ok(Date.now() - t < ms, 'duurde ' + (Date.now() - t) + ' ms'); return r; };
+const shelf = ['Calvé Pindakaas', 'Pindakaas zonder palmolie', 'Roomboter ongezouten', 'Wonder wasmiddel', 'Mr Wonder allesreiniger', 'Suiker zonder klontjes',
+  'Elstar appels', 'Zout 1 kg', 'Halfvolle melk', 'Tandpasta mint', 'Komkommer', 'Bonder kaas', 'Zomder test'].map(name => ({name, cat: 'x'}));
+
+test('zoeken: de zoekopdrachten die vastliepen eindigen', () => {
+  for (const q of ['pindakaas zonder suiker', 'roomboter zonder zout', 'appel xqztw'])
+    within(500, () => assert.strictEqual(searchRank(parseQuery(q).tokens, shelf).size, 0, q));
+});
+
+test('zoeken: alleen een woord zonder enkele treffer wordt verbeterd, stopwoorden nooit', () => {
+  assert.deepStrictEqual(plain(rank('komkomer', shelf)), ['Komkommer']);
+  /* zonder heeft zelf treffers en wonder ernaast mag er nooit van worden gemaakt */
+  assert.deepStrictEqual(plain(rank('zonder suiker', shelf)), ['Suiker zonder klontjes']);
+  const noHit = [{name: 'Wonder wasmiddel', cat: 'x'}, {name: 'Wonder zeep', cat: 'x'}];
+  assert.strictEqual(searchRank(['zonder'], noHit).size, 0);
+  assert.strictEqual(searchRank(['wonder', 'zonder'], noHit).size, 0);
+  /* een goed woord blijft staan als alleen het andere woord een tikfout is */
+  assert.deepStrictEqual(plain(rank('tandpsta mint', shelf)), ['Tandpasta mint']);
+});
+
+test('zoeken: willekeurige woordcombinaties eindigen altijd snel', () => {
+  let seed = 20261105; const rnd = n => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  const words = ['zonder', 'wonder', 'zomder', 'bonder', 'suiker', 'suikre', 'zout', 'pindakaas', 'pindakas', 'met', 'en', 'de', 'appel', 'appels', 'xqztw', 'kaas', 'melk', 'melkk',
+    'constructor', '__proto__', 'tostring', 'hasownproperty', 'wc', 'papier', '500', 'kaaskaaskaas', 'ééé', 'roomboter', 'roomboder'];
+  within(5000, () => {
+    for (let k = 0; k < 3000; k++){
+      const q = Array.from({length: 1 + rnd(8)}, () => words[rnd(words.length)]).join(' ');
+      assert.ok(searchRank(parseQuery(q).tokens, shelf) instanceof ctx.Map, q);
+    }
+  });
+});
+
+test('zoeken: ook op de echte prijsdata eindigen ze snel', () => {
+  const b64 = fs.readFileSync(path.join(__dirname, '..', 'data', 'data.b64'), 'utf8').trim();
+  const D = JSON.parse(require('zlib').gunzipSync(Buffer.from(b64, 'base64')));
+  const items = [];
+  D.stores.forEach(s => s.n.forEach(name => items.push({name, cat: ''})));
+  searchRank(['melk'], items);   /* eenmalig: de woorden van alle namen uitrekenen */
+  for (const q of ['pindakaas zonder suiker', 'roomboter zonder zout', 'appel xqztw', 'constructor', 'zonder wonder zonder'])
+    within(4000, () => searchRank(parseQuery(q).tokens, items));
+});
+
+test('zoekopdracht: hoogstens 6 woorden en 80 tekens', () => {
+  assert.strictEqual(parseQuery('a1 b2 c3 d4 e5 f6 g7 h8').tokens.length, 6);
+  assert.deepStrictEqual(plain(parseQuery('x'.repeat(200)).tokens), ['x'.repeat(80)]);
+  assert.deepStrictEqual(plain(parseQuery('500 g').tokens), []);
+  assert.deepStrictEqual(plain(parseQuery('de').tokens), []);
+});
+
+/* ---------- rare namen ---------- */
+const RARE = ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf', 'prototype'];
+
+test('rare namen: analyseren, zoeken en suggesties geven geen fout', () => {
+  const A = store('A', [['A constructor 1 kg', 199, 1, 1000], ['A melk 1 l', 99, 2, 1000]]);
+  const eng = new Engine([A]);
+  for (const q of RARE){
+    const a = eng.analyze(q, 15);
+    assert.strictEqual(a.per.length, 1);
+    eng.suggest(q, [0], 5);
+    searchRank(parseQuery(q).tokens, [{name: 'Constructor kit', cat: 'constructor'}, {name: 'Melk', cat: '__proto__'}]);
+    assert.strictEqual(typeof stemNL(q.toLowerCase()), 'string');
+  }
+  const {pl} = basket([A], RARE.map((q, k) => ({id: k + 1, q, qty: 1})));
+  assert.ok(pl.missing.length >= 1);
+});
+
+test('rare afdeling in de data: afdelingen raden gaat goed', () => {
+  const g = [{base: 'melk'}, {base: 'kaas'}];
+  guessCats(g, [{name: 'Melk', cat: 'constructor'}, {name: 'Halfvolle melk', cat: 'constructor'}, {name: 'Kaas', cat: '__proto__'}]);
+  assert.strictEqual(g[0].cat, 'constructor');
+});
+
+test('gedeelde lijst: lege namen weg, aantal geheel en 1-99', () => {
+  assert.deepStrictEqual(plain(cleanList([['  melk ', 2.6], ['', 3], ['   ', 1], ['kaas', 0], ['brood', -4], ['ei', 1000], ['bier', 'x'], [5, 1], null, 'tekst', ['a  b', 1]])),
+    [['melk', 3], ['kaas', 1], ['brood', 1], ['ei', 99], ['bier', 1], ['a b', 1]]);
+  assert.strictEqual(cleanList(Array.from({length: 150}, (_, k) => ['p' + k, 1]), 100).length, 100);
+  assert.strictEqual(cleanList([['x'.repeat(200), 1]])[0][0].length, 80);
+  for (const bad of [null, 'x', {}, 5]) assert.deepStrictEqual(plain(cleanList(bad)), []);
+});
+
+test('tellers uit de opslag: alleen echte aantallen, prototype onaangetast', () => {
+  const h = cleanCounts(JSON.parse('{"melk":3,"kaas":"x","ei":-1,"__proto__":{"melk":9},"constructor":2}'));
+  assert.strictEqual(h.melk, 3);
+  assert.strictEqual(h.constructor, 2);
+  assert.strictEqual(h.kaas, undefined);
+  assert.strictEqual(Object.getPrototypeOf(h), null);
+  assert.strictEqual(Object.keys(cleanCounts(null)).length, 0);
+});
+
+/* ---------- ander soort product ---------- */
+test('kaas: ravioli met kaas stuurt de winkelkeuze niet', () => {
+  const A = store('A', [['Jong belegen kaas 400 g', 499, 1, 400]]);
+  const B = store('B', [['Daily Chef Ravioli kaas 400 g', 245, 1, 400]]);
+  const {m, pl} = basket([A, B], [{id: 1, q: 'kaas', qty: 1}]);
+  assert.strictEqual(m[0][1], null);
+  assert.deepStrictEqual(plain(pl.result[0].combo), [0]);
+});
+
+test('ander soort product zakt binnen de winkel onder het echte product', () => {
+  const A = store('A', [['Daily Chef Ravioli kaas 400 g', 245, 1, 400], ['Belegen kaas 400 g', 699, 1, 400]]);
+  const a = new Engine([A]).analyze('kaas', 5);
+  assert.strictEqual(a.per[0].cands[0].name, 'Belegen kaas 400 g');
+});
+
+test('merk als zoekwoord: wasmiddel en yoghurt tellen niet als ander soort', () => {
+  const A = store('A', [['Ariel Wasmiddel Color 1 l', 1399, 2, 1000]]);
+  const B = store('B', [['Ariel Pods 1 l', 999, 2, 1000]]);
+  const {m} = basket([A, B], [{id: 1, q: 'ariel', qty: 1}]);
+  assert.ok(m[0][0] && m[0][1]);
+  assert.strictEqual(m[0][0].c.other, false);
+});
+
+test('merkproduct met het gevraagde product in de naam blijft meedoen', () => {
+  const A = store('A', [['Calvé Pindakaas 350 g', 349, 1, 350]]);
+  const B = store('B', [['Pindakaas 350 g', 149, 1, 350]]);
+  const {m} = basket([A, B], [{id: 1, q: 'pindakaas 350 g', qty: 1}]);
+  assert.ok(m[0][0] && m[0][1]);
+});
+
+test('alleen ander soort product te koop: dan blijft dat staan', () => {
+  const A = store('A', [['Ravioli kaas 400 g', 245, 1, 400]]);
+  const {m} = basket([A], [{id: 1, q: 'kaas', qty: 1}]);
+  assert.ok(m[0][0]);
+});
+
+test('zelf gekozen ander soort product blijft staan', () => {
+  const A = store('A', [['Kaas 400 g', 499, 1, 400]]);
+  const B = store('B', [['Kaas ravioli 400 g', 245, 1, 400]]);
+  const eng = new Engine([A, B]), items = [{id: 1, q: 'kaas', qty: 1}];
+  const m = priceMatrix(items, {1: eng.analyze('kaas', 15)}, {1: {1: 0}}, [0, 1]);
+  assert.strictEqual(m[0][1].c.name, 'Kaas ravioli 400 g');
+});
+
+/* ---------- beter passend maar niet om te rekenen ---------- */
+test('bananen 1 kg: echte bananen per 5 stuks blijven staan als onbekend formaat, soesjes vallen af', () => {
+  const A = store('A', [['Jumbo Bananen Soesjes 240 g', 349, 1, 240], ['Jumbo Dole Bananen 5 Stuks', 169, 3, 5]]);
+  const B = store('B', [['Bananen', 185, 3, 5]]);
+  const C = store('C', [['Chiquita Groene bananen', 175, 3, 5]]);
+  const D = store('D', [['Budget Bananen 832 g', 129, 1, 832]]);
+  const {m} = basket([A, B, C, D], [{id: 1, q: 'bananen 1 kg', qty: 1}]);
+  assert.strictEqual(m[0][0].c.name, 'Jumbo Dole Bananen 5 Stuks');
+  for (const j of [0, 1, 2]){
+    assert.strictEqual(m[0][j].mode, 'unknown');
+    assert.strictEqual(ctx.comparable(m[0][j]), false);
+  }
+  assert.strictEqual(m[0][3].mode, 'scaled');
+  /* de waarschuwing en de groene prijs gaan alleen over wat wel te vergelijken is */
+  assert.strictEqual(muchCheaperElsewhere(m[0], 3), null);
+});
+
+test('beter passend product zonder rekenbare eenheid wijkt niet voor een slechter passend product', () => {
+  const A = store('A', [['Volkoren brood', 250, 3, 1]]);
+  const B = store('B', [['Meergranen lang houdbaar volkoren brood stevig 800 g', 300, 1, 800]]);
+  const {m} = basket([A, B], [{id: 1, q: 'volkoren brood 800 g', qty: 1}]);
+  assert.strictEqual(m[0][0].mode, 'unknown');
+  assert.strictEqual(m[0][1].mode, 'exact');
+});
+
+test('veel te groot pak dat even goed past blijft weg als er een vergelijkbaar pak is', () => {
+  const A = store('A', [['Zout 25 kg', 900, 1, 25000]]);
+  const B = store('B', [['Zout 1 kg', 60, 1, 1000]]);
+  const {m} = basket([A, B], [{id: 1, q: 'zout 1 kg', qty: 1}]);
+  assert.strictEqual(m[0][0], null);
 });

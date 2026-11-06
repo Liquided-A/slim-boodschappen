@@ -36,7 +36,7 @@
     <div class="shop">
       <div class="sidecol">
         <form class="search" id="searchform" role="search">
-          <input id="q" type="search" placeholder="Zoek een product" aria-label="Zoek een product" autocomplete="off" enterkeyhint="search">
+          <input id="q" type="search" maxlength="80" placeholder="Zoek een product" aria-label="Zoek een product" autocomplete="off" enterkeyhint="search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         </form>
         <aside class="filters" id="filters" data-open="false" aria-label="Filters"></aside>
@@ -104,7 +104,7 @@
   <div class="inner">
     <div style="display:flex;flex-direction:column;gap:10px">
       <p>Aanbiedingen via <a href="https://www.prijsprofeet.nl" target="_blank" rel="noopener">PrijsProfeet</a>, opgehaald op <span id="pfdate"></span>. Gewone prijzen uit de open data van <a href="https://github.com/supermarkt/checkjebon" target="_blank" rel="noopener">Checkjebon.nl</a>. Folders op <a href="https://www.folderz.nl" target="_blank" rel="noopener">Folderz</a>. Productfoto's van <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (CC BY-SA), voor zover beschikbaar. Deze app is onafhankelijk en heeft geen band met de supermarkten.</p>
-      <p>De korting is berekend ten opzichte van de van-prijs die de supermarkt zelf noemt. Bij acties als "1+1 gratis" of "4 voor" rekent de app alleen met de actieprijs als je het hele aantal koopt. Acties met meer dan 70% korting zijn weggelaten, omdat dat bijna altijd een fout in de bron is.</p>
+      <p>De korting is berekend ten opzichte van de van-prijs die de supermarkt zelf noemt. Bij acties als "1+1 gratis" of "4 voor" rekent de app alleen met de actieprijs als je het hele aantal koopt. Acties met 70% korting of meer zijn weggelaten, omdat dat bijna altijd een fout in de bron is.</p>
       <p>Van een aantal winkels worden de gewone prijzen niet meer bijgewerkt. Die doen standaard alleen mee met hun actuele aanbiedingen. Dit is een prototype: controleer prijzen en producten in de winkel.</p>
       <p>Prijzen en aanbiedingen zijn indicatief en kunnen afwijken van de actuele prijzen bij de supermarkt. Controleer de uiteindelijke prijs bij de aanbieder.</p>
       <p>Geen account, geen advertenties, je lijstje blijft op je eigen toestel.</p>
@@ -157,7 +157,7 @@ const NATIVE = window.SlimNative || null;
 function sheetUrl(n){ return CFG && CFG.remote && n >= (CFG.localSheets || 0) ? CFG.remote + 'img/s' + n + '.jpg' : 'img/s' + n + '.jpg'; }
 
 let ENG = null, STORES = [], CATS = [], DEALS = [], PFETCH = null, HASIMG = false;
-const S = {items:[], off:new Set(), k:null, pins:{}, an:{}, demo:true, nextId:1, oldReg:false, done:new Set(), hist:{},
+const S = {items:[], off:new Set(), k:null, pins:{}, an:{}, demo:true, nextId:1, oldReg:false, done:new Set(), hist:Object.create(null),
   q:'', cat:'all', fstores:new Set(), fdisc:0, fmulti:false, fnow:false, fphoto:false, sort:'top', show:36,
   tpl:[]};
 
@@ -265,11 +265,15 @@ function save(){
 function load(){
   try{
     const raw = localStorage.getItem(KEY); if (!raw) return false;
-    const d = JSON.parse(raw); if (!Array.isArray(d.items)) return false;
-    S.items = d.items.map(([q, qty]) => ({id:S.nextId++, q:String(q), qty:Math.max(1, Math.min(99, +qty || 1))}));
-    S.off = new Set(Array.isArray(d.off) ? d.off : []); S.demo = !!d.demo; S.oldReg = d.v >= 3 ? !!d.oldReg : false;   /* v3: oude gewone prijzen staan voortaan standaard uit */
-    S.done = new Set(Array.isArray(d.done) ? d.done : []); S.hist = d.hist && typeof d.hist === 'object' ? d.hist : {};
-    S.saved = d.saved || null; S.onb = d.onb !== false; S.persons = Math.max(1, Math.min(12, +d.persons || 4)); S.tpl = Array.isArray(d.tpl) ? d.tpl.filter(t => t && t.n && Array.isArray(t.i)).slice(0, 12) : []; return true;
+    /* alles wat hier binnenkomt kan beschadigd zijn: neem alleen over wat klopt */
+    const d = JSON.parse(raw); if (!d || !Array.isArray(d.items)) return false;
+    const texts = a => Array.isArray(a) ? a.filter(x => typeof x === 'string') : [];
+    S.items = cleanList(d.items, 200).map(([q, qty]) => ({id:S.nextId++, q, qty}));
+    S.off = new Set(texts(d.off)); S.demo = !!d.demo; S.oldReg = d.v >= 3 ? !!d.oldReg : false;   /* v3: oude gewone prijzen staan voortaan standaard uit */
+    S.done = new Set(texts(d.done)); S.hist = cleanCounts(d.hist);
+    S.saved = d.saved && Number.isFinite(d.saved.c) ? {y:String(d.saved.y), c:d.saved.c, n:+d.saved.n || 0} : null;
+    S.onb = d.onb !== false; S.persons = Math.max(1, Math.min(12, +d.persons || 4));
+    S.tpl = Array.isArray(d.tpl) ? d.tpl.filter(t => t && typeof t.n === 'string' && t.n && Array.isArray(t.i)).slice(0, 12).map(t => ({n:t.n.slice(0, 30), i:cleanList(t.i)})) : []; return true;
   }catch(e){ return false; }
 }
 function remember(q){
@@ -286,7 +290,11 @@ function storeChips(){
 }
 function allStoresLabel(){ return enabledStores().length ? 'Alles uit' : 'Alles aan'; }
 function storeOrder(){ return STORES.map((s, i) => i).sort((a, b) => STORES[a].c.localeCompare(STORES[b].c, 'nl')); }
-function reanalyze(){ S.an = {}; S.pins = {}; S.items.forEach(it => { S.an[it.id] = ENG.analyze(it.q); }); }
+/* één rare regel mag de rest van het lijstje niet tegenhouden: zonder analyse is de prijs gewoon onbekend */
+function analyzeItem(q){ try{ return ENG.analyze(q); }catch(e){ return null; } }
+function reanalyze(){ S.an = {}; S.pins = {}; S.items.forEach(it => { S.an[it.id] = analyzeItem(it.q); }); }
+/* nieuw op het lijstje is nooit al afgevinkt, ook niet als hetzelfde product er eerder op stond */
+function pushItem(q, qty){ const it = {id:S.nextId++, q, qty}; S.done.delete(doneKey(it)); S.items.push(it); S.an[it.id] = analyzeItem(q); return it; }
 function hasItem(q){ return S.items.some(it => it.q.toLowerCase() === q.toLowerCase()); }
 
 /* ---------- aanbiedingen ---------- */
@@ -311,13 +319,35 @@ function rankMap(){
   if (RANK.q !== S.q){ const t = S.q ? parseQuery(S.q).tokens : []; RANK = {q: S.q, map: t.length ? searchRank(t, DEALS.concat(assortIndex())) : null}; }
   return RANK.map;
 }
-/* het gewone assortiment om in te zoeken; pas opgebouwd bij het eerste zoeken */
-let ASSORT = null;
+/* het gewone assortiment om in te zoeken. Wordt in stukjes vooraf opgebouwd als de pagina niets te doen heeft;
+   zoekt iemand eerder, dan maakt assortIndex het in één keer af */
+let ASSORT = null, WARM = null;
+function* assortBuild(){
+  const steps = ENG.assortSteps(); let r = steps.next();
+  while (!r.done){ yield; r = steps.next(); }
+  const list = r.value;
+  guessCats(list, DEALS); yield;
+  /* de woorden van alle namen alvast uitrekenen: dat is het duurste deel van de eerste zoekopdracht */
+  for (let k = 0; k < DEALS.length; k++){ nameParts(DEALS[k].name); if (k % 200 === 199) yield; }
+  for (let k = 0; k < list.length; k++){ nameParts(list[k].name); if (k % 200 === 199) yield; }
+  ASSORT = list; WARM = null;
+}
 function assortIndex(){
-  if (!ASSORT){ ASSORT = ENG.assortment(); guessCats(ASSORT, DEALS); }
+  if (!ASSORT){ const gen = WARM || assortBuild(); WARM = gen; while (!gen.next().done); }
   return ASSORT;
 }
-function resetAssort(){ ASSORT = null; RANK = {q: null, map: null}; }
+const whenIdle = fn => window.requestIdleCallback ? requestIdleCallback(fn, {timeout: 1000}) : setTimeout(fn, 60);
+function warmSearch(){
+  const gen = WARM = assortBuild();
+  const slice = () => {
+    if (WARM !== gen) return;
+    const end = performance.now() + 8;
+    while (performance.now() < end) if (gen.next().done) return;
+    whenIdle(slice);
+  };
+  whenIdle(slice);
+}
+function resetAssort(){ ASSORT = null; RANK = {q: null, map: null}; warmSearch(); }
 /* gewone producten bij de zoekopdracht die in de gekozen winkels te koop zijn, in dezelfde vorm als een aanbieding */
 function regFound(found){
   const on = S.fstores.size ? S.fstores : new Set(enabledStores()), out = [];
@@ -337,7 +367,7 @@ function baseFiltered(skip){
     (!found || found.has(d)));
 }
 function renderCatbar(){
-  const cc = {}; baseFiltered('cat').forEach(d => { cc[d.cat] = (cc[d.cat] || 0) + 1; });
+  const cc = Object.create(null); baseFiltered('cat').forEach(d => { cc[d.cat] = (cc[d.cat] || 0) + 1; });
   const cats = CATORDER.filter(c => cc[c]);
   $('catbar').innerHTML = ['all'].concat(cats).map(c => '<button type="button" data-act="cat" data-k="' + c + '" aria-pressed="' + (S.cat === c) + '">' +
     esc(c === 'all' ? (S.q ? 'Alles' : 'Alle aanbiedingen') : (CATLABEL[c] || c)) + '</button>').join('');
@@ -488,7 +518,7 @@ function cardHtml(d){
     '<span class="store">' + esc(st.c) + '</span>' + (d.pct > 0 ? '<span class="disc">−' + d.pct + '%</span>' : '') +
     (d.upcoming ? '<span class="soon">Vanaf ' + esc(dayFmt.format(d.from)) + '</span>' : '') + '</div>' +
     '<div class="cbody"><div class="cname" data-act="detail" data-s="' + d.s + '" data-i="' + d.i + '" title="' + esc(d.name) + '">' + esc(d.name) + '</div>' +
-    (size ? '<div class="csize">' + esc(size) + (unitPrice(d.price, st.u[d.i], st.q[d.i], d.multi ? 1 : 1) ? ' · ' + unitPrice(d.price, st.u[d.i], st.q[d.i]) : '') + '</div>' : '') +
+    (size ? '<div class="csize">' + esc(size) + (unitPrice(d.price, st.u[d.i], st.q[d.i]) ? ' · ' + unitPrice(d.price, st.u[d.i], st.q[d.i]) : '') + '</div>' : '') +
     (d.label ? '<span class="mech">' + esc(d.label) + '</span>' : '') +
     '<div class="prow">' + (d.usual ? '<span class="old">' + money(d.usual) + '</span>' : '') + '<span class="now">' + money(d.price) + '</span>' +
     (d.multi ? '<span class="per">per stuk</span>' : '') + '</div>' +
@@ -717,7 +747,7 @@ function renderBasket(){
   bonsEl.innerHTML = '<div class="col">' + perStore + '<div class="bonshead"><div><h2>Wat haal je waar</h2><p class="small muted">Tik in de winkel op het rondje om een product af te vinken.</p></div>' +
     '<div class="bonsbtns"><button type="button" class="btn ghost" data-act="share">' + ICON_SHARE + 'Lijstje delen</button>' +
     (anyDone ? '<button type="button" class="btn primary" data-act="finish">Klaar: afgevinkte weghalen</button>' : '') + '</div></div><div class="bons">' + bons + unkBon + '</div>' +
-    '<section class="panel"><header><h2>Alle prijzen naast elkaar</h2><span class="small muted">groen = goedkoopst · ~ = omgerekend · • = aanbieding</span></header>' +
+    '<section class="panel"><header><h2>Alle prijzen naast elkaar</h2><span class="small muted">groen = goedkoopst · ~ = omgerekend of formaat onbekend · • = aanbieding</span></header>' +
     '<div class="tablewrap"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div></section></div>';
 }
 function renderList(){ compute(); renderItems(); renderStores(); renderBasket(); renderCart(); renderMeals(); }
@@ -951,10 +981,12 @@ function readListHash(h){
   try{
     const b = m[1].replace(/-/g, '+').replace(/_/g, '/');
     const arr = JSON.parse(decodeURIComponent(escape(atob(b + '==='.slice((b.length + 3) % 4)))));
-    return Array.isArray(arr) ? arr.filter(x => Array.isArray(x) && typeof x[0] === 'string').slice(0, 100).map(([q, n]) => [q.slice(0, 80), Math.max(1, Math.min(99, +n || 1))]) : null;
+    return Array.isArray(arr) ? cleanList(arr, 100) : null;
   }catch(e){ return null; }
 }
 let INCOMING = null;
+/* de deellink uit de adresbalk, zodat een herlaadbeurt hem niet opnieuw aanbiedt */
+function dropListHash(){ if (/^#lijst=/.test(location.hash)) history.replaceState(null, '', location.href.split('#')[0]); }
 function offerImport(list){
   if (!list || !list.length) return;
   INCOMING = list;
@@ -976,7 +1008,7 @@ async function shareList(){
   if (navigator.share){ try{ await navigator.share({text: t}); return; }catch(e){ if (e && e.name === 'AbortError') return; } }
   openSheet('<h2>Lijstje delen</h2><p class="muted">Stuur je lijstje naar iemand die de boodschappen doet.</p>' +
     '<a class="bigbtn" href="https://wa.me/?text=' + encodeURIComponent(t) + '" target="_blank" rel="noopener">' + ICON_SHARE + '<span>Via WhatsApp<small>Kies daarna naar wie</small></span></a>' +
-    '<button type="button" class="bigbtn" data-act="copylist">' + ICON_PIC.replace('<rect', '<rect') + '<span>Kopiëren<small>Plak het in een sms, mail of notitie</small></span></button>' +
+    '<button type="button" class="bigbtn" data-act="copylist">' + ICON_PIC + '<span>Kopiëren<small>Plak het in een sms, mail of notitie</small></span></button>' +
     '<button type="button" class="btn ghost" data-act="closesheet" style="justify-content:center">Sluiten</button>', 'Lijstje delen');
 }
 
@@ -1010,7 +1042,8 @@ function route(){
 /* ---------- instellingen: tekstgrootte en thema ---------- */
 const PKEY = 'slim-prefs';
 const PREFS = {size:'normaal', theme:'auto', gain:'2'};
-try{ Object.assign(PREFS, JSON.parse(localStorage.getItem(PKEY) || '{}')); }catch(e){}
+const PREFOK = {size:['normaal','groot','extra'], theme:['auto','light','dark'], gain:['1','2','3','5']};
+try{ const p = JSON.parse(localStorage.getItem(PKEY) || '{}'); Object.keys(PREFOK).forEach(k => { if (p && PREFOK[k].includes(p[k])) PREFS[k] = p[k]; }); }catch(e){}
 function applyPrefs(){
   const r = document.documentElement;
   if (PREFS.size === 'normaal') r.removeAttribute('data-size'); else r.setAttribute('data-size', PREFS.size);
@@ -1025,7 +1058,7 @@ function openSheet(html, label){
   $('sheetroot').innerHTML = '<div class="sheetbg" data-act="closesheet"><div class="sheet" role="dialog" aria-modal="true" aria-label="' + esc(label) + '"><span class="grab" aria-hidden="true"></span>' + html + '</div></div>';
   const f = $('sheetroot').querySelector('button, [tabindex], label'); f && f.focus();
 }
-function closeSheet(){ $('sheetroot').innerHTML = ''; }
+function closeSheet(){ $('sheetroot').innerHTML = ''; if (INCOMING){ INCOMING = null; dropListHash(); } }
 function settingsHtml(){
   const seg = (key, opts) => '<div class="seg">' + opts.map(([v, l, c]) => '<button type="button" data-act="pref" data-key="' + key + '" data-v="' + v + '" aria-pressed="' + (PREFS[key] === v) + '"' + (c ? ' class="' + c + '"' : '') + '>' + l + '</button>').join('') + '</div>';
   return '<h2>Instellingen</h2>' +
@@ -1058,8 +1091,7 @@ function addItem(q){
   q = q.trim().replace(/\s+/g, ' ');
   if (!q || hasItem(q)) return false;
   S.demo = false;
-  const it = {id:S.nextId++, q, qty:1};
-  S.items.push(it); S.an[it.id] = ENG.analyze(q); S.k = null; remember(q);
+  pushItem(q, 1); S.k = null; remember(q);
   save(); renderAll(); return true;
 }
 document.addEventListener('click', e => {
@@ -1069,17 +1101,16 @@ document.addEventListener('click', e => {
   if (act === 'inc' && it){ it.qty = Math.min(99, it.qty + 1); }
   else if (act === 'dec' && it){ it.qty = Math.max(1, it.qty - 1); }
   else if (act === 'rm' && it){
-    const pos = S.items.indexOf(it);
+    const pos = S.items.indexOf(it), wasDone = S.done.delete(doneKey(it));
     S.items = S.items.filter(x => x.id !== id); delete S.an[id]; delete S.pins[id]; S.demo = false; S.k = null;
-    toast('"' + it.q + '" verwijderd', 'Ongedaan maken', () => { S.items.splice(Math.min(pos, S.items.length), 0, it); S.an[it.id] = ENG.analyze(it.q); S.k = null; save(); renderAll(); });
+    toast('"' + it.q + '" verwijderd', 'Ongedaan maken', () => { S.items.splice(Math.min(pos, S.items.length), 0, it); if (wasDone) S.done.add(doneKey(it)); S.an[it.id] = analyzeItem(it.q); S.k = null; save(); renderAll(); });
   }
   else if (act === 'toastdo'){ const f = toastFn; $('toast').hidden = true; toastFn = null; f && f(); return; }
   else if (act === 'clear' && S.items.length){
-    const keepItems = S.items.slice();
-    S.items = []; S.an = {}; S.pins = {}; S.demo = false; S.k = null;
-    toast('Lijstje gewist', 'Ongedaan maken', () => { S.items = keepItems; reanalyze(); S.k = null; save(); renderAll(); });
+    const keepItems = S.items.slice(), keepDone = [...S.done];
+    S.items = []; S.an = {}; S.pins = {}; S.done.clear(); S.demo = false; S.k = null;
+    toast('Lijstje gewist', 'Ongedaan maken', () => { S.items = keepItems; S.done = new Set(keepDone); reanalyze(); S.k = null; save(); renderAll(); });
   }
-  else if (act === 'clear_old'){ S.items = []; S.an = {}; S.pins = {}; S.demo = false; S.k = null; }
   else if (act === 'storesall'){
     S.off = new Set(enabledStores().length ? STORES.map(s => s.k) : []); S.fstores.clear(); S.k = null; save(); renderAll();
     if ($('sheetroot').innerHTML) openSheet(onboardingHtml(), 'Welkom');
@@ -1105,7 +1136,7 @@ document.addEventListener('click', e => {
   else if (act === 'clearfilters' || act === 'home'){ S.q = ''; $('q').value = ''; S.cat = 'all'; S.fstores.clear(); S.fdisc = 0; S.fmulti = S.fnow = S.fphoto = false; S.show = 36; renderShop(); if (act === 'home') window.scrollTo(0, 0); return; }
   else if (act === 'adddeal'){
     const q = b.dataset.q;
-    if (hasItem(q)){ const x = S.items.find(y => y.q.toLowerCase() === q.toLowerCase()); S.items = S.items.filter(y => y !== x); delete S.an[x.id]; S.k = null; save(); renderAll(); }
+    if (hasItem(q)){ const x = S.items.find(y => y.q.toLowerCase() === q.toLowerCase()); S.items = S.items.filter(y => y !== x); S.done.delete(doneKey(x)); delete S.an[x.id]; S.k = null; save(); renderAll(); }
     else addItem(q);
     return;
   }
@@ -1116,7 +1147,7 @@ document.addEventListener('click', e => {
     const picks = [...document.querySelectorAll('[data-mealing]')].filter(x => x.checked).map(x => m[3][+x.dataset.mealing]);
     if (S.demo){ S.items = []; S.an = {}; S.pins = {}; S.demo = false; }
     picks.forEach(([q, n]) => { const qty = mealQty(n, S.persons); const ex = S.items.find(y => y.q.toLowerCase() === q);
-      if (ex) ex.qty = Math.min(99, ex.qty + qty); else { const it = {id: S.nextId++, q, qty}; S.items.push(it); S.an[it.id] = ENG.analyze(q); remember(q); } });
+      if (ex) ex.qty = Math.min(99, ex.qty + qty); else { pushItem(q, qty); remember(q); } });
     closeSheet(); S.k = null; save(); renderAll(); toast(picks.length + ' boodschappen voor ' + m[2].toLowerCase() + ' op je lijstje gezet'); return;
   }
   else if (act === 'detail'){ openSheet(detailHtml(+b.dataset.s, +b.dataset.i), 'Product'); return; }
@@ -1125,7 +1156,7 @@ document.addEventListener('click', e => {
     if (!INCOMING) return;
     if (act === 'impreplace' || S.demo){ S.items = []; S.an = {}; S.pins = {}; S.done.clear(); }
     INCOMING.forEach(([q, n]) => { const ex = S.items.find(y => y.q.toLowerCase() === q.toLowerCase());
-      if (ex) ex.qty = Math.min(99, ex.qty + n); else { const it = {id: S.nextId++, q, qty: n}; S.items.push(it); S.an[it.id] = ENG.analyze(q); } });
+      if (ex) ex.qty = Math.min(99, ex.qty + n); else pushItem(q, n); });
     const n = INCOMING.length; INCOMING = null; S.demo = false; S.k = null; closeSheet(); save(); renderAll();
     location.hash = 'lijstje'; toast(n + ' product' + (n === 1 ? '' : 'en') + ' op je lijstje gezet'); return;
   }
@@ -1187,7 +1218,7 @@ document.addEventListener('click', e => {
       const q = r.q.trim().replace(/\s+/g, ' ');
       const ex = S.items.find(y => y.q.toLowerCase() === q.toLowerCase());
       if (ex){ ex.qty = Math.min(99, ex.qty + r.qty); return; }
-      const it = {id:S.nextId++, q, qty:r.qty}; S.items.push(it); S.an[it.id] = ENG.analyze(q); added++; remember(q);
+      pushItem(q, r.qty); added++; remember(q);
     });
     S.demo = false; S.k = null; SCAN = null;
     const total = SCAN_N; $('scanout').innerHTML = '<div class="scandone"><span>' + total + ' product' + (total === 1 ? '' : 'en') + ' op je lijstje gezet.</span><a class="btn primary" href="#lijstje">Bekijk waar het goedkoopst is</a></div>';
@@ -1210,7 +1241,16 @@ document.addEventListener('change', e => {
   S.show = 36; renderShop();
 });
 let qTimer = 0;
-$('q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value.trim(); S.show = 36; renderShop(); if (document.querySelector('.shop').getBoundingClientRect().top < 0) window.scrollTo(0, 0); }, 180); });
+/* alleen een stopwoord of formaat ("de", "500 g") is geen zoekopdracht: dan blijft de startlijst staan */
+function searchText(v){ const t = String(v).trim().slice(0, 80); return parseQuery(t).tokens.length ? t : ''; }
+function runSearch(v, then){
+  clearTimeout(qTimer);
+  S.q = searchText(v); S.show = 36;
+  const go = () => { renderShop(); then && then(); };
+  /* index nog niet klaar: eerst laten zien dat er iets gebeurt, dan pas rekenen */
+  if (S.q && !ASSORT){ $('rescount').textContent = 'Zoeken…'; qTimer = setTimeout(go, 40); } else go();
+}
+$('q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => runSearch(e.target.value, () => { if (document.querySelector('.shop').getBoundingClientRect().top < 0) window.scrollTo(0, 0); }), 180); });
 document.addEventListener('submit', e => {
   if (!e.target.matches('[data-tplform]')) return; e.preventDefault();
   const n = ($('tplname').value || '').trim().slice(0, 30); if (!n) return;
@@ -1219,7 +1259,7 @@ document.addEventListener('submit', e => {
 });
 $('searchform').addEventListener('submit', e => {
   e.preventDefault();
-  S.q = $('q').value.trim(); S.show = 36; renderShop(); $('q').blur();
+  runSearch($('q').value); $('q').blur();
 });
 $('more').addEventListener('click', () => { S.show += 36; renderShop(); });
 /* winkelknoppen met de muis verschuiven; na slepen telt het loslaten niet als klik op een winkel */
@@ -1253,9 +1293,9 @@ async function cachedData(){
 }
 function applyData(D){
   NOW = new Date();
-  STORES = D.stores; CATS = D.cats; PFETCH = new Date(D.promoFetched); PHOTOS = null; ASSORT = null;
+  STORES = D.stores; CATS = D.cats; PFETCH = new Date(D.promoFetched); PHOTOS = null; ASSORT = null; WARM = null;
   ENG = new Engine(STORES); HASIMG = false; S.fstores = new Set();
-  ENG.setMask(keep); reanalyze(); buildDeals(); renderFresh();
+  ENG.setMask(keep); reanalyze(); buildDeals(); renderFresh(); warmSearch();
   $('pfdate').textContent = dayFmt.format(PFETCH);
   const old = (NOW - PFETCH) / 36e5 > 36;
   $('staletext').textContent = old ? 'De aanbiedingen zijn opgehaald op ' + dayFmt.format(PFETCH) + '. Verlopen acties worden automatisch weggelaten.' + (CFG ? ' Met internet haalt de app de nieuwste prijzen op.' : '') : '';
@@ -1290,11 +1330,16 @@ document.addEventListener('keydown', e => {
     if (C && new Date(C.promoFetched) > new Date(D.promoFetched)) D = C;
     STORES = D.stores;
     const fresh = !load();
-    if (fresh || !S.items.length){ useDemo(); S.off = new Set(STORES.filter(s => !DEFAULT_ON.has(s.k)).map(s => s.k)); }
-    applyData(D);
+    /* alleen bij een echte eerste keer: een leeg lijstje en je winkelkeuze blijven gewoon staan */
+    if (fresh){ useDemo(); S.off = new Set(STORES.filter(s => !DEFAULT_ON.has(s.k)).map(s => s.k)); }
+    /* gaat het met het bewaarde lijstje toch mis, dan zonder dat lijstje verder: de app moet altijd openen */
+    let broken = false;
+    try{ applyData(D); }catch(err){ broken = true; S.items = []; S.an = {}; S.pins = {}; S.done.clear(); S.tpl = []; S.hist = Object.create(null); S.k = null; applyData(D); }
+    if (broken) toast('Je bewaarde lijstje was beschadigd en is leeggemaakt.');
     computeMealDeals();
     if (PENDING_IMPORT){ const l = PENDING_IMPORT; PENDING_IMPORT = null; if (fresh) S.onb = true; setTimeout(() => offerImport(l), 300); }
     else if (fresh){ S.onb = false; setTimeout(() => openSheet(onboardingHtml(), 'Welkom'), 300); }
+    if (!PENDING_IMPORT && !INCOMING) setTimeout(() => { if (!INCOMING) dropListHash(); }, 400);   /* onleesbare of lege deellink */
     refreshRemote();
     checkAppUpdate();
     document.addEventListener('visibilitychange', () => { if (!document.hidden && (Date.now() - PFETCH) / 36e5 > 20) refreshRemote(); });

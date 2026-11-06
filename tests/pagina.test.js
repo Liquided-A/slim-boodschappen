@@ -8,7 +8,8 @@ const vm = require('vm');
 const body = fs.readFileSync(path.join(__dirname, '..', 'web', 'body.html'), 'utf8');
 /* de functies zelf uit de pagina halen, zodat de test altijd de echte code draait */
 const grab = name => {
-  const m = body.match(new RegExp('^function ' + name + '\\(.*?(?:\\}\\r?\\n|\\n\\}\\r?\\n)', 'ms'));
+  /* een functie op één regel, of alles tot de sluitaccolade aan het begin van een regel */
+  const m = body.match(new RegExp('^function ' + name + '\\(.*\\}\\r?$', 'm')) || body.match(new RegExp('^function ' + name + '\\(.*?^\\}\\r?$', 'ms'));
   assert.ok(m, 'functie ' + name + ' niet gevonden');
   return m[0];
 };
@@ -48,4 +49,52 @@ test('winkellink: alleen http en https', () => {
   assert.strictEqual(shopUrl({b: 'data:text/html,', l: ['abc']}, 0), '');
   assert.strictEqual(shopUrl({b: '', l: ['abc']}, 0), '');
   assert.strictEqual(shopUrl({b: 'geen adres ', l: ['abc']}, 0), '');
+});
+
+/* ---------- bewaard lijstje en deellink: alles wat binnenkomt kan kapot zijn ---------- */
+const engine = fs.readFileSync(path.join(__dirname, '..', 'web', 'engine.js'), 'utf8');
+function app(saved){
+  const c = {localStorage: {getItem: () => saved}, atob: s => Buffer.from(s, 'base64').toString('latin1')};
+  vm.createContext(c);
+  vm.runInContext(engine + "\nconst KEY = 'k';\nconst S = {items:[], off:new Set(), demo:true, nextId:1, oldReg:false, done:new Set(), hist:Object.create(null), tpl:[]};\n" +
+    ['load', 'readListHash', 'searchText'].map(grab).join('\n') + '\nObject.assign(globalThis, {S, load, readListHash, searchText});', c);
+  return c;
+}
+const hash = v => 'lijst=' + Buffer.from(JSON.stringify(v), 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+test('kapot bewaard lijstje: geen fout, en wat klopt blijft bewaard', () => {
+  for (const raw of ['{', 'null', '5', '"x"', '[]', '{"items":5}']) assert.strictEqual(app(raw).load(), false, raw);
+  const c = app(JSON.stringify({items: [null, 5, ['melk', 2], ['', 1], [7, 1], ['constructor', 'x'], ['kaas', 1e9]], off: [1, 'ah', null], done: 'x', hist: {melk: 'x', kaas: 2},
+    saved: 'x', persons: 'veel', tpl: [null, {n: 5, i: []}, {n: 'week', i: [null, ['ei', 2]]}, {n: 'x', i: 5}], v: 3}));
+  assert.strictEqual(c.load(), true);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.S.items.map(i => [i.q, i.qty]))), [['melk', 2], ['constructor', 1], ['kaas', 99]]);
+  assert.deepStrictEqual([...c.S.off], ['ah']);
+  assert.strictEqual(c.S.done.size, 0);
+  assert.strictEqual(c.S.saved, null);
+  assert.strictEqual(c.S.persons, 4);
+  assert.strictEqual(c.S.hist.kaas, 2);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.S.tpl)), [{n: 'week', i: [['ei', 2]]}]);
+});
+
+test('leeg bewaard lijstje is geen eerste keer', () => {
+  const c = app(JSON.stringify({items: [], off: ['ah'], demo: false, v: 3}));
+  assert.strictEqual(c.load(), true);
+  assert.strictEqual(c.S.items.length, 0);
+  assert.strictEqual(c.S.off.has('ah'), true);
+  assert.ok(/\n\s*if \(fresh\)\{ useDemo\(\)/.test(body), 'voorbeeld alleen bij de eerste keer');
+});
+
+test('deellink: lege namen weg, aantal geheel, kapotte link geeft niets', () => {
+  const c = app(null);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.readListHash('#' + hash([['melk', 2.4], ['', 1], ['  ', 1], ['constructor', 500], ['__proto__', -1]])))), [['melk', 2], ['constructor', 99], ['__proto__', 1]]);
+  assert.strictEqual(c.readListHash('#' + 'lijst=%%%'), null);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.readListHash('#' + hash([])))), []);
+  assert.strictEqual(c.readListHash('#lijst=e30'), null);
+  assert.strictEqual(c.readListHash('#lijstje'), null);
+});
+
+test('zoeken op alleen een stopwoord of formaat is geen zoekopdracht', () => {
+  const c = app(null);
+  for (const q of ['de', '500 g', '  ', 'een', '%%%']) assert.strictEqual(c.searchText(q), '', q);
+  assert.strictEqual(c.searchText(' kaas 500 g '), 'kaas 500 g');
 });

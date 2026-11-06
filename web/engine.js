@@ -1,17 +1,22 @@
 /* ENGINE: zoeken en combineren, geen DOM nodig */
-const UNIT = {kg:['g',1000],kilo:['g',1000],kilogram:['g',1000],g:['g',1],gr:['g',1],gram:['g',1],
+/* opzoeken met tekst van de gebruiker: zonder prototype vindt constructor, toString of __proto__ niets */
+const dict = o => Object.assign(Object.create(null), o);
+const UNIT = dict({kg:['g',1000],kilo:['g',1000],kilogram:['g',1000],g:['g',1],gr:['g',1],gram:['g',1],
   l:['m',1000],lt:['m',1000],liter:['m',1000],ml:['m',1],cl:['m',10],dl:['m',100],
-  st:['s',1],stuks:['s',1],stuk:['s',1]};
+  st:['s',1],stuks:['s',1],stuk:['s',1]});
 const KIND = {g:1,m:2,s:3};
 const KIND_LABEL = {1:'g',2:'ml',3:'st'};
 const UNITWORDS = new Set(['g','gr','gram','kg','kilo','ml','cl','dl','l','liter','stuks','stuk','st','per','x','pak','pakje','fles','blik','doos','zak','tray']);
 const PENALTY = new Set(['gesuikerde','gedroogde','gedroogd','gekonfijte','gepofte','snoep','chips','reep','koek','koekjes','ijs','siroop','yoghurtdrank','saus','mix','choco','chocolade','maaltijd','pizza','snack','smaak','drink','shake','vla','cholesterol','lactosevrij','glutenvrij','bio','biologisch','vegan','vegetarisch','light','zero','kant','klaar']);
 const HOUSE = new Set(['ah','jumbo','plus','dirk','deka','dekamarkt','dekavers','hoogvliet','spar','lidl','poiesz','vomar','woon','beste','de','zuivelmeester','melkan','budget','huismerk','pcd','kwetters','vleeschmeesters','daily','chef','basic','bakkershart','soma','van','den']);
 const STOP = new Set(['van','de','het','een','met','en','of','voor']);
+/* deze woorden verbeteren we nooit als tikfout: zonder is geen wonder */
+const NOFIX = new Set([...STOP, 'zonder','geen','extra','per','ook','in','op','bij']);
+const MAXWORDS = 6, MAXQUERY = 80;   /* langere zoekopdrachten kosten alleen tijd */
 /* samenstellingen die wél hetzelfde product zijn: roomboter = boter, scharreleieren = eieren */
 const GOODPRE = ['room','ijsberg','mineraal','bron','krop','vloer','scharrel','vrijeuitloop','biologische','zilvervlies','volkoren','tarwe','meergranen','spelt','waldkorn','kristal','riet','basmati','jasmijn','pandan','filter','snel','hand','stoof','kruimig','vast','runder','varkens','kalkoen','kippen','braad','was','vaat','toilet','keuken','cherry','tros','vlees','roma','trostomaat','snoep','mini','grote','groene','rode','gele','witte','zoete','vers','verse','halfvolle','volle','magere','griekse','turkse','boeren'];
 /* korte, algemene woorden: zoek eerst naar het gangbare product */
-const GENERIC = {
+const GENERIC = dict({
   'melk':'halfvolle melk','kaas':'jong belegen kaas','brood':'volkoren brood','eieren':'scharreleieren','eiren':'scharreleieren','eitjes':'scharreleieren',
   'boter':'roomboter ongezouten','wc papier':'toiletpapier','wcpapier':'toiletpapier','wc-papier':'toiletpapier','closetpapier':'toiletpapier','wcrol':'toiletpapier',
   'pasta':'spaghetti','macaroni':'macaroni','suiker':'kristalsuiker','koffie':'filterkoffie','thee':'zwarte thee','yoghurt':'magere yoghurt','yogurt':'magere yoghurt',
@@ -23,7 +28,8 @@ const GENERIC = {
   'koekjes':'biscuit','koek':'ontbijtkoek','tomaat':'tomaten','ui':'uien','paprika':'paprika rood','wortels':'winterpeen','wortelen':'winterpeen','peen':'winterpeen',
   'kip':'kipfilet','vis':'zalmfilet','zalm':'zalmfilet','pindakaas':'pindakaas','jam':'aardbeienjam','mayo':'mayonaise','ketchup':'tomatenketchup',
   'shampoo':'shampoo','tandpasta':'tandpasta','luiers':'luiers','afwasblokjes':'vaatwastabletten','vaatwastabletten':'vaatwastabletten'
-};
+});
+const genericFor = q => GENERIC[String(q).toLowerCase().trim().replace(/\s+/g, ' ')];
 
 function norm(s){
   return ' ' + String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
@@ -31,7 +37,7 @@ function norm(s){
 }
 
 function parseQuery(q){
-  const low = q.toLowerCase().replace(',', '.');
+  const low = String(q).slice(0, MAXQUERY).toLowerCase().replace(',', '.');
   const re = /(\d+(?:\.\d+)?)\s*(kilogram|kilo|kg|gram|gr|g|liter|lt|ml|cl|dl|l|stuks|stuk|st)\b/;
   const m = low.match(re);
   let kind = 0, amount = 0, rest = low;
@@ -40,7 +46,7 @@ function parseQuery(q){
     kind = KIND[k]; amount = parseFloat(m[1]) * f;
     rest = low.replace(m[0], ' ');
   }
-  const tokens = norm(rest).trim().split(' ').filter(t => t && !STOP.has(t));
+  const tokens = norm(rest).trim().split(' ').filter(t => t && !STOP.has(t)).slice(0, MAXWORDS);
   return {tokens, kind, amount};
 }
 
@@ -82,25 +88,26 @@ class Engine {
     return [].concat(...tiers.map((arr, t) => arr.map(i => ({i, tier: t}))));
   }
   analyze(query, limit){
-    const g = GENERIC[String(query).toLowerCase().trim().replace(/\s+/g, ' ')];
+    const g = genericFor(query);
     if (g && g !== String(query).toLowerCase().trim()){
       /* "melk" -> eerst halfvolle melk; winkels zonder treffer vallen terug op het gewone zoekwoord */
-      const a = this._analyze(g, limit), b = this._analyze(query, limit);
+      const a = this._analyze(g, limit, true), b = this._analyze(query, limit, true);
       a.per = a.per.map((e, s) => e || b.per[s]); a.query = query;
       return a;
     }
     return this._analyze(query, limit);
   }
-  _analyze(query, limit){
+  /* known: het zoekwoord is zeker een soort product en geen merk */
+  _analyze(query, limit, known){
     const p = parseQuery(query);
-    const qset = new Set(p.tokens);
+    const qset = new Set(p.tokens), asked = new Set(p.tokens.map(stemNL));
     const joined = ' ' + p.tokens.join(' ') + ' ';
     /* 1. relevantie: hoe weinig extra woorden heeft de productnaam */
     const scoredAll = this.stores.map((st, s) => {
       const N = this.norms[s];
       return this.matchStore(s, p.tokens).map(({i, tier}) => {
         const words = N[i].trim().split(' ').filter(w => w.length > 1 && !/^\d/.test(w) && !UNITWORDS.has(w));
-        let extra = 0;
+        let extra = 0, other = false, pen = 0;
         for (const w of words){
           let c = null;
           for (const t of qset){
@@ -114,14 +121,20 @@ class Engine {
           if (c === null){
             let related = false;
             for (const t of qset){ if (w.includes(t)) { related = true; break; } }
-            c = related ? 3 : (PENALTY.has(w) ? 4 : (HOUSE.has(w) ? 0 : 1));                  /* boterhamworst is geen boter */
+            /* ravioli met kaas is geen kaas, boterhamworst geen boter */
+            c = related ? 3 : (PENALTY.has(w) ? 4 : (HOUSE.has(w) ? 0 : 1));
+            if (otherType(w, asked)){ pen += 4 - c; c = 4; other = true; }
           }
           extra += c;
         }
         if (p.tokens.length > 1 && !N[i].includes(joined)) extra += 2;
-        return {i, score: extra};
+        return {i, score: extra, other, pen};
       });
     });
+    /* nergens het kale product (ariel, optimel, dove): dan is het zoekwoord een merk en hoort wasmiddel of yoghurt
+       gewoon bij wat je zoekt. De soortwoorden kosten dan niets extra, zodat merkproducten niet wegzakken */
+    if (!known && !scoredAll.some(l => l.some(x => !x.other && x.score <= 0.5)))
+      scoredAll.forEach(l => l.forEach(x => { x.score -= x.pen; x.other = false; }));
     let kind = p.kind, amount = p.amount, inferred = false;
     if (!kind){
       /* geen formaat opgegeven: neem het gangbare formaat van de best passende producten */
@@ -154,7 +167,7 @@ class Engine {
           else { const rr = amount / q; if (rr >= 0.25 && rr <= 10){ r = rr; mode = 'scaled'; eff = price * packsFor(1, r); } }
         } else if (u === 0) mode = 'unknown';
         /* je koopt hele pakken: kleiner pak = meer pakken, groter pak = je betaalt het hele pak */
-        const c = {i, name: st.n[i], price, eff, r, q, u, mode, score: x.score, usual: 0, mbq: 0, mbp: 0, label: '', until: ''};
+        const c = {i, name: st.n[i], price, eff, r, q, u, mode, score: x.score, other: x.other, usual: 0, mbq: 0, mbp: 0, label: '', until: ''};
         if (i >= st.r){
           const j = i - st.r;
           c.usual = st.po[j]; c.mbq = st.pm[j]; c.mbp = st.pp[j]; c.label = st.pl[j]; c.until = st.pv[j];
@@ -171,16 +184,24 @@ class Engine {
   }
   /* het gewone assortiment: producten zonder actie, per naam zonder merk en formaat; wat setMask uitzet doet niet mee */
   assortment(){
+    const steps = this.assortSteps(); let r = steps.next();
+    while (!r.done) r = steps.next();
+    return r.value;
+  }
+  /* dezelfde lijst in stukjes: de pagina kan hem bouwen terwijl er niets te doen is */
+  *assortSteps(){
     const map = new Map();
-    this.stores.forEach((st, s) => {
+    for (let s = 0; s < this.stores.length; s++){
+      const st = this.stores[s];
       for (let i = 0; i < st.r; i++){
+        if (i % 500 === 499) yield;
         if (this.skip[s][i] || !(st.p[i] > 0)) continue;
         const base = cleanName(st.n[i]); if (!base) continue;
         let g = map.get(base);
         if (!g){ g = {reg: true, base, name: base[0].toUpperCase() + base.slice(1), cat: '', rows: []}; map.set(base, g); }
         g.rows.push([s, i]);
       }
-    });
+    }
     return [...map.values()];
   }
   /* wat groep g kost in de winkels on (Set): het gangbare formaat en daarvan de laagste prijs; null als het daar niet te koop is */
@@ -200,7 +221,7 @@ class Engine {
     const p = parseQuery(text);
     if (!p.tokens.length || p.tokens.join('').length < 3) return [];
     const a = this._analyze(text, 80);
-    const gq = GENERIC[String(text).toLowerCase().trim().replace(/\s+/g, ' ')];
+    const gq = genericFor(text);
     if (gq && gq !== String(text).toLowerCase().trim()){
       /* algemeen woord: het gangbare product bovenaan, daarna de andere soorten */
       const ga = this._analyze(gq, 30);
@@ -248,7 +269,7 @@ class Engine {
 
 /* ---------- zoeken in de aanbiedingen ---------- */
 /* grondvorm: banaan en bananen, appel en appels, koek en koekjes zijn hetzelfde woord */
-const IRREGULAR = {eieren:'ei', eitjes:'ei', uien:'ui', uitje:'ui', uitjes:'ui', kazen:'kaas', kaasje:'kaas'};
+const IRREGULAR = dict({eieren:'ei', eitjes:'ei', uien:'ui', uitje:'ui', uitjes:'ui', kazen:'kaas', kaasje:'kaas'});
 function stemNL(w){
   if (IRREGULAR[w]) return IRREGULAR[w];
   let s = w;
@@ -259,16 +280,35 @@ function stemNL(w){
   return s.replace(/(aa|ee|oo|uu)([^aeiou])$/, (m, v, c) => v[0] + c);   /* banaan -> banan, zoals bananen */
 }
 /* woorden die zeggen dat het iets anders is dan het losse product: bananensap, appeltaart, drink met banaan */
-const OTHERTYPE = ['drink','drank','sap','nectar','smoothie','limonade','siroop','stroop','yoghurt','kwark','skyr','vla','pudding','toetje','dessert','ijs','roomijs','cake','koek','koekje','wafel','taart','gebak','reep','snoep','chips','chocolade','jam','moes','saus','soep','thee','ijsthee','shampoo','zeep','crème','creme','douche','mix','poeder','knijpfruit','fruit','hapje','ontbijtje','maaltijd','boost','split','aioli','hoemoes','boter','brood','pasta','gnocchi','chutney','azijn','bier','cider','wijn','likeur','geur','schijfjes','wrap','pizza','popcorn','dip','salade','hummus','jus','biscuit','middel','afwas','mnd','maanden','baby','kroket','tablet','dubbelfrisss','olvarit','ella','bonbebe','tuc','mcvitie','sandwich','soup'];
+const OTHERTYPE = ['drink','drank','sap','nectar','smoothie','limonade','siroop','stroop','yoghurt','kwark','skyr','vla','pudding','toetje','dessert','ijs','roomijs','cake','koek','koekje','wafel','taart','gebak','reep','snoep','chips','chocolade','jam','moes','saus','soep','thee','ijsthee','shampoo','zeep','crème','creme','douche','mix','poeder','knijpfruit','fruit','hapje','ontbijtje','maaltijd','boost','split','aioli','hoemoes','boter','brood','pasta','gnocchi','chutney','azijn','bier','cider','wijn','likeur','geur','schijfjes','wrap','pizza','popcorn','dip','salade','hummus','jus','biscuit','middel','afwas','mnd','maanden','baby','kroket','tablet','dubbelfrisss','olvarit','ella','bonbebe','tuc','mcvitie','sandwich','soup','ravioli','tortellini','soes','soesjes','stamppot','bolognese','spritsen','burger','quiche','wraps','ketchup','haribo'];
 const OTHERSTEM = OTHERTYPE.map(o => [o, stemNL(o)]);
+const OTHERWORD = new Map();
+/* staat dit woord (of het einde ervan) in OTHERTYPE? Eén keer per woord uitgerekend */
+function otherWord(w){
+  let v = OTHERWORD.get(w);
+  if (v === undefined){
+    const st = stemNL(w);
+    v = OTHERSTEM.some(([o, os]) => w === o || st === os || (o.length >= 3 && w.endsWith(o)) || (o.length >= 4 && st.endsWith(os)));
+    OTHERWORD.set(w, v);
+  }
+  return v;
+}
+/* zegt w dat het iets anders is dan wat er gevraagd is? asked: grondvormen van de zoekwoorden */
+function otherType(w, asked){
+  if (!otherWord(w)) return false;
+  const st = stemNL(w);
+  if (asked.has(st)) return false;
+  for (const a of asked) if (a.length >= 3 && st.endsWith(a)) return false;
+  return true;
+}
 const FLAVOUR = new Set(['met','smaak','geur','aroma']);
 /* zo kort dat begin-van-woord te veel treft: ui mag geen uit vinden, ei geen eigen */
 const EXACTONLY = new Set(['ui','ei']);
 /* kipfilet is gewoon kip */
 const GOODPOST = ['filet','filets','dij','dijen','dijfilet','bout','bouten','poot','poten','vleugels','gehakt','reepjes','haas'];
-const SEARCHALIAS = {'wc papier':'toiletpapier','wcpapier':'toiletpapier','closetpapier':'toiletpapier','wcrol':'toiletpapier','pleepapier':'toiletpapier','piepers':'aardappelen'};
+const SEARCHALIAS = dict({'wc papier':'toiletpapier','wcpapier':'toiletpapier','closetpapier':'toiletpapier','wcrol':'toiletpapier','pleepapier':'toiletpapier','piepers':'aardappelen'});
 /* de afdeling van veelgezochte producten; bij andere woorden telt de app zelf waar ze het meest staan */
-const HOMECAT = {};
+const HOMECAT = Object.create(null);
 [['groente-fruit','banaan appel peer sinaasappel mandarijn druif citroen tomaat paprika komkommer sla ui wortel aardappel broccoli bloemkool champignon spinazie'],
  ['zuivel-eieren','melk boter yoghurt kwark vla eieren ei'],['kaas','kaas'],['vlees','kip gehakt worst biefstuk spek'],['vis','zalm tonijn kabeljauw'],
  ['frisdrank','water cola'],['brood-bakkerij','brood']].forEach(([c, w]) => w.split(' ').forEach(x => { HOMECAT[stemNL(x)] = c; }));
@@ -307,8 +347,7 @@ function searchScore(tokens, name){
   }
   /* wat er na het zoekwoord staat of eromheen zegt iets over het soort product */
   const core = words.filter(w => w.length > 1 && !/\d/.test(w) && !UNITWORDS.has(w));
-  const other = w => { const st = stemNL(w); return !asked.has(st) && ![...asked].some(a => a.length >= 3 && st.endsWith(a)) && OTHERSTEM.some(([o, os]) => w === o || st === os || (o.length >= 3 && w.endsWith(o)) || (o.length >= 4 && st.endsWith(os))); };
-  if (words.some(other)) score += 6;
+  if (words.some(w => otherType(w, asked))) score += 6;
   if (words.some(w => FLAVOUR.has(w))) score += 3;
   score += Math.max(0, core.length - tokens.length) * 0.3;   /* hoe minder extra woorden hoe beter */
   return score;
@@ -320,21 +359,30 @@ function searchScore(tokens, name){
 function searchRank(tokens, items){
   const alias = SEARCHALIAS[tokens.join(' ')];
   if (alias) tokens = [alias];
-  let out = new Map(); const count = {};
+  let pass = rankPass(tokens, items);
+  /* niets gevonden: misschien een tikfout (tandpsta, komkomer). Eén ronde, anders blijft zonder -> wonder -> zonder rondgaan */
+  if (!pass.out.size){
+    const fixed = fixTokens(tokens, items);
+    if (fixed.join() !== tokens.join()){ tokens = fixed; pass = rankPass(tokens, items); }
+  }
+  const {out, count} = pass;
+  const fixedHome = tokens.length === 1 ? HOMECAT[stemNL(tokens[0])] : null;
+  const home = fixedHome || Object.keys(count).sort((a, b) => count[b] - count[a])[0];
+  if (home) out.forEach((v, d) => { if (d.cat !== home) out.set(d, v + (d.cat ? 3 : v > 0 ? 1 : 0)); });
+  return out;
+}
+function rankPass(tokens, items){
+  const out = new Map(), count = Object.create(null);
   items.forEach(d => {
     const v = searchScore(tokens, d.name); if (v === null) return;
     out.set(d, v);
     if (v < 2 && d.cat) count[d.cat] = (count[d.cat] || 0) + 1;
   });
-  /* niets gevonden: misschien een tikfout (tandpsta, komkomer) */
-  if (!out.size && tokens.some(t => t.length >= 5)){
-    const fixed = tokens.map(t => t.length >= 5 ? closestWord(t, items) || t : t);
-    if (fixed.join() !== tokens.join()) return searchRank(fixed, items);
-  }
-  const fixedHome = tokens.length === 1 ? HOMECAT[stemNL(tokens[0])] : null;
-  const home = fixedHome || Object.keys(count).sort((a, b) => count[b] - count[a])[0];
-  if (home) out.forEach((v, d) => { if (d.cat !== home) out.set(d, v + (d.cat ? 3 : v > 0 ? 1 : 0)); });
-  return out;
+  return {out, count};
+}
+/* alleen woorden die in geen enkele naam voorkomen zijn een mogelijke tikfout */
+function fixTokens(tokens, items){
+  return tokens.map(t => t.length < 5 || NOFIX.has(t) || items.some(d => searchScore([t], d.name) !== null) ? t : closestWord(t, items) || t);
 }
 
 /* gewone producten hebben geen afdeling in de data: leen die van de aanbiedingen. Eerst dezelfde naam, anders
@@ -343,7 +391,7 @@ function guessCats(groups, deals){
   const exact = new Map(), per = new Map();
   deals.forEach(d => {
     const base = cleanName(d.name); exact.set(base, d.cat);
-    base.split(' ').forEach(w => { const k = stemNL(w), c = per.get(k) || {}; c[d.cat] = (c[d.cat] || 0) + 1; per.set(k, c); });
+    base.split(' ').forEach(w => { const k = stemNL(w), c = per.get(k) || Object.create(null); c[d.cat] = (c[d.cat] || 0) + 1; per.set(k, c); });
   });
   const main = w => {
     const c = per.get(stemNL(w)); if (!c) return '';
@@ -359,7 +407,7 @@ function guessCats(groups, deals){
 /* het woord uit de productnamen dat één letter verschilt van w; bij meerdere het vaakst voorkomende */
 function closestWord(w, items){
   const seen = new Map();
-  items.forEach(d => norm(d.name).trim().split(' ').forEach(x => { if (Math.abs(x.length - w.length) <= 1 && x.length >= 4) seen.set(x, (seen.get(x) || 0) + 1); }));
+  items.forEach(d => nameParts(d.name).words.forEach(x => { if (Math.abs(x.length - w.length) <= 1 && x.length >= 4) seen.set(x, (seen.get(x) || 0) + 1); }));
   let best = null, n = 0;
   seen.forEach((c, x) => { if (c > n && oneEdit(w, x)){ best = x; n = c; } });
   return best;
@@ -385,7 +433,11 @@ const comparable = x => !!x && (x.mode === 'exact' || x.mode === 'scaled');
 /* uitkomst voor een gekozen set winkels */
 function priceMatrix(items, analyses, pins, storeIdxs){
   return items.map(it => {
-    const row = priceRow(it, analyses[it.id], pins, storeIdxs);
+    const a = analyses[it.id];
+    let row = priceRow(it, a, pins, storeIdxs);
+    /* een ander soort product (ravioli bij kaas, bananensoesjes bij bananen) doet niet mee zodra een andere winkel
+       het echte product heeft; bij een merk als zoekwoord staat c.other nooit aan (zie _analyze) */
+    if (row.some(x => x && !x.c.other)) row = row.map(x => x && x.c.other && !x.pinned ? null : x);
     /* zodra een andere winkel een vergelijkbaar product heeft, tellen niet mee: een ander soort product
        (per stuk in plaats van per kilo, of veel te klein/groot) en een product met onbekend formaat dat ook
        slechter bij de zoekterm past (bananenbrood bij "bananen"); zelf gekozen producten blijven staan */
@@ -400,9 +452,19 @@ function priceMatrix(items, analyses, pins, storeIdxs){
       const better = cmp.filter(y => y !== x && y.c.score + 0.5 < x.c.score);
       return better.length > 0 && x.price > OUTLIER * Math.min(...better.map(y => y.price));
     };
-    return row.map(x => !x || x.pinned || (comparable(x) && !suspect(x)) || (x.mode === 'unknown' && x.c.score <= best + 1) ? x : null);
+    /* niet om te rekenen maar wel het gevraagde product: dat verdwijnt niet, het telt als onbekend formaat (~).
+       Beter passend dan alles wat wel te rekenen is, of ongeveer even goed passend als er geen formaat is gevraagd
+       (dat is dan een schatting) of als het een pak van meer stuks is (5 bananen) bij een vraag in kilo's.
+       Eén los stuk zegt niets over een kilo; dat valt af zolang er een even goed vergelijkbaar product is */
+    const loose = x => x.mode === 'other' && !x.c.other && (x.c.score + 0.5 < best || (x.c.score <= best + LOOSEFIT &&
+      (a.inferred || (x.c.u === 3 && a.kind !== 3 && x.c.q > 1))));
+    return row.map(x => {
+      if (!x || x.pinned || (comparable(x) && !suspect(x)) || (x.mode === 'unknown' && x.c.score <= best + 1)) return x;
+      return loose(x) ? Object.assign({}, x, {mode: 'unknown', c: Object.assign({}, x.c, {mode: 'unknown'})}) : null;
+    });
   });
 }
+const LOOSEFIT = 3;   /* tot drie woorden meer dan het best passende product: Chiquita Groene bananen, Campina Greek Style Yoghurt */
 const OUTLIER = 8;   /* gemeten op 40 gangbare producten: bij 4 of 6 vielen ook echte A-merken (Ariel, Dreft, Dove) af */
 
 /* positie j in een rij van priceMatrix minstens 3 keer zo duur als het goedkoopste vergelijkbare product
@@ -528,6 +590,26 @@ function plan(m, storeIdxs, kmax){
   }
   const avgSingle = singles.length ? Math.round(singles.reduce((a,b)=>a+b,0)/singles.length) : null;
   return {found, missing, result, partial, avgSingle, singles: singles.length};
+}
+
+/* boodschappen uit een gedeelde link of uit de opslag: alleen [naam, aantal] met een echte naam en een heel aantal 1-99 */
+function cleanList(rows, limit){
+  if (!Array.isArray(rows)) return [];
+  const out = [];
+  for (const r of rows){
+    if (!Array.isArray(r) || typeof r[0] !== 'string') continue;
+    const q = r[0].trim().replace(/\s+/g, ' ').slice(0, MAXQUERY).trim();
+    if (q) out.push([q, Math.max(1, Math.min(99, Math.round(+r[1]) || 1))]);
+    if (out.length === (limit || 100)) break;
+  }
+  return out;
+}
+
+/* tellers uit de opslag: alleen echte aantallen, in een object zonder prototype */
+function cleanCounts(o){
+  const out = Object.create(null);
+  if (o && typeof o === 'object') Object.keys(o).forEach(k => { const n = +o[k]; if (k && n > 0 && Number.isFinite(n)) out[k] = n; });
+  return out;
 }
 
 /* wat plan to echt oplevert ten opzichte van plan from: een regel uit from met een waarschuwing (waarschijnlijk

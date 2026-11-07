@@ -25,6 +25,7 @@ for pair in pairs:
         print(f'{k}: winkel niet in Checkjebon; overgeslagen', file=sys.stderr); continue
     before = len(st.get('d') or [])
     st['d'] = rows
+    if isinstance(own.get('base'), str) and own['base'].startswith('https://'): st['u'] = own['base']   # links naar de eigen productpagina
     newest = max(p['t'] for p in own['d'] if p.get('t', '') >= cut)
     fresh[k] = newest
     print(f'{k}: {len(rows)} eigen prijzen (was {before} uit Checkjebon), bijgewerkt {newest}', file=sys.stderr)

@@ -420,6 +420,14 @@ tr:last-child td{border-bottom:0}
 @media (min-width:721px){.sheetbg{align-items:center}.sheet{border-radius:20px}}
 .sheet .grab{width:44px;height:5px;border-radius:9px;background:var(--line);align-self:center}
 .sheet h2{font-size:1.25rem}
+.qtyname{margin:-10px 0 0;color:var(--muted);font-weight:600}
+.qtybig{display:flex;align-items:center;justify-content:center;gap:20px}
+.qtybig button{width:58px;height:58px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:1.7rem;line-height:1}
+.qtybig button:disabled{opacity:.35}
+.qtybig output{min-width:70px;text-align:center;font-size:2.3rem;font-weight:800}
+.qtyquick{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.qtyquick .chip{padding:8px 16px;font-size:1rem;font-weight:700}
+.qtyquick .chip[aria-pressed="true"]{background:var(--sel-bg);border-color:var(--sel);color:var(--sel)}
 .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--soft);padding:5px;border-radius:12px}
 .seg button{border:0;background:none;border-radius:9px;padding:10px 4px;font-weight:700;min-height:48px}
 .seg button[aria-pressed="true"]{background:var(--surface);box-shadow:var(--shadow);color:var(--cta)}

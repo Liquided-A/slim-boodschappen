@@ -151,3 +151,12 @@ test('boodschappenlijst gebruikt dezelfde vinkjes als de bonnen en sluit met de 
   assert.ok(/window\.slimBack = function\(\)\{[^\n]*closeTrip\(\)/.test(body), 'terugknop sluit de lijst');
   assert.ok(!/<[^>]+\son[a-z]+=/i.test(body.replace(/<script[\s\S]*$/, '')), 'geen inline handlers');
 });
+test('toevoegen opent het aantal-venster; knop toont het aantal op het lijstje', () => {
+  assert.ok(/act === 'adddeal' \|\| act === 'adddetail'\)\{ openQty\(/.test(body), 'beide knoppen openen het venster');
+  const c = {esc: s => String(s), S: {items: [{q: 'Melk', qty: 3}, {q: 'Brood', qty: 1}]}};
+  vm.createContext(c);
+  vm.runInContext(['findItem', 'addLabel'].map(grab).join('\n') + '\nObject.assign(globalThis, {findItem, addLabel});', c);
+  assert.strictEqual(c.addLabel('melk'), '✓ 3 × Op je lijstje');
+  assert.strictEqual(c.addLabel('Brood'), '✓ Op je lijstje');
+  assert.strictEqual(c.addLabel('kaas'), '+ Op mijn lijstje');
+});

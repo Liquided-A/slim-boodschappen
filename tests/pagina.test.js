@@ -125,7 +125,7 @@ function trip(items, L){
   const c = {S: {items, done: new Set()}, STORES: [{c: 'Jumbo'}, {c: 'Lidl'}],
     afdOf: (it, st, i) => i};   /* afdeling volgt hier het productnummer */
   vm.createContext(c);
-  vm.runInContext(['unpriced', 'bonRows', 'doneLast', 'tripGroups'].map(grab).join('\n') + '\nObject.assign(globalThis, {bonRows, doneLast, tripGroups});', c);
+  vm.runInContext(['unpriced', 'bonRows', 'storeMark', 'tripGroups'].map(grab).join('\n') + '\nObject.assign(globalThis, {bonRows, storeMark, tripGroups});', c);
   c.L = L; return c;
 }
 const cell = i => ({price: 100, c: {i}});
@@ -139,10 +139,12 @@ test('boodschappenlijst: per winkel op afdeling, producten zonder prijs apart, l
   assert.deepStrictEqual(JSON.parse(JSON.stringify(c.tripGroups({sel: [0], none: true}).map(g => [g.name, g.rows]))), [['Prijs onbekend', [0, 1, 2, 3]]]);
   assert.strictEqual(trip([], {empty: true}).tripGroups({empty: true}).length, 0);
 });
-test('boodschappenlijst: afgevinkt zakt naar onderen, volgorde blijft verder gelijk', () => {
-  const c = trip([], null), done = new Set([4, 1]);
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.doneLast([4, 2, 1, 3], i => done.has(i)))), [2, 3, 4, 1]);
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.doneLast([], () => true))), []);
+test('boodschappenlijst: afgevinkt blijft op zijn plek; elke winkel heeft een teken', () => {
+  assert.ok(!/doneLast/.test(body), 'geen herordening na afvinken');
+  assert.ok(/function renderTrip[\s\S]*?class="tlogo"/.test(body), 'winkelteken in het kopje');
+  const c = trip([], null);
+  for (const [n, want] of [['AH', 'AH'], ['SPAR', 'SPAR'], ['ALDI', 'ALDI'], ['Jumbo', 'J'], ['DekaMarkt', 'DM'], ["Boon's Markt", 'BM'], ['Lidl', 'LIDL']])
+    assert.strictEqual(c.storeMark(n), want, n);
 });
 test('boodschappenlijst gebruikt dezelfde vinkjes als de bonnen en sluit met de terugknop', () => {
   assert.ok(/function renderTrip[\s\S]*?data-act="tick"/.test(body), 'zelfde tick-actie');

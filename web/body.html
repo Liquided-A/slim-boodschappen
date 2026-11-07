@@ -171,6 +171,8 @@ function mmddToDate(mmdd, start){
   const dt = start ? new Date(y, m, d, 0, 0) : new Date(y, m, d, 23, 59);
   return dt.getMonth() === m && dt.getDate() === d ? dt : null;   /* ook 1345 of 0231: Date schuift die stil door */
 }
+/* herkenbaar winkelteken: korte namen voluit (AH, SPAR), anders de hoofdletters (DekaMarkt -> DM) of de eerste letter */
+function storeMark(c){ const n = String(c); if (n.replace(/[^A-Za-z]/g, '').length <= 4) return n.replace(/[^A-Za-z]/g, '').toUpperCase(); const caps = n.match(/[A-Z]/g) || []; return (caps.length > 1 ? caps.slice(0, 2).join('') : n[0]).toUpperCase(); }
 function initials(c){ return c.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase(); }
 function regFresh(s){ return s.f && (NOW - new Date(s.f + 'T12:00:00')) / 864e5 <= STALE_DAYS; }
 function promoActive(s, j){
@@ -678,7 +680,6 @@ function bonRows(L){
   });
 }
 /* afgevinkt zakt naar onderen; verder blijft de volgorde van de bon staan */
-function doneLast(rows, isDone){ return rows.filter(i => !isDone(i)).concat(rows.filter(isDone)); }
 /* wat je waar haalt, met de producten zonder prijs als laatste groep; leeg lijstje geeft niets */
 function tripGroups(L){
   if (!S.items.length || !L) return [];
@@ -708,13 +709,13 @@ function renderTrip(){
   const groups = G.map(g => {
     const gd = g.rows.filter(isDone).length, b = g.b;
     const sub = b ? g.rows.reduce((t, i) => t + L.m[i][b.pos].price, 0) : 0;
-    const rows = doneLast(g.rows, isDone).map(i => {
+    const rows = g.rows.map(i => {   /* afgevinkt blijft op zijn plek, zodat je niet de draad kwijtraakt */
       const it = S.items[i], dn = isDone(i);
       if (!b) return '<li class="tline' + (dn ? ' done' : '') + '" data-act="tick" data-id="' + it.id + '">' + tick(it, dn) + '<span class="tn">' + (it.qty > 1 ? it.qty + ' × ' : '') + esc(it.q) + '</span></li>';
       const cell = L.m[i][b.pos];
       return '<li class="tline' + (dn ? ' done' : '') + '" data-act="tick" data-id="' + it.id + '">' + tick(it, dn) + '<span class="tn">' + bonName(it, cell.c) + (cell.c.usual ? ' <span class="tag sale">actie</span>' : '') + '</span><span class="tp">' + (estimated(cell) ? '~' : '') + money(cell.price) + '</span></li>';
     }).join('');
-    return '<section class="tgroup' + (gd === g.rows.length ? ' alldone' : '') + '"><header><h2>' + esc(g.name) + '</h2><span class="tc">' + (gd ? gd + ' van ' + g.rows.length : nProd(g.rows.length)) + '</span>' +
+    return '<section class="tgroup' + (gd === g.rows.length ? ' alldone' : '') + '"><header><span class="tlogo" aria-hidden="true">' + esc(g.unk ? '?' : storeMark(g.name)) + '</span><h2>' + esc(g.name) + '</h2><span class="tc">' + (gd ? gd + ' van ' + g.rows.length : nProd(g.rows.length)) + '</span>' +
       (b ? '<span class="tsub">' + money(sub) + '</span>' : '') + '</header><ul>' + rows + '</ul></section>';
   }).join('');
   el.innerHTML = '<div class="tripbar"><div class="tripinner"><button type="button" class="tripback" data-act="closetrip" aria-label="Terug naar mijn lijstje"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>' +

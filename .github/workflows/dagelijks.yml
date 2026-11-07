@@ -43,6 +43,8 @@ jobs:
         run: |
           git clone --shallow-since="$(date -d '15 months ago' +%F)" https://github.com/supermarkt/checkjebon.git /tmp/cjb
           python3 -I kit/freshness.py /tmp/cjb /tmp/fresh.json
+          # zelf opgehaalde gewone prijzen (dirk.yml) gaan voor de verouderde van Checkjebon
+          python3 -I kit/own_prices.py /tmp/cjb/data/supermarkets.json /tmp/fresh.json dirk=data/dirk.json
           python3 -I kit/fetch_promos.py /tmp/promos.json
           timeout 25m python3 -I kit/fetch_images.py /tmp/promos.json data/images.json data/img 1500 || echo "foto's deels overgeslagen"
           python3 -I kit/compact.py /tmp/cjb/data/supermarkets.json /tmp/promos.json /tmp/fresh.json /tmp/data.b64 data/images.json data/fotolinks.json

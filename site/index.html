@@ -5,72 +5,110 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E6278">
-<title>Bespaar op je boodschap: alle supermarktaanbiedingen en het goedkoopste boodschappenlijstje</title>
-<meta name="description" content="Gratis app die de aanbiedingen van AH, Jumbo, Lidl, PLUS, Aldi, Dirk, Poiesz en andere supermarkten naast elkaar zet en uitrekent bij welke winkels je boodschappenlijstje het goedkoopst is. Zonder account en zonder reclame.">
-<link rel="canonical" href="https://liquided-a.github.io/slim-boodschappen/">
+<title>Supermarktprijzen vergelijken | Bespaar op je boodschap</title>
+<meta name="description" content="Vergelijk je hele boodschappenlijst bij Jumbo, Dirk, Lidl, Hoogvliet en meer. Gewone prijzen én aanbiedingen, en of 2 winkels goedkoper is. Gratis.">
+<link rel="canonical" href="{{SITE}}">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="nl_NL">
 <meta property="og:site_name" content="Bespaar op je boodschap">
-<meta property="og:title" content="Bespaar op je boodschap: zie waar je boodschappen het goedkoopst zijn">
-<meta property="og:description" content="Alle folderacties van de supermarkten op één plek, en per lijstje uitgerekend of 1, 2 of 3 winkels het voordeligst is. Gratis, zonder account.">
-<meta property="og:url" content="https://liquided-a.github.io/slim-boodschappen/">
-<meta property="og:image" content="https://liquided-a.github.io/slim-boodschappen/icon.png">
+<meta property="og:title" content="Ontdek waar jouw boodschappen het goedkoopst zijn">
+<meta property="og:description" content="Vergelijk slim. Betaal minder. Gewone supermarktprijzen en aanbiedingen naast elkaar, voor je complete boodschappenlijst.">
+<meta property="og:url" content="{{SITE}}">
+<meta property="og:image" content="{{SITE}}icon.png">
 <link rel="icon" href="icon.png">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"MobileApplication","name":"Bespaar op je boodschap","operatingSystem":"Android","applicationCategory":"ShoppingApplication","inLanguage":"nl","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},"url":"https://liquided-a.github.io/slim-boodschappen/"}</script>
-<style>
-:root{--bg:#F2F7F8;--surface:#fff;--ink:#12222A;--muted:#54666D;--line:#DAE5E8;--brand:#0E6278;--cta:#0E7A94;--cta-ink:#fff;--soft:#DCEEF3}
-@media (prefers-color-scheme:dark){:root{--bg:#0D1518;--surface:#162227;--ink:#E8F1F3;--muted:#9BAFB6;--line:#293A41;--brand:#0B4152;--cta:#3DB8D4;--cta-ink:#04171D;--soft:#123540}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.55 system-ui,-apple-system,'Segoe UI',sans-serif}
-header{background:var(--brand);color:#fff;padding:28px 16px 64px;text-align:center}
-header img{width:84px;height:84px;border-radius:22px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
-h1{margin:14px 0 6px;font-size:1.9rem;letter-spacing:-.02em}
-header p{margin:0 auto;max-width:34ch;opacity:.9}
-main{max-width:560px;margin:-40px auto 40px;padding:0 16px;display:flex;flex-direction:column;gap:16px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px}
-.big{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--cta);color:var(--cta-ink);text-decoration:none;font-weight:800;font-size:1.15rem;border-radius:14px;padding:18px;min-height:64px}
-.big svg{width:26px;height:26px}
-.alt{display:flex;align-items:center;justify-content:center;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:700;border-radius:14px;padding:14px;min-height:54px}
-h2{margin:0;font-size:1.2rem}
-ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:8px}
-.muted{color:var(--muted);font-size:.92rem}
-.links{text-align:center}
-.links a{color:inherit}
-.feat{display:grid;grid-template-columns:auto 1fr;gap:10px 12px;align-items:start}
-.feat span{width:34px;height:34px;border-radius:10px;background:var(--soft);display:grid;place-items:center;font-size:1.1rem}
-</style>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[
+{"@type":"WebSite","@id":"{{SITE}}#website","url":"{{SITE}}","name":"Bespaar op je boodschap","slogan":"Vergelijk slim. Betaal minder.","inLanguage":"nl-NL"},
+{"@type":"Organization","@id":"{{SITE}}#org","name":"Bespaar op je boodschap","url":"{{SITE}}","logo":"{{SITE}}icon.png"},
+{"@type":"WebApplication","name":"Bespaar op je boodschap","url":"{{SITE}}app.html","applicationCategory":"ShoppingApplication","operatingSystem":"Android, iOS, Windows, macOS (in de browser)","inLanguage":"nl","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"}},
+{"@type":"FAQPage","mainEntity":[
+{"@type":"Question","name":"Welke supermarkt is het goedkoopst?","acceptedAnswer":{"@type":"Answer","text":"Dat verschilt per boodschappenlijst en per week, omdat aanbiedingen elke week wisselen. Daarom rekenen we het elke dag opnieuw uit voor een vast mandje met gangbare producten, en kun je in de app je eigen lijstje vergelijken."}},
+{"@type":"Question","name":"Vergelijken jullie alleen aanbiedingen?","acceptedAnswer":{"@type":"Answer","text":"Nee. We vergelijken gewone supermarktprijzen en tellen lopende aanbiedingen mee als extra voordeel. Van sommige winkels hebben we nog geen actuele gewone prijzen; die laten we dan buiten de vergelijking en dat staat er duidelijk bij."}},
+{"@type":"Question","name":"Is het goedkoper om bij meerdere supermarkten te halen?","acceptedAnswer":{"@type":"Answer","text":"Soms. De app rekent uit of 1, 2, 3 of 4 winkels voor jouw lijstje het voordeligst is, en adviseert alleen een extra winkel als je daarmee minstens het bedrag bespaart dat je zelf instelt."}},
+{"@type":"Question","name":"Wat kost het?","acceptedAnswer":{"@type":"Answer","text":"Niets. Je hebt geen account nodig, er is geen reclame en je lijstje blijft op je eigen toestel."}},
+{"@type":"Question","name":"Hoe actueel zijn de prijzen?","acceptedAnswer":{"@type":"Answer","text":"Aanbiedingen worden elke ochtend bijgewerkt. Gewone prijzen van Dirk, DekaMarkt en Hoogvliet halen we elke nacht op; die van andere winkels komen uit open data. Per winkel staat in de app hoe actueel de prijzen zijn."}}
+]}]}</script>
+{{STIJL}}
 </head>
 <body>
-<header>
-  <img src="icon.png" alt="">
-  <h1>Bespaar op je boodschap</h1>
-  <p>Alle aanbiedingen van de supermarkten op één plek, en zien waar je lijstje het goedkoopst is.</p>
+{{KOP}}
+<header class="hero">
+  <span class="tag">Bespaar op je boodschap · Vergelijk slim. Betaal minder.</span>
+  <h1>Ontdek waar jouw boodschappen het goedkoopst zijn</h1>
+  <p>Zet je boodschappenlijst in de app en zie per supermarkt wat je kwijt bent, met gewone prijzen én de aanbiedingen van deze week. Ook of het loont om bij twee winkels te halen.</p>
+  <div class="btns">
+    <a class="big" href="app.html">Vergelijk je boodschappen</a>
+    <a class="big ghost" href="#android">Download voor Android</a>
+  </div>
 </header>
 <main>
-  <section class="card">
-    <a class="big" id="apk" href="https://github.com/Liquided-A/slim-boodschappen/releases/download/app/SlimBoodschappen.apk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>Download voor Android</a>
-    <a class="alt" href="app.html">Of open de app in je browser (ook iPhone)</a>
-    <p class="muted">Gratis, zonder account en zonder reclame. In de browser-versie werkt het inlezen van een foto niet; in de Android-app wel.</p>
+  <section class="card" aria-labelledby="vandaag">
+    <h2 id="vandaag">Welke supermarkt is vandaag het goedkoopst?</h2>
+    <!--GEN:mandjekort-->
   </section>
-  <section class="card">
-    <h2>Zo installeer je de app</h2>
+
+  <section class="card" aria-labelledby="werkt">
+    <h2 id="werkt">Zo vergelijk je supermarktprijzen</h2>
+    <ol class="steps">
+      <li><strong>Maak je boodschappenlijst.</strong> Typ wat je nodig hebt, kies uit de aanbiedingen, of maak een foto van je briefje (Android).</li>
+      <li><strong>Kies je supermarkten.</strong> Alleen de winkels waar jij komt worden vergeleken.</li>
+      <li><strong>Zie wat het kost.</strong> Per winkel het totaal van je hele mandje, en het goedkoopste plan: bij één winkel of verdeeld over twee of drie.</li>
+    </ol>
+    <a class="cta" href="app.html">Boodschappenlijst vergelijken</a>
+  </section>
+
+  <section class="card" aria-labelledby="wat">
+    <h2 id="wat">Meer dan aanbiedingen</h2>
+    <p>Veel sites laten alleen folderacties zien. Wij vergelijken je <strong>complete boodschappenmandje</strong>: de gewone prijs van elk product, met de lopende aanbieding als die er is.</p>
+    <ul>
+      <li><strong>Hele lijstje in één keer:</strong> geen losse producten opzoeken, maar het totaal per supermarkt.</li>
+      <li><strong>Eerlijk vergeleken:</strong> verschillende verpakkingen rekenen we om naar dezelfde hoeveelheid, zodat 6 eieren niet goedkoper lijken dan 10.</li>
+      <li><strong>Slim verdelen:</strong> de app zegt of een tweede winkel genoeg oplevert om de moeite waard te zijn.</li>
+      <li><strong>Eerlijk over wat we niet weten:</strong> ontbreekt een prijs, dan tellen we die niet als € 0 en zie je dat.</li>
+    </ul>
+    <p><a href="boodschappen-vergelijken.html">Lees hoe boodschappen vergelijken werkt</a></p>
+  </section>
+
+  <section class="card" aria-labelledby="winkels">
+    <h2 id="winkels">Deze supermarkten vergelijken we</h2>
+    <p>Van de ene winkel hebben we gewone prijzen en aanbiedingen, van de andere (nog) alleen aanbiedingen. Zo staat het er vandaag voor:</p>
+    <!--GEN:winkels-->
+    <p class="small">Waar de prijzen vandaan komen en hoe we producten koppelen, lees je op <a href="prijzen.html">hoe we prijzen vergelijken</a>.</p>
+  </section>
+
+  <section class="card" aria-labelledby="tips">
+    <h2 id="tips">Goedkoop boodschappen doen</h2>
+    <p>Vergelijken is één manier om te besparen. Met een vast weekmenu, huismerken en de prijs per kilo kom je nog verder. We zetten de tips die echt iets opleveren op een rij.</p>
+    <p><a href="besparen-op-boodschappen.html">Bespaartips voor je boodschappen</a> · <a href="supermarkt-aanbiedingen.html">Alle supermarkt aanbiedingen van deze week</a></p>
+  </section>
+
+  <section class="card" id="android" aria-labelledby="install">
+    <h2 id="install">De app op je telefoon</h2>
+    <p>De app werkt in elke browser, ook op een iPhone: <a href="app.html">open de app</a>. Op Android kun je hem ook installeren; dan kun je een foto van je boodschappenbriefje laten inlezen.</p>
+    <a class="cta" href="https://github.com/Liquided-A/slim-boodschappen/releases/download/app/SlimBoodschappen.apk">Download voor Android (gratis)</a>
+    <h3>Zo installeer je de app</h3>
     <ol>
       <li>Tik hierboven op <b>Download voor Android</b>.</li>
       <li>Open het bestand <b>SlimBoodschappen.apk</b> als het gedownload is (via de melding of de map Downloads).</li>
       <li>Vraagt je telefoon om toestemming? Kies <b>Instellingen</b> en zet <b>Toestaan van deze bron</b> aan. Ga terug en tik op <b>Installeren</b>.</li>
       <li>Krijg je een melding van Play Protect? Kies <b>Toch installeren</b>. De app komt niet uit de Play Store, daarom vraagt Android dit.</li>
     </ol>
-    <p class="muted">Een nieuwe versie installeer je op dezelfde manier; je lijstje blijft dan bewaard. De prijzen werkt de app zelf elke dag bij.</p>
+    <p class="small">Een nieuwe versie installeer je op dezelfde manier; je lijstje blijft bewaard. De prijzen werkt de app zelf elke dag bij.</p>
   </section>
-  <section class="card">
-    <h2>Wat kan de app?</h2>
-    <div class="feat"><span>🏷️</span><div>Ruim 12.000 folderacties van zo'n 20 supermarkten, elke ochtend bijgewerkt.</div>
-      <span>📷</span><div>Maak een foto van je boodschappenbriefje of deel een lijstje uit Notities: de app zet het op je lijstje.</div>
-      <span>🧮</span><div>Zie of het loont om bij 1, 2, 3 of 4 winkels te halen.</div>
-      <span>🔠</span><div>Grote letters en grote knoppen, in te stellen met de knop Aa.</div></div>
+
+  <section class="card faq" aria-labelledby="vragen">
+    <h2 id="vragen">Veelgestelde vragen</h2>
+    <h3>Welke supermarkt is het goedkoopst?</h3>
+    <p>Dat verschilt per boodschappenlijst en per week, omdat aanbiedingen elke week wisselen. Daarom rekenen we het elke dag opnieuw uit voor een vast mandje met gangbare producten, en kun je in de app je eigen lijstje vergelijken.</p>
+    <h3>Vergelijken jullie alleen aanbiedingen?</h3>
+    <p>Nee. We vergelijken gewone supermarktprijzen en tellen lopende aanbiedingen mee als extra voordeel. Van sommige winkels hebben we nog geen actuele gewone prijzen; die laten we dan buiten de vergelijking en dat staat er duidelijk bij.</p>
+    <h3>Is het goedkoper om bij meerdere supermarkten te halen?</h3>
+    <p>Soms. De app rekent uit of 1, 2, 3 of 4 winkels voor jouw lijstje het voordeligst is, en adviseert alleen een extra winkel als je daarmee minstens het bedrag bespaart dat je zelf instelt.</p>
+    <h3>Wat kost het?</h3>
+    <p>Niets. Je hebt geen account nodig, er is geen reclame en je lijstje blijft op je eigen toestel.</p>
+    <h3>Hoe actueel zijn de prijzen?</h3>
+    <p>Aanbiedingen worden elke ochtend bijgewerkt. Gewone prijzen van Dirk, DekaMarkt en Hoogvliet halen we elke nacht op; die van andere winkels komen uit open data. Per winkel staat in de app hoe actueel de prijzen zijn.</p>
   </section>
-  <p class="muted links">Aanbiedingen via <a href="https://www.prijsprofeet.nl" rel="noopener">PrijsProfeet</a> · gewone prijzen via <a href="https://github.com/supermarkt/checkjebon" rel="noopener">Checkjebon</a> en de websites van Dirk, DekaMarkt en Hoogvliet · foto's via <a href="https://world.openfoodfacts.org" rel="noopener">Open Food Facts</a>. Onafhankelijk, geen band met de supermarkten. Prijzen zijn indicatief: controleer de uiteindelijke prijs bij de aanbieder.</p>
-  <p class="muted links"><a href="over.html">Over</a> · <a href="prijzen.html">Over de prijzen</a> · <a href="privacy.html">Privacy</a> · <a href="cookies.html">Cookies</a> · <a href="voorwaarden.html">Voorwaarden</a> · <a href="contact.html">Contact</a></p>
 </main>
+{{VOET}}
 </body>
 </html>

@@ -95,8 +95,10 @@ jobs:
           cp data/data.b64 _site/
           cp data/img/s*.jpg _site/img/
           mkdir -p _site/logos && cp web/logos/* _site/logos/
-          cp site/* _site/
           python3 -I web/assemble.py --wrap web/style.html web/body.html web/engine.js data/data.b64 _site/app.html
+          # pagina's met de prijzen van vandaag (goedkoopste supermarkt, aanbiedingen), sitemap en robots.txt.
+          # Eigen domein: zet bij Settings > Variables de variabele SITE_URL, bijvoorbeeld https://www.bespaaropjeboodschap.nl/
+          node kit/seo_build.js data/data.b64 site _site "${{ vars.SITE_URL }}"
           touch _site/.nojekyll
 
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3

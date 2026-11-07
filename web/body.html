@@ -1,7 +1,7 @@
 
 <header class="hdr">
   <div class="inner">
-    <a class="logo" href="#aanbiedingen" data-act="home"><span class="mk" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"/><circle cx="9.5" cy="20" r="1.2"/><circle cx="17" cy="20" r="1.2"/></svg></span>Slim Boodschappen</a>
+    <a class="logo" href="#aanbiedingen" data-act="home"><span class="mk" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"/><circle cx="9.5" cy="20" r="1.2"/><circle cx="17" cy="20" r="1.2"/></svg></span>Bespaar op je boodschap</a>
     <div class="hdrbtns">
     <button class="iconbtn" type="button" data-act="settings" aria-label="Instellingen: tekstgrootte en weergave"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19 9 5l5 14M5.8 14h6.4"/><path d="M15 19l3-8 3 8M15.9 16.6h4.2"/></svg></button>
     <a class="cartbtn" href="#lijstje" aria-label="Naar mijn lijstje">
@@ -108,7 +108,7 @@
       <p>Van een aantal winkels worden de gewone prijzen niet meer bijgewerkt. Die doen standaard alleen mee met hun actuele aanbiedingen. Dit is een prototype: controleer prijzen en producten in de winkel.</p>
       <p>Prijzen en aanbiedingen zijn indicatief en kunnen afwijken van de actuele prijzen bij de supermarkt. Controleer de uiteindelijke prijs bij de aanbieder.</p>
       <p>Geen account, geen advertenties, je lijstje blijft op je eigen toestel.</p>
-      <nav class="footlinks" aria-label="Informatie"><a href="https://liquided-a.github.io/slim-boodschappen/over.html" target="_blank" rel="noopener">Over Slim Boodschappen</a><a href="https://liquided-a.github.io/slim-boodschappen/prijzen.html" target="_blank" rel="noopener">Over de prijzen</a><a href="https://liquided-a.github.io/slim-boodschappen/privacy.html" target="_blank" rel="noopener">Privacyverklaring</a><a href="https://liquided-a.github.io/slim-boodschappen/cookies.html" target="_blank" rel="noopener">Cookies</a><a href="https://liquided-a.github.io/slim-boodschappen/voorwaarden.html" target="_blank" rel="noopener">Voorwaarden</a><a href="https://liquided-a.github.io/slim-boodschappen/contact.html" target="_blank" rel="noopener">Contact</a></nav>
+      <nav class="footlinks" aria-label="Informatie"><a href="https://liquided-a.github.io/slim-boodschappen/over.html" target="_blank" rel="noopener">Over Bespaar op je boodschap</a><a href="https://liquided-a.github.io/slim-boodschappen/prijzen.html" target="_blank" rel="noopener">Over de prijzen</a><a href="https://liquided-a.github.io/slim-boodschappen/privacy.html" target="_blank" rel="noopener">Privacyverklaring</a><a href="https://liquided-a.github.io/slim-boodschappen/cookies.html" target="_blank" rel="noopener">Cookies</a><a href="https://liquided-a.github.io/slim-boodschappen/voorwaarden.html" target="_blank" rel="noopener">Voorwaarden</a><a href="https://liquided-a.github.io/slim-boodschappen/contact.html" target="_blank" rel="noopener">Contact</a></nav>
     </div>
     <div class="tablewrap"><table class="fresh-table"><thead><tr><th>Winkel</th><th>Gewone prijzen</th><th>Aanbiedingen</th></tr></thead><tbody id="freshrows"></tbody></table></div>
   </div>
@@ -1178,7 +1178,7 @@ function settingsHtml(){
 }
 /* eerste keer: kies je supermarkten (zoals 'Mijn supermarkten' in andere apps) */
 function onboardingHtml(){
-  return '<h2>Welkom bij Slim Boodschappen</h2><p class="muted">Bij welke supermarkten doe je boodschappen? De app laat alleen die winkels zien en vergelijkt alleen die. Je kunt dit altijd aanpassen bij Mijn winkels.</p>' +
+  return '<h2>Welkom bij Bespaar op je boodschap</h2><p class="muted">Bij welke supermarkten doe je boodschappen? De app laat alleen die winkels zien en vergelijkt alleen die. Je kunt dit altijd aanpassen bij Mijn winkels.</p>' +
     '<div class="fhead"><h3>Jouw supermarkten</h3><button type="button" class="linkbtn" data-act="storesall">' + allStoresLabel() + '</button></div><div class="onbgrid">' + storeOrder().map(i => '<button type="button" class="onbstore" data-act="onbstore" data-k="' + esc(STORES[i].k) + '" aria-pressed="' + !S.off.has(STORES[i].k) + '">' + esc(STORES[i].c) + '</button>').join('') + '</div>' +
     '<div class="setrow"><h3>Tekstgrootte</h3><div class="seg">' + [['normaal', 'Normaal', 's1'], ['groot', 'Groot', 's2'], ['extra', 'Extra groot', 's3']].map(([v, l, c]) =>
       '<button type="button" data-act="onbsize" data-v="' + v + '" aria-pressed="' + (PREFS.size === v) + '" class="' + c + '">' + l + '</button>').join('') + '</div></div>' +

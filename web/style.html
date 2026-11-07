@@ -1,4 +1,4 @@
-<title>Slim Boodschappen</title>
+<title>Bespaar op je boodschap</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
 /* Plus Jakarta Sans (latin, variabel 400-800), in de pagina zelf zodat bezoekers niets bij Google ophalen.
@@ -50,6 +50,8 @@ a{color:var(--cta)}
 .logo{display:flex;align-items:center;gap:9px;color:var(--brand-ink);text-decoration:none;font-weight:800;font-size:1.1rem;letter-spacing:-.02em;white-space:nowrap}
 .logo .mk{width:32px;height:32px;border-radius:9px;background:var(--brand-ink);color:var(--brand);display:grid;place-items:center}
 .logo .mk svg{width:19px;height:19px}
+@media (max-width:400px){.logo{font-size:.98rem;gap:7px;letter-spacing:-.03em}.logo .mk{width:28px;height:28px}}
+@media (max-width:350px){.logo{font-size:.86rem}}
 .search{position:relative;display:flex;min-width:0}
 .search input{width:100%;min-width:0;border:1px solid var(--line);min-height:46px;border-radius:10px;padding:11px 44px 11px 16px;background:var(--surface);color:var(--ink);font-size:.98rem}
 .search input::placeholder{color:var(--muted)}

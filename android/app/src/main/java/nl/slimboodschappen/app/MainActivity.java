@@ -43,7 +43,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Slim Boodschappen: de webapp in een WebView, plus het inlezen van een boodschappenbriefje
+ * Bespaar op je boodschap: de webapp in een WebView, plus het inlezen van een boodschappenbriefje
  * met de tekstherkenning van Google (ML Kit). Die draait op de telefoon zelf: gratis, zonder account.
  */
 public class MainActivity extends Activity {

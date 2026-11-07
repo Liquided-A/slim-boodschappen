@@ -144,7 +144,7 @@ jobs:
           "$SIGNER" verify --print-certs android/app/build/outputs/apk/release/app-release.apk | tee /tmp/cert.txt
           # openbare vingerafdruk van de sleutel uit november 2026 (geen geheim)
           grep -q "SHA-256 digest: 53c4b0f0978eef5e0ed273f67a4ab794dde1ee98753ad4414e7eec6ec0e2693a" /tmp/cert.txt || {
-            echo "::error::De app is niet met de sleutel van Slim Boodschappen ondertekend"; exit 1; }
+            echo "::error::De app is niet met de sleutel van de app ondertekend"; exit 1; }
 
       - name: Publiceren als download
         env:
@@ -152,6 +152,6 @@ jobs:
         run: |
           cp android/app/build/outputs/apk/release/app-release.apk SlimBoodschappen.apk
           NOTES="Versie 1.${{ github.run_number }} van $(date +%d-%m-%Y). Open deze pagina op je Android-telefoon en tik op SlimBoodschappen.apk om te installeren."
-          gh release view app >/dev/null 2>&1 || gh release create app --title "Slim Boodschappen voor Android" --notes "$NOTES"
+          gh release view app >/dev/null 2>&1 || gh release create app --title "Bespaar op je boodschap voor Android" --notes "$NOTES"
           gh release upload app SlimBoodschappen.apk --clobber
-          gh release edit app --notes "$NOTES"
+          gh release edit app --title "Bespaar op je boodschap voor Android" --notes "$NOTES"

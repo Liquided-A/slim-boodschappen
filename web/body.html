@@ -307,8 +307,33 @@ function reanalyze(){ S.an = {}; S.pins = {}; S.items.forEach(it => { S.an[it.id
 /* nieuw op het lijstje is nooit al afgevinkt, ook niet als hetzelfde product er eerder op stond */
 function pushItem(q, qty){ const it = {id:S.nextId++, q, qty}; S.done.delete(doneKey(it)); S.items.push(it); S.an[it.id] = analyzeItem(q); return it; }
 function findItem(q){ q = String(q).toLowerCase(); return S.items.find(it => it.q.toLowerCase() === q); }
-/* knoptekst: laat zien hoeveel er al op het lijstje staat */
-function addLabel(q){ const it = findItem(q); return it ? '✓ ' + (it.qty > 1 ? it.qty + ' × ' : '') + 'Op je lijstje' : '+ Op mijn lijstje'; }
+/* knop om op je lijstje te zetten; staat het er al op, dan op dezelfde plek: min, aantal (zelf in te typen) en plus */
+function addCtl(q, kind){
+  const it = findItem(q);
+  if (!it) return kind === 'detail' ? '<button type="button" class="btn primary" data-act="adddetail" data-q="' + esc(q) + '">+ Op mijn lijstje</button>'
+    : '<button type="button" class="addbtn" data-act="adddeal" data-q="' + esc(q) + '">+ Op mijn lijstje</button>';
+  return '<div class="addstep' + (kind === 'detail' ? ' big' : '') + '" data-addq="' + esc(q) + '" data-kind="' + kind + '">' +
+    '<button type="button" data-act="stepq" data-d="-1" data-q="' + esc(q) + '" aria-label="' + (it.qty > 1 ? 'Eén minder: ' : 'Van je lijstje halen: ') + esc(q) + '">−</button>' +
+    '<input type="number" class="stepin" inputmode="numeric" min="0" max="99" value="' + it.qty + '" data-q="' + esc(q) + '" aria-label="Aantal ' + esc(q) + ' op je lijstje">' +
+    '<button type="button" data-act="stepq" data-d="1" data-q="' + esc(q) + '" aria-label="Eén meer: ' + esc(q) + '"' + (it.qty >= 99 ? ' disabled' : '') + '>+</button></div>';
+}
+/* aantal op het lijstje zetten; 0 of minder haalt het product eraf */
+function setQty(q, n){
+  const x = findItem(q); if (!x) return;
+  n = Math.round(n);
+  if (!(n >= 1)){ S.items = S.items.filter(y => y !== x); S.done.delete(doneKey(x)); delete S.an[x.id]; toast('"' + x.q + '" van je lijstje gehaald'); }
+  else x.qty = Math.min(99, n);
+  S.k = null; save(); renderAll(); refreshCtls();
+}
+/* het productvenster wordt niet opnieuw opgebouwd: zet daar de knop bij */
+function refreshCtls(){
+  $('sheetroot').querySelectorAll('[data-addq], [data-act="adddetail"]').forEach(el => { el.outerHTML = addCtl(el.dataset.addq || el.dataset.q, el.dataset.kind || 'detail'); });
+}
+/* na opnieuw tekenen de focus terugzetten op dezelfde knop */
+function focusCtl(q, sel, inSheet){
+  const all = [...document.querySelectorAll('.addstep')].filter(el => el.dataset.addq === q && !!el.closest('#sheetroot') === inSheet);
+  const f = all[0] && all[0].querySelector(sel); if (f && !f.disabled) f.focus({preventScroll: true});
+}
 function hasItem(q){ return S.items.some(it => it.q.toLowerCase() === q.toLowerCase()); }
 
 /* ---------- aanbiedingen ---------- */
@@ -456,7 +481,7 @@ function detailHtml(s, i){
       '<div class="prow">' + (isDeal && st.po[j] ? '<span class="old">' + money(st.po[j]) + '</span>' : '') + '<span class="now">' + money(st.p[i]) + '</span></div>' +
       (isDeal && st.pl[j] ? '<span class="mech">' + esc(st.pl[j]) + '</span>' : '') +
       (d && d.until ? '<p class="small muted">Geldig t/m ' + esc(dayFmt.format(d.until)) + '</p>' : (!isDeal ? '<p class="small muted">Gewone prijs' + (regFresh(st) ? '' : ', ' + esc(regLabel(st))) + '</p>' : '')) + '</div></div>' +
-    '<div class="dbtns"><button type="button" class="btn primary" data-act="adddetail" data-q="' + esc(q) + '">' + addLabel(q) + '</button>' +
+    '<div class="dbtns">' + addCtl(q, 'detail') + '' +
       (url ? '<a class="btn ghost" href="' + esc(url) + '" target="_blank" rel="noopener">Bekijk bij ' + esc(st.c) + ' ↗</a>' : '') + '</div>' +
     (rows.length > 1 ? '<div class="setrow"><h3>' + esc(cmpLabel) + '</h3><div class="dcmp">' + rows.map(r => {
       const S2 = STORES[r.k], c = r.c;
@@ -537,7 +562,7 @@ function cardHtml(d){
     '<div class="prow">' + (d.usual ? '<span class="old">' + money(d.usual) + '</span>' : '') + '<span class="now">' + money(d.price) + '</span>' +
     (d.multi ? '<span class="per">per stuk</span>' : '') + '</div>' +
     (d.until && !d.upcoming ? '<span class="valid">Geldig t/m ' + esc(dayFmt.format(d.until)) + '</span>' : '') +
-    '<button type="button" class="addbtn" data-act="adddeal" data-q="' + esc(d.q) + '" aria-pressed="' + on + '">' + addLabel(d.q) + '</button>' +
+    addCtl(d.q, 'card') + '' +
     (url ? '<a class="shoplink" href="' + esc(url) + '" target="_blank" rel="noopener">Bekijk bij ' + esc(st.c) + ' ↗</a>' : '') + '</div></article>';
 }
 /* gewoon product: dezelfde kaart, zonder actie */
@@ -548,7 +573,7 @@ function regCardHtml(d){
     '<div class="cbody"><div class="cname" ' + open + ' title="' + esc(st.n[d.i]) + '">' + esc(d.name) + '</div>' +
     (d.size ? '<div class="csize">' + esc(d.size) + (unit ? ' · ' + unit : '') + '</div>' : '') +
     '<div class="prow"><span class="from">vanaf <b>' + money(d.price) + '</b> bij ' + esc(st.c) + '</span></div>' +
-    '<button type="button" class="addbtn" data-act="adddeal" data-q="' + esc(d.q) + '" aria-pressed="' + on + '">' + addLabel(d.q) + '</button></div></article>';
+    addCtl(d.q, 'card') + '</div></article>';
 }
 function renderShop(){
   if (!ENG) return;
@@ -1140,22 +1165,7 @@ function openSheet(html, label){
   $('sheetroot').innerHTML = '<div class="sheetbg" data-act="closesheet"><div class="sheet" role="dialog" aria-modal="true" aria-label="' + esc(label) + '"><span class="grab" aria-hidden="true"></span>' + html + '</div></div>';
   const f = $('sheetroot').querySelector('button, [tabindex], label'); f && f.focus();
 }
-/* venster: hoeveel wil je van dit product? */
-let QTY = null;
-function qtyHtml(){
-  const n = QTY.n, have = !!findItem(QTY.q);
-  return '<h2>Hoeveel wil je?</h2><p class="qtyname">' + esc(QTY.q) + '</p>' +
-    '<div class="qtybig"><button type="button" data-act="qtyd" data-d="-1" aria-label="Minder"' + (n <= 1 ? ' disabled' : '') + '>−</button>' +
-    '<output aria-live="polite">' + n + '</output>' +
-    '<button type="button" data-act="qtyd" data-d="1" aria-label="Meer"' + (n >= 99 ? ' disabled' : '') + '>+</button></div>' +
-    '<div class="qtyquick">' + [1, 2, 3, 4, 6, 10].map(k => '<button type="button" class="chip" data-act="qtyset" data-n="' + k + '" aria-pressed="' + (k === n) + '">' + k + '</button>').join('') + '</div>' +
-    '<button type="button" class="btn primary" data-act="qtyok" style="justify-content:center">' + (have ? 'Aantal opslaan' : 'Op mijn lijstje') + '</button>' +
-    (have ? '<button type="button" class="btn ghost" data-act="qtyrm" style="justify-content:center">Van mijn lijstje halen</button>' : '') +
-    '<button type="button" class="btn ghost" data-act="closesheet" style="justify-content:center">Annuleren</button>';
-}
-function openQty(q){ q = String(q).trim().replace(/\s+/g, ' '); if (!q) return; const it = findItem(q); QTY = {q, n: it ? it.qty : 1}; openSheet(qtyHtml(), 'Aantal kiezen'); }
-function showQty(focusSel){ openSheet(qtyHtml(), 'Aantal kiezen'); const f = focusSel && $('sheetroot').querySelector(focusSel); if (f && !f.disabled) f.focus(); }
-function closeSheet(){ QTY = null; $('sheetroot').innerHTML = ''; if (INCOMING){ INCOMING = null; dropListHash(); } }
+function closeSheet(){ $('sheetroot').innerHTML = ''; if (INCOMING){ INCOMING = null; dropListHash(); } }
 function settingsHtml(){
   const seg = (key, opts) => '<div class="seg">' + opts.map(([v, l, c]) => '<button type="button" data-act="pref" data-key="' + key + '" data-v="' + v + '" aria-pressed="' + (PREFS[key] === v) + '"' + (c ? ' class="' + c + '"' : '') + '>' + l + '</button>').join('') + '</div>';
   return '<h2>Instellingen</h2>' +
@@ -1181,6 +1191,8 @@ function toast(msg, label, fn){
   t.innerHTML = esc(msg) + (label ? ' <button type="button" class="toastbtn" data-act="toastdo">' + esc(label) + '</button>' : '');
   t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; toastFn = null; }, label ? 6000 : 3800);
 }
+/* tik op het aantal: alles selecteren, zodat je meteen een nieuw getal typt */
+document.addEventListener('focusin', e => { if (e.target.classList && e.target.classList.contains('stepin')) e.target.select(); });
 window.addEventListener('hashchange', e => {
   /* naar of van de boodschappenlijst: Mijn lijstje blijft op dezelfde plek staan */
   const trip = /#boodschappen$/.test(e.newURL || ''), wasTrip = /#boodschappen$/.test(e.oldURL || '');
@@ -1237,24 +1249,13 @@ document.addEventListener('click', e => {
     S.show = 36; renderShop(); return;
   }
   else if (act === 'clearfilters' || act === 'home'){ S.q = ''; $('q').value = ''; S.cat = 'all'; S.fstores.clear(); S.fdisc = 0; S.fmulti = S.fnow = S.fphoto = false; S.show = 36; renderShop(); if (act === 'home') window.scrollTo(0, 0); return; }
-  else if (act === 'adddeal' || act === 'adddetail'){ openQty(b.dataset.q); return; }
-  else if (act === 'qtyd' || act === 'qtyset'){
-    if (!QTY) return;
-    QTY.n = Math.max(1, Math.min(99, act === 'qtyd' ? QTY.n + (+b.dataset.d) : +b.dataset.n));
-    showQty(act === 'qtyd' ? '[data-act="qtyd"][data-d="' + b.dataset.d + '"]' : '[data-act="qtyset"][data-n="' + b.dataset.n + '"]'); return;
+  else if (act === 'adddeal' || act === 'adddetail'){
+    const q = b.dataset.q, inSheet = !!b.closest('#sheetroot');
+    addItem(q); refreshCtls(); focusCtl(q, '[data-d="1"]', inSheet); return;
   }
-  else if (act === 'qtyok'){
-    if (!QTY) return;
-    const {q, n} = QTY, x = findItem(q);
-    if (x) x.qty = n; else { S.demo = false; pushItem(q, n); remember(q); }
-    S.k = null; closeSheet(); save(); renderAll();
-    toast((n > 1 ? n + ' × ' : '') + '"' + q + '" ' + (x ? 'staat nu op je lijstje' : 'op je lijstje gezet')); return;
-  }
-  else if (act === 'qtyrm'){
-    if (!QTY) return;
-    const x = findItem(QTY.q); closeSheet();
-    if (x){ S.items = S.items.filter(y => y !== x); S.done.delete(doneKey(x)); delete S.an[x.id]; S.k = null; save(); renderAll(); toast('"' + x.q + '" van je lijstje gehaald'); }
-    return;
+  else if (act === 'stepq'){
+    const q = b.dataset.q, d = b.dataset.d, inSheet = !!b.closest('#sheetroot'), x = findItem(q); if (!x) return;
+    setQty(q, x.qty + (+d)); focusCtl(q, '[data-d="' + d + '"]', inSheet); return;
   }
   else if (act === 'meal'){ openSheet(mealHtml(b.dataset.id), 'Gerecht'); $('sheetroot').dataset.meal = b.dataset.id; return; }
   else if (act === 'persons'){ S.persons = Math.max(1, Math.min(12, S.persons + (+b.dataset.d))); save(); openSheet(mealHtml($('sheetroot').dataset.meal), 'Gerecht'); return; }
@@ -1349,6 +1350,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target, act = t.dataset && t.dataset.act;
+  if (t.classList && t.classList.contains('stepin')){ const x = findItem(t.dataset.q); if (!x) return; if (t.value.trim() === '') t.value = x.qty; else setQty(t.dataset.q, +t.value); return; }
   if (t.hasAttribute && t.hasAttribute('data-scanfile')){ const f = t.files && t.files[0]; closeSheet(); runScan(f); return; }
   if (act === 'scanon' && SCAN){ SCAN.rows[+t.dataset.k].on = t.checked; renderScan(); return; }
   if (act === 'pin'){ const id = +t.dataset.id; (S.pins[id] = S.pins[id] || {})[+t.dataset.s] = +t.value; renderList(); return; }
@@ -1436,6 +1438,7 @@ async function refreshRemote(){
 }
 window.slimBack = function(){ if ($('sheetroot').innerHTML){ closeSheet(); return true; } if (!$('view-trip').hidden){ closeTrip(); return true; } return false; };
 document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('stepin')){ e.preventDefault(); e.target.blur(); return; }
   if (e.key === 'Escape'){ if ($('sheetroot').innerHTML) closeSheet(); else if (!$('view-trip').hidden) closeTrip(); }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('pic')){ e.preventDefault(); e.target.click(); }
 });

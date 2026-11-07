@@ -41,7 +41,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="liquided-a.github.io" android:pathPrefix="/slim-boodschappen/app.html" />
             </intent-filter>
-            <!-- een screenshot of foto delen naar de app ("Delen" > Slim Boodschappen) -->
+            <!-- een screenshot of foto delen naar de app ("Delen" > Bespaar op je boodschap) -->
             <intent-filter android:label="@string/share_label">
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />

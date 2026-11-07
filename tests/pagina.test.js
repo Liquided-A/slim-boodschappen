@@ -141,7 +141,7 @@ test('boodschappenlijst: per winkel op afdeling, producten zonder prijs apart, l
 });
 test('boodschappenlijst: afgevinkt blijft op zijn plek; elke winkel heeft een teken', () => {
   assert.ok(!/doneLast/.test(body), 'geen herordening na afvinken');
-  assert.ok(/function renderTrip[\s\S]*?class="tlogo"/.test(body), 'winkelteken in het kopje');
+  assert.ok(/function renderTrip[\s\S]*?storeLogo\(/.test(body), 'logo of winkelteken in het kopje');
   const c = trip([], null);
   for (const [n, want] of [['AH', 'AH'], ['SPAR', 'SPAR'], ['ALDI', 'ALDI'], ['Jumbo', 'J'], ['DekaMarkt', 'DM'], ["Boon's Markt", 'BM'], ['Lidl', 'LIDL']])
     assert.strictEqual(c.storeMark(n), want, n);

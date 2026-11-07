@@ -173,6 +173,14 @@ function mmddToDate(mmdd, start){
 }
 /* herkenbaar winkelteken: korte namen voluit (AH, SPAR), anders de hoofdletters (DekaMarkt -> DM) of de eerste letter */
 function storeMark(c){ const n = String(c); if (n.replace(/[^A-Za-z]/g, '').length <= 4) return n.replace(/[^A-Za-z]/g, '').toUpperCase(); const caps = n.match(/[A-Z]/g) || []; return (caps.length > 1 ? caps.slice(0, 2).join('') : n[0]).toUpperCase(); }
+/* logo's van de winkels (web/logos, meegeleverd met website en app); zonder logo het winkelteken */
+const LOGOS = Object.assign(Object.create(null), {aldi:'aldi.png', amazing_oriental:'amazing_oriental.png', boni:'boni.png', boons_markt:'boons_markt.png', dekamarkt:'dekamarkt.svg', dirk:'dirk.png', hoogvliet:'hoogvliet.png', lidl:'lidl.svg', mcd:'mcd.png', nettorama:'nettorama.png', plus:'plus.ico', poiesz:'poiesz.png', spar:'spar.png', vomar:'vomar.png'});
+function storeLogo(k, mark){
+  const f = LOGOS[k];
+  return f ? '<span class="tlogo has" aria-hidden="true"><img class="slogo" src="logos/' + f + '" alt="" data-m="' + esc(mark) + '"></span>' : '<span class="tlogo" aria-hidden="true">' + esc(mark) + '</span>';
+}
+/* logo niet te laden: val terug op het winkelteken */
+document.addEventListener('error', e => { const t = e.target; if (t && t.classList && t.classList.contains('slogo')){ const q = t.parentNode; q.classList.remove('has'); q.textContent = t.dataset.m || ''; } }, true);
 function initials(c){ return c.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase(); }
 function regFresh(s){ return s.f && (NOW - new Date(s.f + 'T12:00:00')) / 864e5 <= STALE_DAYS; }
 function promoActive(s, j){
@@ -715,7 +723,7 @@ function renderTrip(){
       const cell = L.m[i][b.pos];
       return '<li class="tline' + (dn ? ' done' : '') + '" data-act="tick" data-id="' + it.id + '">' + tick(it, dn) + '<span class="tn">' + bonName(it, cell.c) + (cell.c.usual ? ' <span class="tag sale">actie</span>' : '') + '</span><span class="tp">' + (estimated(cell) ? '~' : '') + money(cell.price) + '</span></li>';
     }).join('');
-    return '<section class="tgroup' + (gd === g.rows.length ? ' alldone' : '') + '"><header><span class="tlogo" aria-hidden="true">' + esc(g.unk ? '?' : storeMark(g.name)) + '</span><h2>' + esc(g.name) + '</h2><span class="tc">' + (gd ? gd + ' van ' + g.rows.length : nProd(g.rows.length)) + '</span>' +
+    return '<section class="tgroup' + (gd === g.rows.length ? ' alldone' : '') + '"><header>' + storeLogo(g.unk ? '' : g.b.st.k, g.unk ? '?' : storeMark(g.name)) + '<h2>' + esc(g.name) + '</h2><span class="tc">' + (gd ? gd + ' van ' + g.rows.length : nProd(g.rows.length)) + '</span>' +
       (b ? '<span class="tsub">' + money(sub) + '</span>' : '') + '</header><ul>' + rows + '</ul></section>';
   }).join('');
   el.innerHTML = '<div class="tripbar"><div class="tripinner"><button type="button" class="tripback" data-act="closetrip" aria-label="Terug naar mijn lijstje"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>' +

@@ -92,6 +92,7 @@ jobs:
           mkdir -p _site/img
           cp data/data.b64 _site/
           cp data/img/s*.jpg _site/img/
+          mkdir -p _site/logos && cp web/logos/* _site/logos/
           cp site/* _site/
           python3 -I web/assemble.py --wrap web/style.html web/body.html web/engine.js data/data.b64 _site/app.html
           touch _site/.nojekyll

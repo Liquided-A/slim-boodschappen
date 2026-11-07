@@ -120,6 +120,7 @@
   <button type="button" class="bscan" data-act="scanmenu" id="bn-scan" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Briefje</button>
   <a href="#lijstje" id="bn-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h11M9 12h11M9 19h11"/><path d="m3 5 1.2 1.2L6.5 4M3 12l1.2 1.2 2.3-2.2M3 19l1.2 1.2 2.3-2.2"/></svg>Mijn lijstje<span class="bcnt" id="bncnt" hidden>0</span></a>
 </nav>
+<section class="trip" id="view-trip" aria-labelledby="h-trip" hidden></section>
 <div id="sheetroot"></div>
 <div class="toast" id="toast" role="status" hidden></div>
 
@@ -667,11 +668,67 @@ function renderCart(){
   $('bncnt').textContent = S.items.length; $('bncnt').hidden = !S.items.length;
   $('carttotal').textContent = LAST && LAST.cur ? money(LAST.cur.total) : S.items.length ? '–' : money(0);
 }
+/* per winkel van de gekozen combinatie de regels op volgorde van de afdelingen; bonnen en boodschappenlijst gebruiken dezelfde volgorde */
+function bonRows(L){
+  const by = {};
+  L.cur.assign.forEach(([i, s]) => { (by[s] = by[s] || []).push(i); });
+  return L.cur.combo.map(s => {
+    const pos = L.sel.indexOf(s), st = STORES[s], ak = i => afdOf(S.items[i], st, L.m[i][pos].c.i);
+    return {s, pos, st, ak, rows: (by[s] || []).sort((x, y) => ak(x) - ak(y) || S.items[x].q.localeCompare(S.items[y].q, 'nl'))};
+  });
+}
+/* afgevinkt zakt naar onderen; verder blijft de volgorde van de bon staan */
+function doneLast(rows, isDone){ return rows.filter(i => !isDone(i)).concat(rows.filter(isDone)); }
+/* wat je waar haalt, met de producten zonder prijs als laatste groep; leeg lijstje geeft niets */
+function tripGroups(L){
+  if (!S.items.length || !L) return [];
+  const g = L.cur ? bonRows(L).filter(b => b.rows.length).map(b => ({name: b.st.c, rows: b.rows, b})) : [];
+  const unk = L.cur ? unpriced(L) : S.items.map((it, i) => i);
+  if (unk.length) g.push({name: 'Prijs onbekend', rows: unk, unk: true});
+  return g;
+}
+/* productnaam zoals op de bon: aantal pakken, naam en formaat als dat niet al in de naam staat */
+function bonName(it, c){
+  const n = packsFor(it.qty, c.r);
+  return (n > 1 ? n + ' × ' : '') + esc(c.name) + (c.q && !norm(c.name).includes(' ' + String(fmtQty(c.u, c.q)).split(' ')[0].replace(',', ' ')) ? ' <span class="muted">(' + esc(fmtQty(c.u, c.q)) + ')</span>' : '');
+}
+const nProd = n => n + ' product' + (n === 1 ? '' : 'en');
+/* korte opsomming onder het overzicht, met de knop naar de boodschappenlijst */
+function tripSumHtml(G){
+  if (!G.length) return '';
+  return '<section class="tripsum" aria-labelledby="h-tripsum"><h2 id="h-tripsum">Per winkel te halen</h2><ul>' + G.map(g => '<li><b>' + esc(g.name) + '</b> · ' + nProd(g.rows.length) + ': <span class="muted">' + esc(g.rows.map(i => S.items[i].q).join(', ')) + '</span></li>').join('') +
+    '</ul><a class="btn primary tripbtn" href="#boodschappen">' + ICON_LIST + 'Open mijn boodschappenlijst</a></section>';
+}
+/* schermvullende boodschappenlijst om in de winkel af te vinken; dezelfde vinkjes als op de bonnen */
+function renderTrip(){
+  const el = $('view-trip'); if (el.hidden) return;
+  const L = LAST, G = tripGroups(L), isDone = i => S.done.has(doneKey(S.items[i]));
+  const n = S.items.length, nd = S.items.filter(it => S.done.has(doneKey(it))).length;
+  const tick = (it, dn) => '<button type="button" class="tick" data-act="tick" data-id="' + it.id + '" role="checkbox" aria-checked="' + dn + '" aria-label="' + esc(it.q) + ' in mijn mandje"></button>';
+  const groups = G.map(g => {
+    const gd = g.rows.filter(isDone).length, b = g.b;
+    const sub = b ? g.rows.reduce((t, i) => t + L.m[i][b.pos].price, 0) : 0;
+    const rows = doneLast(g.rows, isDone).map(i => {
+      const it = S.items[i], dn = isDone(i);
+      if (!b) return '<li class="tline' + (dn ? ' done' : '') + '" data-act="tick" data-id="' + it.id + '">' + tick(it, dn) + '<span class="tn">' + (it.qty > 1 ? it.qty + ' × ' : '') + esc(it.q) + '</span></li>';
+      const cell = L.m[i][b.pos];
+      return '<li class="tline' + (dn ? ' done' : '') + '" data-act="tick" data-id="' + it.id + '">' + tick(it, dn) + '<span class="tn">' + bonName(it, cell.c) + (cell.c.usual ? ' <span class="tag sale">actie</span>' : '') + '</span><span class="tp">' + (estimated(cell) ? '~' : '') + money(cell.price) + '</span></li>';
+    }).join('');
+    return '<section class="tgroup' + (gd === g.rows.length ? ' alldone' : '') + '"><header><h2>' + esc(g.name) + '</h2><span class="tc">' + (gd ? gd + ' van ' + g.rows.length : nProd(g.rows.length)) + '</span>' +
+      (b ? '<span class="tsub">' + money(sub) + '</span>' : '') + '</header><ul>' + rows + '</ul></section>';
+  }).join('');
+  el.innerHTML = '<div class="tripbar"><div class="tripinner"><button type="button" class="tripback" data-act="closetrip" aria-label="Terug naar mijn lijstje"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>' +
+    '<div><h1 id="h-trip">Boodschappenlijst</h1><p role="status">' + (n ? nd + ' van ' + n + ' in je mandje' : 'Je lijstje is leeg') + '</p></div></div>' +
+    (n ? '<div class="tripprog" aria-hidden="true"><span style="width:' + Math.round(100 * nd / n) + '%"></span></div>' : '') + '</div>' +
+    '<div class="tripinner tripbody">' + (n ? groups : '<p class="muted">Zet eerst producten op je lijstje.</p><button type="button" class="btn primary" data-act="closetrip">Naar mijn lijstje</button>') + '</div>' +
+    (n ? '<div class="tripfoot"><div class="tripinner"><button type="button" class="btn ghost" data-act="share">' + ICON_SHARE + 'Lijstje delen</button>' +
+      (nd ? '<button type="button" class="btn primary" data-act="finish">Klaar: afgevinkte weghalen</button>' : '') + '</div></div>' : '');
+}
 function renderBasket(){
   const L = LAST, sumEl = $('summary'), bonsEl = $('bons');
   if (L.empty || L.none){
     sumEl.innerHTML = '<div class="sumcard"><h2>Overzicht</h2>' + (S.items.length ? '' : '<div class="total">' + money(0) + '</div>') + '<p class="muted">' +
-      (!S.items.length ? 'Voeg producten toe om te vergelijken.' : !L.sel.length ? 'Zet minstens één winkel aan.' : 'Van deze producten is de prijs bij je winkels onbekend. Ze blijven gewoon op je lijstje.') + '</p></div>';
+      (!S.items.length ? 'Voeg producten toe om te vergelijken.' : !L.sel.length ? 'Zet minstens één winkel aan.' : 'Van deze producten is de prijs bij je winkels onbekend. Ze blijven gewoon op je lijstje.') + '</p></div>' + tripSumHtml(tripGroups(L));
     bonsEl.innerHTML = ''; return;
   }
   const {m, pl, adv, ci, cur, whole, baseIdx, sel} = L, base = pl.result[baseIdx];
@@ -698,15 +755,12 @@ function renderBasket(){
     '</div><div class="sright"><div role="radiogroup" aria-label="Aantal winkels" class="kopts">' + opts + '</div>' +
     (S.saved && S.saved.c > 0 ? '<div class="savedbox">🎉 Dit jaar bespaard met aanbiedingen: <b>' + money(S.saved.c) + '</b></div>' : '') +
     '<p class="hint">' + (adv < 0 ? 'Ook met ' + pl.result.length + ' winkels is niet alles te krijgen, daarom is er geen advies.' :
-      'Het advies stopt waar een extra winkel minder dan ' + money(Math.round(parseFloat(PREFS.gain || '2') * 100)) + ' oplevert. Dit stel je in bij Instellingen.' + (baseIdx > 0 ? ' Geen enkele winkel heeft alles, daarom begint het advies bij ' + (baseIdx + 1) + ' winkels.' : '')) + '</p></div></div>';
+      'Het advies stopt waar een extra winkel minder dan ' + money(Math.round(parseFloat(PREFS.gain || '2') * 100)) + ' oplevert. Dit stel je in bij Instellingen.' + (baseIdx > 0 ? ' Geen enkele winkel heeft alles, daarom begint het advies bij ' + (baseIdx + 1) + ' winkels.' : '')) + '</p></div></div>' + tripSumHtml(tripGroups(L));
 
-  const by = {};
-  cur.assign.forEach(([i, s]) => { (by[s] = by[s] || []).push(i); });
-  const bons = cur.combo.map(s => {
-    const pos = sel.indexOf(s), st = STORES[s];
-    /* op volgorde van de afdelingen, zodat je in één keer door de winkel loopt */
-    const afdOfRow = i => afdOf(S.items[i], st, m[i][pos].c.i);
-    (by[s] || []).sort((x, y) => afdOfRow(x) - afdOfRow(y) || S.items[x].q.localeCompare(S.items[y].q, 'nl'));
+  /* op volgorde van de afdelingen, zodat je in één keer door de winkel loopt */
+  const BR = bonRows(L), by = {};
+  BR.forEach(b => { by[b.s] = b.rows; });
+  const bons = BR.map(({s, pos, st, ak: afdOfRow}) => {
     let lastAfd = -1;
     const rows = (by[s] || []).map(i => {
       const ak = afdOfRow(i), head = ak !== lastAfd && (by[s] || []).length > 2 ? '<div class="afd">' + (AFD[ak] ? AFD[ak][1] + ' ' + esc(AFD[ak][0]) : 'Overig') + '</div>' : '';
@@ -721,8 +775,7 @@ function renderBasket(){
       const tip = bvU ?'<span class="note">💡 Voordeliger per ' + esc(perUnit(bv).per) + ': ' + esc(bv.name) + (bv.q ? ' (' + esc(fmtQty(bv.u, bv.q)) + ')' : '') + ' voor ' + money(bv.price) + ', ' + bvU + '. Kies het via "Ander product".</span>' : '';
       const deal = c.usual ? '<span class="tag sale">' + esc(c.label || ('−' + Math.round(100 * (1 - c.price / c.usual)) + '%')) + '</span>' + (mmddToDate(c.until) ? '<span class="small muted">t/m ' + esc(dayFmt.format(mmddToDate(c.until))) + '</span>' : '') : '';
       const dn = S.done.has(doneKey(it));
-      return head + '<div class="line' + (dn ? ' done' : '') + '"><button type="button" class="tick" data-act="tick" data-id="' + it.id + '" role="checkbox" aria-checked="' + dn + '" aria-label="' + esc(it.q) + ' in mijn mandje"></button><span class="thumb">' + imgHtml(imgRef(st, c.i), '') + '</span><div><div class="row"><span class="pn">' + (packsFor(it.qty, c.r) > 1 ? packsFor(it.qty, c.r) + ' × ' : '') + esc(c.name) +
-        (c.q && !norm(c.name).includes(' ' + String(fmtQty(c.u, c.q)).split(' ')[0].replace(',', ' ')) ? ' <span class="muted">(' + esc(fmtQty(c.u, c.q)) + ')</span>' : '') + '</span><span class="pp">' + (estimated(cell) ? '~' : '') + money(cell.price) + '</span></div>' +
+      return head + '<div class="line' + (dn ? ' done' : '') + '"><button type="button" class="tick" data-act="tick" data-id="' + it.id + '" role="checkbox" aria-checked="' + dn + '" aria-label="' + esc(it.q) + ' in mijn mandje"></button><span class="thumb">' + imgHtml(imgRef(st, c.i), '') + '</span><div><div class="row"><span class="pn">' + bonName(it, c) + '</span><span class="pp">' + (estimated(cell) ? '~' : '') + money(cell.price) + '</span></div>' +
         '<div class="meta">' + deal + oldTag(st, c) + (unitText(c) ? '<span class="small muted">' + unitText(c) + '</span>' : '') + '</div>' + (nt ? '<span class="note">' + esc(nt) + '</span>' : '') + warnx + tip +
         '<div class="meta"><details class="swap"><summary>Ander product</summary><select data-act="pin" data-id="' + it.id + '" data-s="' + s + '" aria-label="Kies product voor ' + esc(it.q) + '">' + opts + '</select></details>' +
         (url ? '<a class="shoplink" href="' + esc(url) + '" target="_blank" rel="noopener">Bekijk ↗</a>' : '') + '</div></div></div>';
@@ -760,7 +813,7 @@ function renderBasket(){
     '<section class="panel"><header><h2>Alle prijzen naast elkaar</h2><span class="small muted">groen = goedkoopst · ~ = omgerekend of geschat · grijs = telt niet mee · • = aanbieding</span></header>' +
     '<div class="tablewrap"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div></section></div>';
 }
-function renderList(){ compute(); renderItems(); renderStores(); renderBasket(); renderCart(); renderMeals(); }
+function renderList(){ compute(); renderItems(); renderStores(); renderBasket(); renderCart(); renderMeals(); renderTrip(); }
 function renderAll(){ renderList(); renderShop(); renderFolders(); }
 
 /* ---------- folders ---------- */
@@ -815,6 +868,7 @@ let SCANMODE = null, nativeToken = 0;
 const ICON_CAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
 const ICON_SHARE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></svg>';
 const ICON_MIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+const ICON_LIST = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h11M9 12h11M9 19h11"/><path d="m3 5 1.2 1.2L6.5 4M3 12l1.2 1.2 2.3-2.2M3 19l1.2 1.2 2.3-2.2"/></svg>';
 const ICON_PIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>';
 function enableScan(mode){
   SCANMODE = mode; $('scan').hidden = false; $('bn-scan').hidden = false; $('herolink').hidden = false;
@@ -1041,8 +1095,14 @@ async function checkAppUpdate(){
 }
 
 /* ---------- weergave wisselen ---------- */
+/* de boodschappenlijst ligt over Mijn lijstje heen; via de app geopend gaat sluiten terug in de geschiedenis */
+let TRIP_IN = false;
+function closeTrip(){ if (TRIP_IN){ TRIP_IN = false; history.back(); } else { history.replaceState(null, '', '#lijstje'); route(); } }
 function route(){
-  const v = location.hash === '#lijstje' ? 'list' : location.hash === '#folders' ? 'folders' : 'shop';
+  const trip = location.hash === '#boodschappen';
+  $('view-trip').hidden = !trip; document.documentElement.classList.toggle('tripopen', trip); if (!trip) TRIP_IN = false;
+  if (trip && ENG) renderTrip();
+  const v = location.hash === '#lijstje' || trip ? 'list' : location.hash === '#folders' ? 'folders' : 'shop';
   if (/^#lijst=/.test(location.hash) && ENG){ const l = readListHash(location.hash); history.replaceState(null, '', '#lijstje'); if (l) offerImport(l); return route(); }
   $('view-shop').hidden = v !== 'shop'; $('view-list').hidden = v !== 'list'; $('view-folders').hidden = v !== 'folders';
   document.querySelector('.catbar').hidden = v !== 'shop';
@@ -1094,7 +1154,13 @@ function toast(msg, label, fn){
   t.innerHTML = esc(msg) + (label ? ' <button type="button" class="toastbtn" data-act="toastdo">' + esc(label) + '</button>' : '');
   t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; toastFn = null; }, label ? 6000 : 3800);
 }
-window.addEventListener('hashchange', () => { route(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', e => {
+  /* naar of van de boodschappenlijst: Mijn lijstje blijft op dezelfde plek staan */
+  const trip = /#boodschappen$/.test(e.newURL || ''), wasTrip = /#boodschappen$/.test(e.oldURL || '');
+  if (trip) TRIP_IN = true;
+  route(); if (trip) $('view-trip').scrollTop = 0; else if (!wasTrip) window.scrollTo(0, 0);
+  if (trip){ const f = $('view-trip').querySelector('.tripback'); f && f.focus({preventScroll: true}); }
+});
 
 /* ---------- acties ---------- */
 function addItem(q){
@@ -1194,6 +1260,7 @@ document.addEventListener('click', e => {
     toast(n + ' product' + (n === 1 ? '' : 'en') + ' afgestreept.' + (saved > 0 ? ' Je bespaarde ' + money(saved) + ' met aanbiedingen; dit jaar al ' + money(S.saved.c) + '.' : ''));
   }
   else if (act === 'share'){ shareList(); return; }
+  else if (act === 'closetrip'){ closeTrip(); return; }
   else if (act === 'reload'){ location.reload(); return; }
   else if (act === 'tplsave'){
     openSheet('<h2>Lijstje bewaren</h2><p class="muted">Geef dit lijstje een naam. Je zet het later in één tik weer op je lijstje.</p><form data-tplform><input id="tplname" class="tplin" type="text" maxlength="30" placeholder="Bijvoorbeeld: Weekboodschappen" autocomplete="off" aria-label="Naam van het lijstje"><button type="submit" class="btn primary" style="justify-content:center;min-height:52px;margin-top:10px;width:100%">Bewaren</button></form>', 'Lijstje bewaren');
@@ -1238,6 +1305,8 @@ document.addEventListener('click', e => {
   else if (act === 'addq'){ addItem(S.q); location.hash = 'lijstje'; return; }
   else return;
   save(); renderList();
+  /* na het opnieuw tekenen de focus terug op hetzelfde rondje, voor wie met toetsenbord of schermlezer werkt */
+  if (act === 'tick' && !$('view-trip').hidden){ const t = $('view-trip').querySelector('.tick[data-id="' + id + '"]'); t && t.focus({preventScroll: true}); }
 });
 document.addEventListener('change', e => {
   const t = e.target, act = t.dataset && t.dataset.act;
@@ -1326,9 +1395,9 @@ async function refreshRemote(){
     toast('Nieuwe prijzen geladen van ' + dayFmt.format(PFETCH));
   }catch(e){}
 }
-window.slimBack = function(){ if ($('sheetroot').innerHTML){ closeSheet(); return true; } return false; };
+window.slimBack = function(){ if ($('sheetroot').innerHTML){ closeSheet(); return true; } if (!$('view-trip').hidden){ closeTrip(); return true; } return false; };
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && $('sheetroot').innerHTML) closeSheet();
+  if (e.key === 'Escape'){ if ($('sheetroot').innerHTML) closeSheet(); else if (!$('view-trip').hidden) closeTrip(); }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('pic')){ e.preventDefault(); e.target.click(); }
 });
 (async function start(){

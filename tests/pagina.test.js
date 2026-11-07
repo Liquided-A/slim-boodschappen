@@ -119,3 +119,33 @@ test('bon, totaal, winkelkeuze en per supermarkt laten de schatting zien; groen 
   assert.ok(body.includes("(estIn(t.store) ? ', ' + estText(estIn(t.store)) : '')"), 'per supermarkt');
   assert.ok(body.includes('row.filter(priced).map(x => x.price)'), 'groen');
 });
+
+/* ---------- boodschappenlijst: volgorde per winkel en afgevinkt naar onderen ---------- */
+function trip(items, L){
+  const c = {S: {items, done: new Set()}, STORES: [{c: 'Jumbo'}, {c: 'Lidl'}],
+    afdOf: (it, st, i) => i};   /* afdeling volgt hier het productnummer */
+  vm.createContext(c);
+  vm.runInContext(['unpriced', 'bonRows', 'doneLast', 'tripGroups'].map(grab).join('\n') + '\nObject.assign(globalThis, {bonRows, doneLast, tripGroups});', c);
+  c.L = L; return c;
+}
+const cell = i => ({price: 100, c: {i}});
+test('boodschappenlijst: per winkel op afdeling, producten zonder prijs apart, leeg lijstje geeft niets', () => {
+  const items = [{q: 'melk'}, {q: 'brood'}, {q: 'appels'}, {q: 'saffraan'}];
+  /* winkel 1 (Lidl) en 0 (Jumbo); saffraan heeft geen prijs */
+  const L = {sel: [0, 1], m: [[cell(5), null], [null, cell(2)], [cell(1), null], [null, null]], cur: {combo: [1, 0], assign: [[0, 0], [1, 1], [2, 0]]}};
+  const c = trip(items, L), G = JSON.parse(JSON.stringify(c.tripGroups(L)));
+  assert.deepStrictEqual(G.map(g => [g.name, g.rows]), [['Lidl', [1]], ['Jumbo', [2, 0]], ['Prijs onbekend', [3]]]);
+  /* zonder prijzen staat alles onder prijs onbekend; leeg lijstje: geen opsomming */
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.tripGroups({sel: [0], none: true}).map(g => [g.name, g.rows]))), [['Prijs onbekend', [0, 1, 2, 3]]]);
+  assert.strictEqual(trip([], {empty: true}).tripGroups({empty: true}).length, 0);
+});
+test('boodschappenlijst: afgevinkt zakt naar onderen, volgorde blijft verder gelijk', () => {
+  const c = trip([], null), done = new Set([4, 1]);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.doneLast([4, 2, 1, 3], i => done.has(i)))), [2, 3, 4, 1]);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.doneLast([], () => true))), []);
+});
+test('boodschappenlijst gebruikt dezelfde vinkjes als de bonnen en sluit met de terugknop', () => {
+  assert.ok(/function renderTrip[\s\S]*?data-act="tick"/.test(body), 'zelfde tick-actie');
+  assert.ok(/window\.slimBack = function\(\)\{[^\n]*closeTrip\(\)/.test(body), 'terugknop sluit de lijst');
+  assert.ok(!/<[^>]+\son[a-z]+=/i.test(body.replace(/<script[\s\S]*$/, '')), 'geen inline handlers');
+});

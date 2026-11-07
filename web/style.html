@@ -438,5 +438,47 @@ tr:last-child td{border-bottom:0}
 .scanicon{width:34px;height:34px;border-radius:10px}.scanicon svg{width:19px;height:19px}
 .scanintro h2{font-size:.98rem;margin:0}
 .scanbtns .btn{padding:8px 14px;font-size:.92rem}
+/* opsomming per winkel onder het overzicht */
+.tripsum{margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow)}
+.tripsum h2{font-size:1rem}
+.tripsum ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:.92rem;overflow-wrap:anywhere}
+.tripbtn{align-self:flex-start;justify-content:center;min-height:48px;font-size:1rem}
+.tripbtn svg{width:20px;height:20px}
+@media (max-width:720px){.tripbtn{align-self:stretch}}
+
+/* boodschappenlijst: schermvullend, om in de winkel af te vinken */
+.tripopen body{overflow:hidden}
+.trip{position:fixed;inset:0;z-index:35;background:var(--bg);color:var(--ink);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;display:flex;flex-direction:column}
+.tripinner{width:100%;max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.tripbar{position:sticky;top:0;z-index:2;background:var(--brand);color:var(--brand-ink);padding-top:env(safe-area-inset-top,0px)}
+.tripbar .tripinner{display:flex;align-items:center;gap:10px;padding-block:10px}
+.tripbar h1{font-size:1.25rem;margin:0}
+.tripbar p{margin:0;font-weight:600;opacity:.9}
+.tripback{display:grid;place-items:center;width:48px;height:48px;flex:none;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:var(--brand-2);color:var(--brand-ink);padding:0}
+.tripback svg{width:24px;height:24px}
+.tripprog{height:4px;background:rgba(255,255,255,.18)}
+.tripprog span{display:block;height:100%;background:var(--cta);transition:width .2s}
+.tripbody{flex:1;display:flex;flex-direction:column;gap:14px;padding-block:16px 24px}
+.tgroup{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px 14px 6px}
+.tgroup>header{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:12px 0 10px;border-bottom:2px solid var(--ink)}
+.tgroup>header h2{font-size:1.15rem;margin:0}
+.tgroup .tc{color:var(--muted);font-size:.9rem}
+.tgroup .tsub{margin-left:auto;font-weight:800;font-size:1.05rem}
+.tgroup.alldone>header{border-bottom-color:var(--cta)}
+.tgroup.alldone>header h2::after{content:" ✓";color:var(--cta)}
+.tgroup ul{list-style:none;margin:0;padding:0}
+.tline{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;min-height:60px;padding:8px 0;border-top:1px solid var(--line);cursor:pointer;font-size:1.02rem}
+.tgroup li:first-child{border-top:0}
+.tline .tick{width:44px;height:44px}
+.tline .tick[aria-checked="true"]::after{width:14px;height:8px}
+.tline .tn{overflow-wrap:anywhere;font-weight:600}
+.tline .tp{font-weight:800;white-space:nowrap}
+.tline.done .tn,.tline.done .tp{text-decoration:line-through;color:var(--muted)}
+.tline.done .tag{opacity:.6}
+.tripfoot{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tripfoot .tripinner{display:flex;gap:8px;flex-wrap:wrap;padding-block:10px}
+.tripfoot .btn{flex:1 1 160px;justify-content:center;min-height:50px}
+.tripfoot svg{width:18px;height:18px}
+.tripopen .toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 </style>
 

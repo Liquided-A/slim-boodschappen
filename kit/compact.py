@@ -66,11 +66,12 @@ FRESH = json.load(open(freshf))      # winkel -> datum waarop de gewone prijzen 
 
 UNITS = {'kg':('g',1000),'kilo':('g',1000),'kilogram':('g',1000),'g':('g',1),'gr':('g',1),'gram':('g',1),
          'l':('m',1000),'lt':('m',1000),'liter':('m',1000),'ltr':('m',1000),'ml':('m',1),'milliliter':('m',1),'cl':('m',10),'dl':('m',100),
-         'stuks':('s',1),'stuk':('s',1),'st':('s',1)}
+         'stuks':('s',1),'stuk':('s',1),'st':('s',1),'rol':('s',1),'rollen':('s',1),'centiliter':('m',10)}
 KIND = {'g':1,'m':2,'s':3}
 num = r'(\d+(?:[.,]\d+)?)'
 def parse_one(txt):
     t = txt.lower().replace('per ','').strip()
+    if t == 'stuk': return KIND['s'], 1            # 'Per stuk' (Dirk, DekaMarkt)
     m = re.search(r'(\d+)\s*[x×]\s*'+num+r'\s*([a-z]+)\b', t)
     mult = 1
     if m and m.group(3) in UNITS:
@@ -84,7 +85,7 @@ def parse_one(txt):
 def parse(size, name):
     r = parse_one(size) if size else None
     if r is None:
-        m = re.search(num+r'\s*(kg|g|gr|gram|ml|cl|l|liter|st|stuks)\b\s*$', name.lower())   # "Scharreleieren 6st"
+        m = re.search(num+r'\s*(kg|g|gr|gram|ml|cl|l|liter|st|stuks|rol|rollen)\b\s*$', name.lower())   # "Scharreleieren 6st"
         if m: r = parse_one(m.group(0))
     return r or (0, 0)
 

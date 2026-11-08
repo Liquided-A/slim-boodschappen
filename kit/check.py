@@ -31,6 +31,7 @@ if old is not None:
 for s in new['stores']:
     if not re.fullmatch(r'[a-z_]{2,20}', str(s['k'])): errors.append(f"vreemde winkelsleutel: {str(s['k'])[:30]!r}")
     if s['b'] and not s['b'].startswith('https://'): errors.append(f"{s['k']}: basisadres is geen https")
+    if s['b'] and not s['b'].endswith('/'): errors.append(f"{s['k']}: basisadres eindigt niet op /")
     if any(not isinstance(p, int) or not 1 <= p <= MAX_CENTS for p in s['p']): errors.append(f"{s['k']}: prijs buiten bereik")
     if any(v and not re.fullmatch(r'(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])', str(v)) for v in s['pf'] + s['pv']): errors.append(f"{s['k']}: ongeldige datum")
     if s['r'] and not re.fullmatch(r'\d{4}-\d{2}-\d{2}', str(s['f'])): errors.append(f"{s['k']}: ongeldige versheidsdatum")

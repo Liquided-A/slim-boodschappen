@@ -11,6 +11,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm'), zlib = req
 const [dataFile, srcDir, outDir, siteArg] = process.argv.slice(2);
 if (!dataFile || !srcDir || !outDir) { console.error('gebruik: node kit/seo_build.js data.b64 site uitmap [adres]'); process.exit(2); }
 const SITE = (siteArg || process.env.SITE_URL || 'https://liquided-a.github.io/slim-boodschappen/').replace(/\/?$/, '/');
+if (!/^https:\/\/[a-z0-9.-]+(\/[A-Za-z0-9._~\/-]*)?$/.test(SITE)) throw new Error('ongeldig site-adres: ' + SITE);
 const ROOT = path.join(__dirname, '..');
 
 /* ---------- data en rekenmodule, precies zoals de app ze gebruikt ---------- */
@@ -31,7 +32,7 @@ const C = ctx;
 const eng = new C.Engine(data.stores);
 eng.setMask(C.keep);
 
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const esc = s => String(s).replace(/[&<>"'{}]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '{': '&#123;', '}': '&#125;'}[c]));
 const euro = cents => '€ ' + (cents / 100).toFixed(2).replace('.', ',');
 const dayFmt = new Intl.DateTimeFormat('nl-NL', {day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Amsterdam'});
 const DATUM = dayFmt.format(NOW);
@@ -223,9 +224,10 @@ for (const f of fs.readdirSync(srcDir)){
     for (const [k, v] of Object.entries(PARTS)) h = h.split(k).join(v);
     /* in het menu de huidige pagina aanwijzen */
     h = h.replace('<a href="' + f + '">', '<a href="' + f + '" aria-current="page">');
-    h = h.replace(/<!--GEN:(\w+)-->/g, (all, k) => gen[k] ? gen[k]() : all);
+    /* eerst het sjabloon invullen en controleren, pas daarna de prijsdata invoegen: een productnaam met {{...}} mag de build niet stoppen */
     h = h.split('{{SITE}}').join(SITE).split('{{DATUM}}').join(esc(DATUM)).split('{{JAAR}}').join(String(NOW.getFullYear()));
     if (/\{\{[A-Z]+\}\}/.test(h)) throw new Error(f + ': onbekende {{...}} over');
+    h = h.replace(/<!--GEN:(\w+)-->/g, (all, k) => gen[k] ? gen[k]() : all);
     fs.writeFileSync(path.join(outDir, f), h);
     if (!/<meta name="robots" content="noindex/.test(h)) pages.push(f);
   } else if (f !== 'sitemap.xml' && f !== 'robots.txt') fs.copyFileSync(src, path.join(outDir, f));

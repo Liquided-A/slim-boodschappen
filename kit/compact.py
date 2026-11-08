@@ -118,6 +118,7 @@ for r in promos['rows']:
 for s in cjb:
     if not s['d']: continue
     st = store(s['n']); st['b'] = safe(s['u'], LINK_HOSTS); seen = set()
+    if st['b'] and not st['b'].endswith('/'): st['b'] = ''   # anders kan basis + link naar een andere host wijzen
     for p in s['d']:
         if p['p'] is None or p['p'] < 0.10: continue
         key = (p['n'].strip().lower(), round(p['p'],2), p.get('s',''))

@@ -36,3 +36,19 @@ test('website bouwen: alles ingevuld, één h1, unieke titels, sitemap zonder 40
   assert.ok(/Niet vergeleken|het goedkoopst|te weinig actuele/.test(g));
   fs.rmSync(out, {recursive: true, force: true});
 });
+
+test('een winkel- of productnaam met {{...}} of HTML stopt de build niet en wordt veilig getoond', () => {
+  const zlib = require('zlib');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'seo-'));
+  const d = JSON.parse(zlib.gunzipSync(Buffer.from(fs.readFileSync(path.join(ROOT, 'data', 'data.b64'), 'utf8'), 'base64')));
+  const s = d.stores.find(st => st.r > 0 && st.n && st.n.length);
+  s.c = s.c + ' {{BOOM}} <img src=x>';
+  const b64 = path.join(dir, 'data.b64');
+  fs.writeFileSync(b64, zlib.gzipSync(Buffer.from(JSON.stringify(d))).toString('base64'));
+  const out = path.join(dir, 'uit'); fs.mkdirSync(out);
+  execFileSync(process.execPath, [path.join(ROOT, 'kit', 'seo_build.js'), b64, path.join(ROOT, 'site'), out, 'https://voorbeeld.nl/'], {stdio: 'pipe'});
+  const all = fs.readdirSync(out).filter(f => f.endsWith('.html')).map(f => fs.readFileSync(path.join(out, f), 'utf8')).join('');
+  assert.ok(!all.includes('<img src=x>'), 'HTML uit de data wordt geëscaped');
+  assert.ok(!all.includes('{{BOOM}}'), 'accolades uit de data worden gecodeerd');
+  fs.rmSync(dir, {recursive: true, force: true});
+});

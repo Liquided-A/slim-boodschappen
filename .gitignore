@@ -14,3 +14,7 @@ android/sleutel/
 SECURITY_AUDIT.md
 PRIVACY_AUDIT.md
 OPENSTAANDE_PUNTEN.md
+# geheimen nooit in de repo
+.env*
+*.pem
+*.key

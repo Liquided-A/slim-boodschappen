@@ -26,6 +26,8 @@ jobs:
         winkel: [dirk, dekamarkt, hoogvliet]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false   # het schrijftoken alleen in de stap die bewaart, niet tijdens het verwerken van externe data
 
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
@@ -35,7 +37,10 @@ jobs:
         run: python3 -I kit/fetch_store.py ${{ matrix.winkel }} data/${{ matrix.winkel }}.json --max-minutes 300
 
       - name: Bewaren
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git config user.name "slim-boodschappen-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/${{ matrix.winkel }}.json

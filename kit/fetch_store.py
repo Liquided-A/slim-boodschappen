@@ -80,6 +80,14 @@ LIMIT, MAXMIN, DELAY = opt('--limit', 0), opt('--max-minutes', 300.0), opt('--de
 
 class Blocked(Exception): pass
 
+class HttpsOnly(urllib.request.HTTPRedirectHandler):
+    """alleen doorsturen naar een https-adres; nooit naar http of een ander soort adres"""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not newurl.startswith('https://'): return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+OPENER = urllib.request.build_opener(HttpsOnly)
+MAXBYTES = 30_000_000   # grootste toegestane pagina of productlijst
+
 def get(url):
     """pagina ophalen; None bij 404; Blocked bij 403; wacht en probeert opnieuw bij 429/503 of een netwerkfout"""
     global DELAY
@@ -87,15 +95,15 @@ def get(url):
     for attempt in range(4):
         try:
             req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept-Language': 'nl-NL'})
-            with urllib.request.urlopen(req, timeout=30) as r:
-                return r.read().decode('utf-8', 'replace')
+            with OPENER.open(req, timeout=30) as r:
+                return r.read(MAXBYTES).decode('utf-8', 'replace')
         except urllib.error.HTTPError as e:
             if e.code in (404, 410): return None
             if e.code == 403: raise Blocked(url)
             if e.code in (429, 503):
                 DELAY = min(DELAY * 2, 10)
                 ra = str(e.headers.get('Retry-After') or '')
-                time.sleep(max(int(ra) if ra.isdigit() else 0, 60 * (attempt + 1))); continue
+                time.sleep(min(max(int(ra) if ra.isdigit() else 0, 60 * (attempt + 1)), 300)); continue   # nooit langer dan 5 minuten
             time.sleep(5 * (attempt + 1))
         except (urllib.error.URLError, TimeoutError, ConnectionError, OSError):
             time.sleep(10 * (attempt + 1))
@@ -112,10 +120,12 @@ def main():
 
     xml = get(CFG['sitemap'])
     if not xml: sys.exit('productlijst (sitemap) niet te lezen')
-    ids = []
+    ids, seen = [], set()
     for u in re.findall(r'<loc>\s*([^<\s]+)\s*</loc>', xml):
         m = re.match(CFG['keep'], u)
-        if m and m.group(1) not in ids: ids.append(m.group(1))
+        if m and m.group(1) not in seen:
+            seen.add(m.group(1)); ids.append(m.group(1))
+            if len(ids) >= 100_000: break   # bovengrens: een productlijst is nooit zo lang
     allowed = [i for i in ids if rp.can_fetch(UA, CFG['url'].format(i))]
     print(f'{KEY}: {len(ids)} producten in de sitemap, {len(allowed)} toegestaan door robots.txt', file=sys.stderr)
     if not allowed: sys.exit('robots.txt staat het ophalen niet toe; gestopt')
@@ -130,7 +140,7 @@ def main():
 
     new, fails, streak = {}, 0, 0
     for k, i in enumerate(allowed):
-        if (time.time() - started) / 60 > MAXMIN:
+        if (time.time() - started) / 60 > MAXMIN:   # ook na lang wachten op de winkel
             print(f'tijdslimiet bereikt na {k} pagina\'s', file=sys.stderr); break
         try: html = get(CFG['url'].format(i))
         except Blocked:

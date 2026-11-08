@@ -5,7 +5,7 @@ on:
     - cron: '20 5 * * *'      # elke ochtend rond 06:20 (winter) / 07:20 (zomer), na de nachtelijke update van PrijsProfeet
   push:
     branches: [main]
-    paths: ['web/**', 'site/**', '.github/workflows/dagelijks.yml']
+    paths: ['web/**', 'site/**', 'kit/**', '.github/workflows/dagelijks.yml']
   workflow_dispatch:
 
 permissions:

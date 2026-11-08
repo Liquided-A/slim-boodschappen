@@ -17,7 +17,7 @@ for pair in pairs:
     except (OSError, ValueError) as e:
         print(f'{k}: eigen prijzen niet te lezen ({e}); Checkjebon blijft', file=sys.stderr); continue
     rows = [{'n': p['n'], 'l': p['l'], 'p': p['p'], 's': p.get('s', '')} for p in own.get('d', [])
-            if isinstance(p, dict) and p.get('t', '') >= cut and isinstance(p.get('p'), (int, float)) and p.get('n')]
+            if isinstance(p, dict) and isinstance(p.get('t'), str) and p['t'] >= cut and isinstance(p.get('p'), (int, float)) and p.get('n')]
     if len(rows) < 1000:
         print(f'{k}: maar {len(rows)} recente eigen prijzen; Checkjebon blijft', file=sys.stderr); continue
     st = next((s for s in cjb if s.get('n') == k), None)
@@ -26,7 +26,7 @@ for pair in pairs:
     before = len(st.get('d') or [])
     st['d'] = rows
     if isinstance(own.get('base'), str) and own['base'].startswith('https://'): st['u'] = own['base']   # links naar de eigen productpagina
-    newest = max(p['t'] for p in own['d'] if p.get('t', '') >= cut)
+    newest = max(p['t'] for p in own['d'] if isinstance(p, dict) and isinstance(p.get('t'), str) and p['t'] >= cut)
     fresh[k] = newest
     print(f'{k}: {len(rows)} eigen prijzen (was {before} uit Checkjebon), bijgewerkt {newest}', file=sys.stderr)
 

@@ -16,6 +16,7 @@ def snap(h):
         return None
 
 cur = snap(lines[0][0])
+if not cur: sys.exit('nieuwste Checkjebon-versie is onleesbaar; uit voorzorg gestopt')
 same = {k: lines[0][1] for k in cur}
 done = set()
 for h, d in lines[1::2]:                 # elke tweede versie is precies genoeg

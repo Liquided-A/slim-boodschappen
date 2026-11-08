@@ -35,6 +35,14 @@ for s in new['stores']:
     if any(not isinstance(p, int) or not 1 <= p <= MAX_CENTS for p in s['p']): errors.append(f"{s['k']}: prijs buiten bereik")
     if any(v and not re.fullmatch(r'(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])', str(v)) for v in s['pf'] + s['pv']): errors.append(f"{s['k']}: ongeldige datum")
     if s['r'] and not re.fullmatch(r'\d{4}-\d{2}-\d{2}', str(s['f'])): errors.append(f"{s['k']}: ongeldige versheidsdatum")
+# geen reden om te stoppen, wel om te melden: een winkel verliest veel gewone prijzen of valt terug op oudere data
+if old is not None:
+    ob = {s['k']: s for s in old['stores']}
+    for s in new['stores']:
+        o = ob.get(s['k'])
+        if not o: continue
+        if o['r'] >= 1000 and s['r'] < o['r'] * 0.5: print(f"::warning::{s['k']}: {s['r']} gewone prijzen, gisteren {o['r']}")
+        if o.get('f') and s.get('f') and str(s['f']) < str(o['f']): print(f"::warning::{s['k']}: gewone prijzen terug van {o['f']} naar {s['f']}")
 for e in errors: print('::error::' + e)
 if errors: sys.exit(1)
 print(f'prijsdata in orde: {total} acties van {sum(1 for v in pn.values() if v)} winkels')

@@ -89,7 +89,7 @@
           <details class="storebox" id="storebox">
             <summary><span>Mijn winkels <span class="muted small" id="storecount"></span></span></summary>
             <div class="storelist" id="stores"></div>
-            <div class="optrow"><span class="small">Ook oudere gewone prijzen gebruiken<br><span class="muted">Zo vind je het hele assortiment. Bij AH, PLUS, Dirk en een paar andere winkels zijn de gewone prijzen soms maanden oud en dus een schatting; aanbiedingen zijn altijd actueel.</span></span>
+            <div class="optrow"><span class="small">Ook oudere gewone prijzen gebruiken<br><span class="muted">Zo vind je het hele assortiment. Van sommige winkels zijn de gewone prijzen al lang niet bijgewerkt (zie de tabel onderaan) en dus een schatting; aanbiedingen zijn altijd actueel.</span></span>
               <button type="button" class="switch" role="switch" id="oldreg" data-act="oldreg" aria-checked="false" aria-label="Ook oude gewone prijzen gebruiken"></button></div>
           </details>
         </section>
@@ -133,6 +133,8 @@
 const KEY = 'slim-boodschappen-v4';
 let NOW = new Date();
 const STALE_DAYS = 92;
+/* telt deze winkel alleen met aanbiedingen mee? */
+const onlyPromos = st => !st.r || (!S.oldReg && !regFresh(st));
 const DEFAULT_ON = new Set(['ah','jumbo','lidl','plus','aldi','dirk','coop','spar','poiesz','dekamarkt','hoogvliet','vomar','nettorama']);
 const CATLABEL = {'zuivel-eieren':'Zuivel & eieren','groente-fruit':'Groente & fruit','vlees':'Vlees','vis':'Vis','vega':'Vega','kaas':'Kaas',
   'brood-bakkerij':'Brood','ontbijt':'Ontbijt','pasta-rijst-wereldkeuken':'Pasta & rijst','soepen-conserven-sauzen':'Soep & sauzen','maaltijden':'Maaltijden',
@@ -584,7 +586,7 @@ function renderShop(){
   $('shopsub').textContent = mineDeals.length.toLocaleString('nl-NL') + ' folderacties van je ' + nMine + (nMine === 1 ? ' winkel' : ' winkels') + ', bijgewerkt op ' + dayFmt.format(PFETCH) + '.';
   $('h-shop').textContent = S.cat !== 'all' ? (CATLABEL[S.cat] || S.cat) : S.q ? 'Producten' : 'Aanbiedingen';
   const filtered = S.cat !== 'all' || S.fstores.size || S.fdisc || S.fmulti || S.fnow || S.fphoto;
-  const none = !enabledStores().length ? 'Je hebt geen winkels aangezet. Kies er minstens één bij Mijn winkels.' : filtered ? 'Niets gevonden met deze filters.' : '';
+  const none = !enabledStores().length ? 'Je hebt geen winkels aangezet. Kies er minstens één bij Mijn winkels.' : filtered ? 'Niets gevonden met deze filters.' : S.q ? 'Niets gevonden voor "' + esc(S.q) + '".' : '';
   $('grid').innerHTML = shown.length ? shown.map(d => d.reg ? regCardHtml(d) : cardHtml(d)).join('') :
     none ? '<div class="emptybox" style="grid-column:1/-1"><span class="muted">' + none + '</span>' + (filtered ? '<button type="button" class="linkbtn" data-act="clearfilters">Filters wissen</button>' : '') + '</div>' : '';
   $('more').hidden = list.length <= S.show;
@@ -833,7 +835,7 @@ function renderBasket(){
   const estIn = s => m.filter(row => estimated(row[sel.indexOf(s)])).length;
   const totals = sortStoreTotals(storeTotals(m, sel)), withPrice = totals.filter(t => t.count), noPrice = totals.filter(t => !t.count);
   const perStore = '<section class="panel" aria-labelledby="h-perstore"><header><h2 id="h-perstore">Per supermarkt</h2></header><ul class="perstore">' + withPrice.map(t =>
-    '<li' + (t.complete ? '' : ' class="part"') + '><span class="pn">' + esc(STORES[t.store].c) + '</span><span class="pa">' + money(t.total) + '</span><span class="pc">' + t.count + ' van ' + t.items + ' producten' + (estIn(t.store) ? ', ' + estText(estIn(t.store)) : '') + (t.complete ? '' : ', bedrag onvolledig') + (t.suspect ? ', ' + t.suspect + ' product' + (t.suspect === 1 ? '' : 'en') + ' mogelijk verkeerd' : '') + '</span></li>').join('') + '</ul>' +
+    '<li' + (t.complete ? '' : ' class="part"') + '><span class="pn">' + esc(STORES[t.store].c) + '</span><span class="pa">' + money(t.total) + '</span><span class="pc">' + t.count + ' van ' + t.items + ' producten' + (estIn(t.store) ? ', ' + estText(estIn(t.store)) : '') + (t.complete ? '' : ', bedrag onvolledig') + (onlyPromos(STORES[t.store]) ? ' (alleen aanbiedingen: geen actuele gewone prijzen)' : '') + (t.suspect ? ', ' + t.suspect + ' product' + (t.suspect === 1 ? '' : 'en') + ' mogelijk verkeerd' : '') + '</span></li>').join('') + '</ul>' +
     (withPrice.some(t => !t.complete) ? '<p class="hint">Een onvolledig bedrag lijkt lager omdat er producten ontbreken. Vergelijk alleen winkels met evenveel producten.</p>' : '') +
     (noPrice.length ? '<p class="hint">Geen prijzen bij: ' + esc(noPrice.map(t => STORES[t.store].c).join(', ')) + '.</p>' : '') + '</section>';
   const head = '<tr><th>Product</th>' + sel.map(s => '<th class="' + (cur.combo.includes(s) ? 'on' : '') + '">' + esc(STORES[s].c) + '</th>').join('') + '</tr>';

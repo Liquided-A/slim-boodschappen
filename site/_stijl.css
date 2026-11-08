@@ -22,7 +22,7 @@ a{color:var(--cta)}
 .cta{display:flex;align-items:center;justify-content:center;background:var(--cta);color:var(--cta-ink);text-decoration:none;font-weight:800;border-radius:14px;padding:14px 18px;min-height:52px;margin-top:6px}
 .steps{counter-reset:s;list-style:none;padding:0}
 .steps li{counter-increment:s;position:relative;padding-left:44px;margin-bottom:12px}
-.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:32px;height:32px;border-radius:50%;background:var(--soft);color:var(--brand);font-weight:800;display:grid;place-items:center}
+.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:32px;height:32px;border-radius:50%;background:var(--soft);color:var(--ink);font-weight:800;display:grid;place-items:center}
 .tablewrap{overflow-x:auto;margin:0 0 12px;-webkit-overflow-scrolling:touch}
 table{border-collapse:collapse;width:100%;font-size:.95rem;overflow-wrap:normal}
 table.items{min-width:540px}

@@ -18,3 +18,4 @@ OPENSTAANDE_PUNTEN.md
 .env*
 *.pem
 *.key
+__pycache__/

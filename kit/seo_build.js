@@ -44,7 +44,7 @@ const BASKET = [
   ['halfvolle melk 1 l', /halfvolle melk|melk halfvol/, /lactosevrij|choco|karne|drink|koffie|poeder|bio/],
   ['volkoren brood', /volkoren/, /beschuit|cracker|knäck|wrap|toast|bol|stokbrood|pistolet|mix|meel|crouton|broodje|kaiser|bolletje|half/],
   ['scharreleieren 10 stuks', /scharrel/, /gekookt|gepeld|salade|bio|vrije uitloop|kwartel/],
-  ['roomboter 250 g', /roomboter/, /stroopwafel|koek|cake|croissant|deeg|kruiden|knoflook|wafel|bonbon|cookie|spritz|sprits|amand|specpop|puntje|taart/],
+  ['roomboter 250 g', /roomboter/, /stroopwa|koek|cake|croissant|deeg|kruiden|knoflook|wafel|bonbon|cookie|spritz|sprits|amand|specpop|puntje|taart/],
   ['jong belegen kaas 48+ 500 g', /jong belegen/, /geraspt|blokjes|plakken|smeer|light|[23]0\+|35\+|biologisch|bio |geit|schaap|komijn|kruiden|pesto|truffel|mosterd|brandnetel|peper|knoflook/],
   ['elstar appels 1 kg', /elstar/, /sap|moes|taart|chips|gedroogd|bio/],
   ['aardappelen 2 kg', /aardappel/, /friet|patat|kriel|puree|chips|schijf|partjes|rosti|kroket|gekookt|zoete|krieltjes|wedges|gratin|salade|bio/],
@@ -55,10 +55,10 @@ const BASKET = [
   ['kristalsuiker 1 kg', /kristalsuiker/, /riet|bruin|klont|stick|poeder/],
   ['komkommer', /komkommer/, /mini|salade|plakjes|snack|zuur|augurk|water|bio/],
   ['uien 1 kg', /\buien\b/, /rode|lente|sjalot|zilver|gebakken|gesnipperd|soep|ringen|poeder|bio|zoete|gedroogd|gefrituurd/],
-  ['kipfilet 500 g', /kipfilet/, /reepjes|blokjes|gekruid|gemarineerd|beleg|plakjes|gerookt|shoarma|saté|sate|schnitzel|gegrild|gebraden|cordon|nugget|burger|bio|haas|mini|wortel|erwt|\bmet\b|maaltijd|americano|kebab|tandoori/],
+  ['kipfilet 500 g', /kipfilet/, /reepjes|blokjes|gekruid|gemarineerd|beleg|plakjes|gerookt|shoarma|saté|sate|schnitzel|gegrild|gebraden|cordon|nugget|burger|bio|haas|mini|wortel|erwt|\bmet\b|maaltijd|americano|kebab|tandoori|roast|gaar/],
   ['rundergehakt 500 g', /rundergehakt/, /bal|burger|kruiden|bio|tartaar|lasagne|ballen/],
   ['halfvolle yoghurt 1 l', /yoghurt/, /vanille|aardbei|fruit|griekse|turkse|drink|perzik|kers|framboos|honing|banaan|mango|magere|\bvolle|bio|kwark|skyr|toetje/],
-  ['hagelslag melk 400 g', /hagelslag/, /puur|wit|vlokken|fruit|mix|anijs|smaak|vanille|beer/],
+  ['hagelslag melk 400 g', /hagelslag/, /puur|wit|vlokken|fruit|mix|anijs|smaak|vanille|beer|jammie/],
   ['afwasmiddel 500 ml', /afwasmiddel/, /machine|vaatwas|tabs|capsule|navul|borstel/],
   ['zonnebloemolie 1 l', /zonnebloemolie/, /spray|bio/],
 ];
@@ -98,10 +98,21 @@ function basketCalc(){
       return best;
     });
   });
-  /* veel duurder dan elders voor dezelfde hoeveelheid: vrijwel altijd een ander product; dan telt die regel nergens mee */
+  /* Veel duurder of goedkoper dan elders voor dezelfde hoeveelheid: vrijwel altijd een ander product of een verkeerd gelezen
+     verpakking. Met drie of meer winkels valt alleen die ene prijs af (meer dan 2x van de middelste prijs); met twee winkels
+     is niet te zeggen welke van de twee afwijkt, dan telt de hele regel niet mee. */
   m.forEach((row, i) => {
-    const ps = row.filter(Boolean).map(x => x.price);
-    if (ps.length > 1 && Math.max(...ps) > 3 * Math.min(...ps)){ if (process.env.SEO_DEBUG) console.error("uitschieter", items[i].q, row.map(x => x ? x.c.name + " " + x.price : "-").join(" | ")); m[i] = row.map(() => null); }
+    const ps = row.filter(Boolean).map(x => x.price).sort((a, b) => a - b);
+    if (ps.length >= 3){
+      const mid = ps.length % 2 ? ps[(ps.length - 1) / 2] : (ps[ps.length / 2 - 1] + ps[ps.length / 2]) / 2;
+      m[i] = row.map(x => {
+        if (x && (x.price > 2 * mid || x.price * 2 < mid)){ if (process.env.SEO_DEBUG) console.error('uitschieter', items[i].q, x.c.name, x.price, 'midden', mid); return null; }
+        return x;
+      });
+    } else if (ps.length === 2 && ps[1] > 3 * ps[0]){
+      if (process.env.SEO_DEBUG) console.error('uitschieter', items[i].q, row.map(x => x ? x.c.name + ' ' + x.price : '-').join(' | '));
+      m[i] = row.map(() => null);
+    }
   });
   const totals = C.sortStoreTotals(C.storeTotals(m, fresh));
   if (process.env.SEO_DEBUG) totals.forEach(t => console.error('mandje', data.stores[t.store].c, t.count + '/' + m.length, 'mist:', t.missing.map(i => items[i].q).join(', ')));

@@ -2,7 +2,7 @@
 mislukt lijkt; dan blijft de website de prijzen van gisteren tonen en stuurt GitHub een mail over de mislukte run.
 Gebruik: python3 -I check.py nieuw.b64 oud.b64
 """
-import base64, gzip, json, re, sys
+import base64, datetime, gzip, json, re, sys
 
 MIN_PROMOS = 2000                         # normaal zijn het er rond de 12.000
 MAX_CENTS = 1000000                       # de duurste echte producten kosten rond de 2.800 euro (AH, Lidl)
@@ -42,7 +42,9 @@ if old is not None:
         o = ob.get(s['k'])
         if not o: continue
         if o['r'] >= 1000 and s['r'] < o['r'] * 0.5: print(f"::warning::{s['k']}: {s['r']} gewone prijzen, gisteren {o['r']}")
-        if o.get('f') and s.get('f') and str(s['f']) < str(o['f']): print(f"::warning::{s['k']}: gewone prijzen terug van {o['f']} naar {s['f']}")
+        try: back = (datetime.date.fromisoformat(str(o['f'])) - datetime.date.fromisoformat(str(s['f']))).days if o.get('f') and s.get('f') else 0
+        except ValueError: back = 0
+        if back > 7: print(f"::warning::{s['k']}: gewone prijzen terug van {o['f']} naar {s['f']}")   # een dag schommelen is normaal
 for e in errors: print('::error::' + e)
 if errors: sys.exit(1)
 print(f'prijsdata in orde: {total} acties van {sum(1 for v in pn.values() if v)} winkels')

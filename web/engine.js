@@ -32,7 +32,13 @@ const GENERIC = dict({
 /* woorden uit de gangbare producten hierboven: dat zijn soorten producten, geen merken */
 let PRODUCTWORDS = null;   /* pas bij het eerste gebruik: stemNL heeft lijsten nodig die verderop staan */
 const isProductWord = s => (PRODUCTWORDS || (PRODUCTWORDS = new Set(Object.values(GENERIC).flatMap(v => v.split(' ')).filter(w => w.length > 3).map(w => stemNL(w))))).has(s);
-const genericFor = q => GENERIC[String(q).toLowerCase().trim().replace(/\s+/g, ' ')];
+/* ook met een hoeveelheid erachter: "kip 500 g" zoekt eerst kipfilet 500 g, "melk 1 l" eerst halfvolle melk 1 l */
+const genericFor = q => {
+  const s = String(q).toLowerCase().trim().replace(/\s+/g, ' ');
+  if (GENERIC[s]) return GENERIC[s];
+  const m = s.match(/^(.+?) (\d+(?:[.,]\d+)? ?(?:kilogram|kilo|kg|gram|gr|g|liter|lt|ml|cl|dl|l|stuks|stuk|st))$/);
+  return m && GENERIC[m[1]] ? GENERIC[m[1]] + ' ' + m[2] : undefined;
+};
 
 function norm(s){
   return ' ' + String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
@@ -194,7 +200,7 @@ class Engine {
       /* De best passende namen eerst; bij een opgegeven hoeveelheid dingen ook net iets minder passende namen mee
          als hun verpakking klopt: scharreleieren 12 st gaat voor scharreleieren zonder formaat, een pak van 800 g
          kipfilet voor 3 pakjes van 200 g */
-      const inBand = c => c.score <= min + 0.5 || (kind && !inferred && !c.other && c.score <= min + 1 && (c.mode === 'exact' || c.mode === 'scaled'));
+      const inBand = c => c.score <= min + 0.5 || (kind && !inferred && !c.other && c.score <= min + 1 && c.mode === 'exact');   /* alleen precies de goede verpakking: omrekenen haalt goedkope verkeerde producten binnen */
       const band = all.filter(inBand).sort((a,b) => GR[a.mode]-GR[b.mode] || a.eff-b.eff || a.name.length-b.name.length);
       const rest = all.filter(c => !inBand(c)).sort((a,b) => a.score-b.score || a.eff-b.eff);
       const cands = band.concat(rest).slice(0, limit || 15);
@@ -312,10 +318,11 @@ function wordForms(w){
   if (!m || weak || /([^aeiou])\1en$/.test(w)) out.add(st);
   out.add(st + 'en'); out.add(st + st.slice(-1) + 'en');
   if (weak || /[aeiou]$/.test(st)) out.add(st + 's');
+  for (const k in IRREGULAR) if (IRREGULAR[k] === st) out.add(k);   /* ei -> eieren, eitjes */
   return [...out].filter(f => stemNL(f) === st);
 }
 /* woorden die zeggen dat het iets anders is dan het losse product: bananensap, appeltaart, drink met banaan */
-const OTHERTYPE = ['drink','drank','sap','nectar','smoothie','limonade','siroop','stroop','yoghurt','kwark','skyr','vla','pudding','toetje','dessert','ijs','roomijs','cake','koek','koekje','wafel','taart','gebak','reep','snoep','chips','chocolade','jam','moes','saus','soep','thee','ijsthee','shampoo','zeep','crème','creme','douche','mix','poeder','knijpfruit','fruit','hapje','ontbijtje','maaltijd','boost','split','aioli','hoemoes','boter','brood','pasta','gnocchi','chutney','azijn','bier','cider','wijn','likeur','geur','schijfjes','wrap','pizza','popcorn','dip','salade','hummus','jus','biscuit','middel','afwas','mnd','maanden','baby','kroket','tablet','dubbelfrisss','olvarit','ella','bonbebe','tuc','mcvitie','sandwich','soup','ravioli','tortellini','soes','soesjes','stamppot','bolognese','spritsen','burger','quiche','wraps','ketchup','haribo','macaroni','lasagne','penne','nasi','bami','ovenschotel','risotto','curry','nuggets','tapenade','pesto','sardines','sardientjes','tonijn','makreel','ansjovis','zuurkool','ijskoffie','radlerwijn','bananenbrood','suikerbrood','krentenbrood','worstenbroodje','worstenbroodjes','roomkaas','smeerkaas','gezeefde','gepelde','frito','reiniger','vaatwas','spread','rings','gehaktbal','gehaktballen','maaza','taksi','snack','chevre','mineraalwater','radler','pepermunt','mosterd','gourmet','kattenvoer','hondenvoer','snijworst','drop','crystal','milk','milkshake','taartje','taartjes','carree','carrees','stroopwafel','stroopwafels','kletsmajoor','kletsmajoors','romeo','specpop','olijven','bakbanaan','bakbananen','krakeling','krakelingen','chocomel','fristi'];
+const OTHERTYPE = ['drink','drank','sap','nectar','smoothie','limonade','siroop','stroop','yoghurt','kwark','skyr','vla','pudding','toetje','dessert','ijs','roomijs','cake','koek','koekje','wafel','taart','gebak','reep','snoep','chips','chocolade','jam','moes','saus','soep','thee','ijsthee','shampoo','zeep','crème','creme','douche','mix','poeder','knijpfruit','fruit','hapje','ontbijtje','maaltijd','boost','split','aioli','hoemoes','boter','brood','pasta','gnocchi','chutney','azijn','bier','cider','wijn','likeur','geur','schijfjes','wrap','pizza','popcorn','dip','salade','hummus','jus','biscuit','middel','afwas','mnd','maanden','baby','kroket','tablet','dubbelfrisss','olvarit','ella','bonbebe','tuc','mcvitie','sandwich','soup','ravioli','tortellini','soes','soesjes','stamppot','bolognese','spritsen','burger','quiche','wraps','ketchup','haribo','macaroni','lasagne','penne','nasi','bami','ovenschotel','risotto','curry','nuggets','tapenade','pesto','sardines','sardientjes','tonijn','makreel','ansjovis','zuurkool','ijskoffie','radlerwijn','bananenbrood','suikerbrood','krentenbrood','worstenbroodje','worstenbroodjes','roomkaas','smeerkaas','gezeefde','gepelde','frito','reiniger','vaatwas','spread','rings','gehaktbal','gehaktballen','maaza','taksi','snack','chevre','mineraalwater','radler','pepermunt','mosterd','gourmet','kattenvoer','hondenvoer','snijworst','drop','crystal','milk','milkshake','taartje','taartjes','carree','carrees','stroopwafel','stroopwafels','kletsmajoor','kletsmajoors','romeo','specpop','olijven','bakbanaan','bakbananen','krakeling','krakelingen','chocomel','fristi','gezeefd','gratin','loempia','croissant','tijgernootjes','sauce','tonic','pate','mousse','kauwstrips'];
 const OTHERSTEM = OTHERTYPE.map(o => [o, stemNL(o)]);
 const OTHERWORD = new Map(), OTHERWHOLE = new Set(OTHERTYPE);
 /* staat dit woord (of het einde ervan) in OTHERTYPE? Eén keer per woord uitgerekend */
@@ -343,11 +350,12 @@ const EXACTONLY = new Set(['ui','ei']);
 /* kipfilet is gewoon kip */
 const GOODPOST = ['filet','filets','dij','dijen','dijfilet','bout','bouten','poot','poten','vleugels','gehakt','reepjes','haas'];
 /* kort zoekwoord w aan het begin van een woord in naam n, alleen als de rest van dat woord in GOODPOST staat */
+const SHORTREST = ['eren', 'logisch', 'logische'];   /* ei -> eieren, bio -> biologisch */
 function shortStart(n, w){
   let k = n.indexOf(' ' + w);
   while (k >= 0){
     const rest = n.slice(k + 1 + w.length, n.indexOf(' ', k + 1));
-    if (GOODPOST.includes(rest)) return true;
+    if (GOODPOST.includes(rest) || SHORTREST.includes(rest)) return true;
     k = n.indexOf(' ' + w, k + 1);
   }
   return false;

@@ -52,7 +52,8 @@ const BASKET = [
   ['spaghetti 500 g', /spaghetti/, /saus|maaltijd|volkoren|glutenvrij|bolognese|pesto|verse|vers |bio|maanden|olvarit|tomaat|\bham\b|\bmet\b/],
   ['rijst 1 kg', /rijst/, /zilvervlies|wafel|pap|maaltijd|bruin|risotto|sushi|noedel|melk|dessert|cracker|basmati|pandan|jasmijn|wild|kook in|zak|bio|\bmet\b|\bkip\b|nasi|bami/],
   ['pindakaas 350 g', /pindakaas/, /reep|koek|saus|chocola|cup|light|honing|kokos|biologisch|bio /],
-  ['filterkoffie 500 g', /filter/, /pads|cups|bonen|oplos|capsule|decaf|cafeïnevrij|cafeinevrij|zakjes|papier/],
+  /* zoeken op 'filter': dan doet ook snelfiltermaling mee; getoond als filterkoffie */
+  ['filter 500 g', /filterkoffie|filter.*koffie|filtermaling|snelfilter/, /pads|cups|bonen|oplos|capsule|decaf|cafeïnevrij|cafeinevrij|zakjes|papier|koffiefilter/, 'filterkoffie 500 g'],
   ['kristalsuiker 1 kg', /kristalsuiker/, /riet|bruin|klont|stick|poeder/],
   ['komkommer', /komkommer/, /mini|salade|plakjes|snack|zuur|augurk|water|bio/],
   ['uien 1 kg', /\buien\b/, /rode|lente|sjalot|zilver|gebakken|gesnipperd|soep|ringen|poeder|bio|zoete|gedroogd|gefrituurd/],
@@ -66,7 +67,12 @@ const BASKET = [
 
 const BASKET_DAYS = 14;
 /* winkels waarvan we de gewone prijzen zelf ophalen (eigen-prijzen.yml); de rest komt uit Checkjebon */
-const OWN = new Set(['dirk', 'dekamarkt', 'hoogvliet']);
+/* zelf opgehaald: er staat een data/<winkel>.json van de laatste 14 dagen (own_prices.py gebruikt die dan) */
+const OWN = new Set(data.stores.map(st => st.k).filter(k => {
+  try { const o = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', k + '.json'), 'utf8'));
+        return o.d && o.d.length >= 1000 && (NOW - new Date(o.fetched + 'T12:00:00')) / 864e5 <= BASKET_DAYS; }
+  catch (e) { return false; }
+}));
 let BASKETMEMO = null;
 function basketSection(){ return BASKETMEMO || (BASKETMEMO = basketCalc()); }
 function basketCalc(){
@@ -76,8 +82,8 @@ function basketCalc(){
   const fresh = data.stores.map((st, s) => s).filter(s => recent(data.stores[s]));
   const stale = data.stores.filter(st => st.r > 0 && !recent(st)).map(st => st.c + (st.f ? ' (gewone prijzen laatst bijgewerkt op ' + dayFmt.format(new Date(st.f + 'T12:00:00')) + ')' : ''));
   const noReg = data.stores.filter(st => !st.r).map(st => st.c);
-  const items = BASKET.map(([q, req, not], i) => ({id: i + 1, q, qty: 1, req, not}));
-  const an = {}; items.forEach(it => { an[it.id] = eng.analyze(it.q, 80); });
+  const items = BASKET.map(([q, req, not, label], i) => ({id: i + 1, q, label: label || q, qty: 1, req, not}));
+  const an = {}; items.forEach(it => { an[it.id] = eng._analyze(it.q, 80); });   /* zonder de vertaling naar het gangbare product (rijst -> zilvervliesrijst): het mandje heeft eigen regels */
   /* eerlijk vergelijken: omrekenen naar precies de gevraagde hoeveelheid (per kilo, liter of stuk), zodat een pak van 20
      eieren niet duurder lijkt dan een doos van 12. Zonder bruikbare hoeveelheid telt de cel niet mee. */
   /* Per winkel het goedkoopste product onder alle goed passende producten (niet alleen de allerbeste naamovereenkomst),
@@ -85,7 +91,7 @@ function basketCalc(){
   const FIT = 3;   /* ruim: de vaste regels per product (req/not) houden verkeerde producten buiten */
   const unitCost = (c, a) => {
     /* het mandje vraagt één stuk: een "2 voor"-actie telt niet mee, net als in de app bij aantal 1 */
-    const each = c.price;
+    const each = c.mbq > 1 && c.mbp ? (c.usual || c.mbp) : c.price;   /* bij 1+1 of 2 voor: de prijs als je er één koopt */
     if (!a.kind || a.inferred) return {price: Math.round(each), c};                     /* geen hoeveelheid gevraagd: één verpakking */
     if (c.u !== a.kind || !c.q || !(c.mode === 'exact' || c.mode === 'scaled')) return null;
     return {price: Math.round(each / c.q * a.amount), c, scaled: Math.abs(c.q - a.amount) > 0.01};
@@ -106,24 +112,30 @@ function basketCalc(){
       return best;
     });
   });
-  /* Veel duurder dan elders voor dezelfde hoeveelheid: vrijwel altijd een ander product of een verkeerd gelezen
-     verpakking. Met drie of meer winkels valt alleen die ene prijs af (meer dan 3x de middelste prijs; een lage prijs blijft staan, die bleek vaak echt); met twee winkels
-     is niet te zeggen welke van de twee afwijkt, dan telt de hele regel niet mee. */
+  /* 1. Veel duurder dan de rest voor dezelfde hoeveelheid (meer dan 3x de middelste prijs): vrijwel altijd een ander
+        product of een verkeerd gelezen verpakking; die ene prijs telt niet mee.
+     2. Liggen de prijzen bij de winkels die meetellen daarna nog meer dan 3,5x uit elkaar, dan vergelijken we bij die
+        regel geen gelijke producten; dan telt het product voor geen enkele winkel mee. */
   m.forEach((row, i) => {
     const ps = row.filter(Boolean).map(x => x.price).sort((a, b) => a - b);
-    if (ps.length >= 3){
-      const mid = ps.length % 2 ? ps[(ps.length - 1) / 2] : (ps[ps.length / 2 - 1] + ps[ps.length / 2]) / 2;
-      m[i] = row.map(x => {
-        if (x && x.price > 3 * mid){ if (process.env.SEO_DEBUG) console.error('uitschieter', items[i].q, x.c.name, x.price, 'midden', mid); return null; }
-        return x;
-      });
-    } else if (ps.length === 2 && ps[1] > 3 * ps[0]){
-      if (process.env.SEO_DEBUG) console.error('uitschieter', items[i].q, row.map(x => x ? x.c.name + ' ' + x.price : '-').join(' | '));
+    if (ps.length < 3) return;
+    const mid = ps.length % 2 ? ps[(ps.length - 1) / 2] : (ps[ps.length / 2 - 1] + ps[ps.length / 2]) / 2;
+    m[i] = row.map(x => {
+      if (x && x.price > 3 * mid){ if (process.env.SEO_DEBUG) console.error('uitschieter', items[i].q, x.c.name, x.price, 'midden', mid); return null; }
+      return x;
+    });
+  });
+  const need = Math.ceil(items.length * 0.8);
+  const eligible = fresh.map((s, j) => m.filter(row => row[j]).length >= need);
+  m.forEach((row, i) => {
+    const ps = row.filter((x, j) => x && eligible[j]).map(x => x.price).sort((a, b) => a - b);
+    if (ps.length >= 2 && ps[ps.length - 1] > 3.5 * ps[0]){
+      if (process.env.SEO_DEBUG) console.error('regel valt weg', items[i].q, row.map(x => x ? x.c.name + ' ' + x.price : '-').join(' | '));
       m[i] = row.map(() => null);
     }
   });
   const totals = C.sortStoreTotals(C.storeTotals(m, fresh));
-  if (process.env.SEO_DEBUG) totals.forEach(t => console.error('mandje', data.stores[t.store].c, t.count + '/' + m.length, 'mist:', t.missing.map(i => items[i].q).join(', ')));
+  if (process.env.SEO_DEBUG) totals.forEach(t => console.error('mandje', data.stores[t.store].c, t.count + '/' + m.length, 'mist:', t.missing.map(i => items[i].label).join(', ')));
   const rows = items.length, minCount = Math.ceil(rows * 0.8);
   const ranked = totals.filter(t => t.count >= minCount);
   const few = totals.filter(t => t.count < minCount);
@@ -157,7 +169,7 @@ function basketCalc(){
     common.map(i => {
       const cells = byCommon.map(t => m[i][fresh.indexOf(t.store)]);
       const low = Math.min(...cells.map(x => x.price));
-      return '<tr><th scope="row">' + esc(items[i].q) + '</th>' + cells.map(x => '<td' + (x.price === low ? ' class="low"' : '') + ' title="' + esc(x.c.name) + '">' +
+      return '<tr><th scope="row">' + esc(items[i].label) + '</th>' + cells.map(x => '<td' + (x.price === low ? ' class="low"' : '') + ' title="' + esc(x.c.name) + '">' +
         euro(x.price) + (x.c.usual ? ' <span class="sale">actie</span>' : '') + '<small>' + esc(x.c.name) + (x.scaled ? ' · omgerekend' : '') + '</small></td>').join('') + '</tr>';
     }).join('') + '</tbody></table></div></details>';
 

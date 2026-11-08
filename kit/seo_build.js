@@ -64,11 +64,17 @@ const BASKET = [
   ['zonnebloemolie 1 l', /zonnebloemolie/, /spray|bio/],
 ];
 
+const BASKET_DAYS = 14;
+/* winkels waarvan we de gewone prijzen zelf ophalen (eigen-prijzen.yml); de rest komt uit Checkjebon */
+const OWN = new Set(['dirk', 'dekamarkt', 'hoogvliet']);
 let BASKETMEMO = null;
 function basketSection(){ return BASKETMEMO || (BASKETMEMO = basketCalc()); }
 function basketCalc(){
-  const fresh = data.stores.map((st, s) => s).filter(s => data.stores[s].r > 0 && C.regFresh(data.stores[s]));
-  const stale = data.stores.filter(st => st.r > 0 && !C.regFresh(st)).map(st => st.c);
+  /* De app toont gewone prijzen tot 92 dagen oud (met waarschuwing). Een openbare uitspraak "X is het goedkoopst" vraagt
+     meer: alleen winkels waarvan de gewone prijzen in de laatste BASKET_DAYS dagen zijn bijgewerkt doen mee. */
+  const recent = st => st.r > 0 && C.regFresh(st) && st.f && (NOW - new Date(st.f + 'T12:00:00')) / 864e5 <= BASKET_DAYS;
+  const fresh = data.stores.map((st, s) => s).filter(s => recent(data.stores[s]));
+  const stale = data.stores.filter(st => st.r > 0 && !recent(st)).map(st => st.c + (st.f ? ' (gewone prijzen laatst bijgewerkt op ' + dayFmt.format(new Date(st.f + 'T12:00:00')) + ')' : ''));
   const noReg = data.stores.filter(st => !st.r).map(st => st.c);
   const items = BASKET.map(([q, req, not], i) => ({id: i + 1, q, qty: 1, req, not}));
   const an = {}; items.forEach(it => { an[it.id] = eng.analyze(it.q, 80); });
@@ -78,7 +84,8 @@ function basketCalc(){
      zodat huismerk tegen huismerk wordt vergeleken en niet het A-merk van de ene winkel tegen het huismerk van de andere. */
   const FIT = 3;   /* ruim: de vaste regels per product (req/not) houden verkeerde producten buiten */
   const unitCost = (c, a) => {
-    const each = c.mbq > 1 && c.mbp ? c.mbp / c.mbq : c.price;
+    /* het mandje vraagt één stuk: een "2 voor"-actie telt niet mee, net als in de app bij aantal 1 */
+    const each = c.price;
     if (!a.kind || a.inferred) return {price: Math.round(each), c};                     /* geen hoeveelheid gevraagd: één verpakking */
     if (c.u !== a.kind || !c.q || !(c.mode === 'exact' || c.mode === 'scaled')) return null;
     return {price: Math.round(each / c.q * a.amount), c, scaled: Math.abs(c.q - a.amount) > 0.01};
@@ -141,7 +148,8 @@ function basketCalc(){
   h += '<div class="tablewrap"><table class="rank"><caption>Mandje van ' + common.length + ' producten, gewone prijzen plus lopende aanbiedingen</caption>' +
     '<thead><tr><th scope="col">#</th><th scope="col">Supermarkt</th><th scope="col">Totaal</th><th scope="col">Verschil</th></tr></thead><tbody>' +
     byCommon.map((t, k) => '<tr' + (k === 0 ? ' class="best"' : '') + '><td>' + (k + 1) + '</td><th scope="row">' + esc(data.stores[t.store].c) + '</th><td>' + euro(sumCommon(t)) +
-      '</td><td>' + (k ? '+ ' + euro(sumCommon(t) - sumCommon(cheapest)) : '–') + '</td></tr>').join('') + '</tbody></table></div>';
+      '</td><td>' + (k ? '+ ' + euro(sumCommon(t) - sumCommon(cheapest)) : '–') + '</td></tr>').join('') + '</tbody></table></div>' +
+    '<p class="small">Dit zegt iets over dit mandje op deze dag, niet over alle producten of over jouw boodschappen. Een andere selectie kan een andere uitkomst geven.</p>';
 
   /* per product: welk product en welke prijs, zodat iedereen kan nagaan hoe het totaal tot stand komt */
   h += '<details><summary>Bekijk per product wat we vergeleken</summary><div class="tablewrap"><table class="items"><thead><tr><th scope="col">Product</th>' +
@@ -156,7 +164,10 @@ function basketCalc(){
   const notes = [];
   if (common.length < rows) notes.push((rows - common.length) + ' van de ' + rows + ' producten in ons mandje hadden niet alle winkels; die tellen hier niet mee.');
   if (few.length) notes.push('Te weinig producten gevonden om eerlijk mee te tellen: ' + few.map(t => esc(data.stores[t.store].c)).join(', ') + '.');
-  if (stale.length) notes.push('Niet vergeleken, omdat we van deze winkels geen actuele gewone prijzen hebben: ' + stale.map(esc).join(', ') + '. Hun aanbiedingen zie je wel in de app.');
+  notes.push('Bronnen van de gewone prijzen: ' + byCommon.map(t => { const st = data.stores[t.store];
+    return esc(st.c) + ' ' + (OWN.has(st.k) ? 'zelf opgehaald van de eigen webwinkel' : 'uit de open data van Checkjebon') + ', bijgewerkt op ' + esc(dayFmt.format(new Date(st.f + "T12:00:00")));
+  }).join('; ') + '. Aanbiedingen via PrijsProfeet, opgehaald op ' + esc(DATUM) + '. Webwinkelprijzen kunnen afwijken van de prijs in een filiaal.');
+  if (stale.length) notes.push('Niet vergeleken, omdat de gewone prijzen van deze winkels de laatste ' + BASKET_DAYS + ' dagen niet zijn bijgewerkt: ' + stale.map(esc).join(', ') + '. Hun aanbiedingen zie je wel in de app.');
   if (noReg.length) notes.push('Van ' + noReg.map(esc).join(', ') + ' hebben we alleen aanbiedingen.');
   h += '<ul class="notes">' + notes.map(n => '<li>' + n + '</li>').join('') + '</ul>';
   return h;
@@ -206,7 +217,7 @@ function dealsSection(){
     per.map(([c, n]) => '<tr><th scope="row">' + esc(c) + '</th><td>' + n.toLocaleString('nl-NL') + '</td></tr>').join('') + '</tbody></table></div>' +
     '<h3>Grote kortingen van deze week</h3><ul class="deals">' + pick.map(d => '<li><span class="pct">−' + d.pct + '%</span> <strong>' + esc(d.name) + '</strong> bij ' + esc(data.stores[d.s].c) +
       ': ' + euro(d.now) + ' <s>' + euro(d.was) + '</s>' + esc(until(d.until)) + '</li>').join('') + '</ul>' +
-    '<p class="small">Kortingen boven 70% laten we weg: dat is vrijwel altijd een fout in de bron. Controleer de prijs altijd in de folder of bij de winkel.</p>';
+    '<p class="small">De van-prijs en de korting zijn zoals de supermarkt of onze bron ze noemt; wij controleren niet of die prijs eerder echt gold. Kortingen boven 70% laten we weg: dat is vrijwel altijd een fout in de bron. Controleer de prijs altijd in de folder of bij de winkel.</p>';
 }
 
 /* ---------- pagina's schrijven ---------- */

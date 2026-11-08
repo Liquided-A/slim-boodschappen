@@ -1,7 +1,7 @@
 """Haalt gewone prijzen op van de websites van supermarkten zelf, voor winkels waarvan Checkjebon al lang niet meer bijwerkt.
 
 Gebruik: python3 -I fetch_store.py <winkel> data/<winkel>.json [--limit N] [--max-minutes M] [--delay S]
-Winkels: dirk, dekamarkt, hoogvliet.
+Winkels: dirk, dekamarkt, hoogvliet, ekoplaza, spar (spar is reserve voor als Checkjebon stopt).
 
 Netjes ophalen:
 - eerlijke User-Agent met een link naar dit project, geen browser nadoen;
@@ -14,7 +14,7 @@ Producten die deze keer niet zijn opgehaald (tijdslimiet, fout) houden hun vorig
 Elke run begint bij de producten die het langst niet zijn bijgewerkt, zodat een te lange lijst in een paar nachten rond is.
 own_prices.py laat prijzen ouder dan 14 dagen weg.
 """
-import json, re, sys, time, datetime, os, urllib.request, urllib.error, urllib.parse, urllib.robotparser
+import json, re, sys, time, datetime, os, html as htmllib, urllib.request, urllib.error, urllib.parse, urllib.robotparser
 
 UA = 'SlimBoodschappen/1.0 (+https://github.com/Liquided-A/slim-boodschappen/issues)'
 
@@ -57,6 +57,62 @@ def next_hoogvliet(html):
     size = (str(sa.get('volume') or '').strip() + ' ' + str(sa.get('unit') or '').strip()).strip() if isinstance(sa, dict) else ''
     return {'l': slug, 'n': name.strip(), 's': size, 'p': round(float(normal), 2)}
 
+def _ld_products(html):
+    """alle schema.org Product-objecten uit de JSON-LD-blokken (ook binnen @graph)"""
+    out = []
+    for m in re.finditer(r'<script[^>]*application/ld\+json[^>]*>(.*?)</script>', html, re.S):
+        try: d = json.loads(m.group(1))
+        except ValueError: continue
+        stack = [d]
+        while stack:
+            x = stack.pop()
+            if isinstance(x, list): stack.extend(x)
+            elif isinstance(x, dict):
+                t = x.get('@type'); t = t if isinstance(t, list) else [t]
+                if 'Product' in t: out.append(x)
+                stack.extend(v for k, v in x.items() if k == '@graph')
+    return out
+
+def _num(v):
+    try: v = float(str(v).replace(',', '.'))
+    except (TypeError, ValueError): return None
+    return round(v, 2) if 0.05 <= v < 1000 else None
+
+def ld_ekoplaza(html):
+    """Ekoplaza: JSON-LD Product. offers.price is de huidige prijs; bij een aanbieding staat de gewone prijs in
+    offers.priceSpecification (priceType ListPrice). Inhoud in 'size'."""
+    canon = re.search(r'<link[^>]*rel="canonical"[^>]*href="https://www\.ekoplaza\.nl/nl/producten/product/([a-z0-9-]+-\d{10})"', html)
+    for p in _ld_products(html):
+        o = p.get('offers')
+        o = o[0] if isinstance(o, list) and o else o
+        if not isinstance(o, dict): continue
+        normal = _num(o.get('price'))
+        specs = o.get('priceSpecification'); specs = specs if isinstance(specs, list) else [specs]
+        for s in specs:
+            if isinstance(s, dict) and str(s.get('priceType', '')).endswith('ListPrice') and _num(s.get('price')):
+                normal = _num(s.get('price'))
+        name = p.get('name')
+        pid = p.get('@id', '')
+        m = re.search(r'/nl/producten/product/([a-z0-9-]+-\d{10})', pid) or canon
+        if not m or not isinstance(name, str) or not name.strip() or normal is None: continue
+        return {'l': m.group(1), 'n': htmllib.unescape(name.strip()), 's': str(p.get('size') or '').strip(), 'p': normal}
+    return None
+
+def ld_spar(html):
+    """SPAR: JSON-LD Product met offers.price. Aanbiedingen staan niet op de productpagina (pas in het mandje),
+    dus dit is de gewone (advies)prijs. Inhoud staat in <h2 class="c-offer__subtitle">."""
+    for p in _ld_products(html):
+        o = p.get('offers')
+        o = o[0] if isinstance(o, list) and o else o
+        if not isinstance(o, dict): continue
+        normal = _num(o.get('price'))
+        m = re.match(r'https://www\.spar\.nl/([^/?#]+-\d{5,}/)$', htmllib.unescape(urllib.parse.unquote(str(o.get('url') or ''))))
+        name = p.get('name')
+        if not m or not isinstance(name, str) or not name.strip() or normal is None: continue
+        s = re.search(r'<h2 class="c-offer__subtitle">\s*([^<]*?)\s*</h2>', html)
+        return {'l': m.group(1), 'n': htmllib.unescape(name.strip()), 's': htmllib.unescape(s.group(1)) if s else '', 'p': normal}
+    return None
+
 STORES = {
     'dirk': {'robots': 'https://www.dirk.nl/robots.txt', 'sitemap': 'https://www.dirk.nl/products-sitemap.xml',
              'keep': r'^https://www\.dirk\.nl/boodschappen/.+/(\d+)$', 'url': 'https://www.dirk.nl/boodschappen/x/x/x/{}',
@@ -68,6 +124,14 @@ STORES = {
     'hoogvliet': {'robots': 'https://hoogvliet.nl/robots.txt', 'sitemap': 'https://hoogvliet.nl/sitemap-catalog.xml',
                   'keep': r'^https://hoogvliet\.nl/([a-z0-9-]+-\d{6,})$', 'url': 'https://hoogvliet.nl/{}',
                   'base': 'https://hoogvliet.nl/', 'parse': next_hoogvliet},
+    'ekoplaza': {'robots': 'https://www.ekoplaza.nl/robots.txt', 'sitemap': 'https://www.ekoplaza.nl/sitemap-products.xml',
+                 'keep': r'^https://www\.ekoplaza\.nl/nl/producten/product/([a-z0-9-]+-\d{10})$',
+                 'url': 'https://www.ekoplaza.nl/nl/producten/product/{}',
+                 'base': 'https://www.ekoplaza.nl/nl/producten/product/', 'parse': ld_ekoplaza},
+    # reserve: alleen inschakelen als Checkjebon stopt met SPAR; zelfde productnummers als Checkjebon (met / aan het eind)
+    'spar': {'robots': 'https://www.spar.nl/robots.txt', 'sitemap': 'https://www.spar.nl/sitemap/products.xml',
+             'keep': r'^https://www\.spar\.nl/([a-z0-9-]+-\d{5,}/)$', 'url': 'https://www.spar.nl/{}',
+             'base': 'https://www.spar.nl/', 'parse': ld_spar},
 }
 
 args = sys.argv[1:]
@@ -120,6 +184,7 @@ def main():
 
     xml = get(CFG['sitemap'])
     if not xml: sys.exit('productlijst (sitemap) niet te lezen')
+    xml = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', xml)   # Ekoplaza zet adressen in CDATA
     ids, seen = [], set()
     for u in re.findall(r'<loc>\s*([^<\s]+)\s*</loc>', xml):
         m = re.match(CFG['keep'], u)

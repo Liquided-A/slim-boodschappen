@@ -46,11 +46,11 @@ const BASKET = [
   ['volkoren brood', /volkoren/, /beschuit|cracker|knäck|wrap|toast|bol|stokbrood|pistolet|mix|meel|crouton|broodje|kaiser|bolletje|half/],
   ['scharreleieren 10 stuks', /scharrel/, /gekookt|gepeld|salade|bio|vrije uitloop|kwartel/],
   ['roomboter 250 g', /roomboter/, /stroopwa|koek|cake|croissant|deeg|kruiden|knoflook|wafel|bonbon|cookie|spritz|sprits|amand|specpop|puntje|taart/],
-  ['jong belegen kaas 48+ 500 g', /jong belegen/, /geraspt|blokjes|plakken|smeer|light|[23]0\+|35\+|biologisch|bio |geit|schaap|komijn|kruiden|pesto|truffel|mosterd|brandnetel|peper|knoflook/],
-  ['elstar appels 1 kg', /elstar/, /sap|moes|taart|chips|gedroogd|bio/],
+  ['jong belegen kaas 500 g', /jong belegen/, /geraspt|blokjes|plakken|smeer|light|[23]0\+|35\+|biologisch|bio |geit|schaap|komijn|kruiden|pesto|truffel|mosterd|brandnetel|peper|knoflook/],
+  ['elstar 1 kg', /elstar/, /sap|moes|taart|chips|gedroogd|bio/],
   ['aardappelen 2 kg', /aardappel/, /friet|patat|kriel|puree|chips|schijf|partjes|rosti|kroket|gekookt|zoete|krieltjes|wedges|gratin|salade|bio/],
-  ['spaghetti 500 g', /spaghetti/, /saus|maaltijd|volkoren|glutenvrij|bolognese|pesto|verse|vers |bio/],
-  ['witte rijst 1 kg', /rijst/, /zilvervlies|wafel|pap|maaltijd|bruin|risotto|sushi|noedel|melk|dessert|cracker|basmati|pandan|jasmijn|wild|kook in|zak|bio/],
+  ['spaghetti 500 g', /spaghetti/, /saus|maaltijd|volkoren|glutenvrij|bolognese|pesto|verse|vers |bio|maanden|olvarit|tomaat|\bham\b|\bmet\b/],
+  ['rijst 1 kg', /rijst/, /zilvervlies|wafel|pap|maaltijd|bruin|risotto|sushi|noedel|melk|dessert|cracker|basmati|pandan|jasmijn|wild|kook in|zak|bio|\bmet\b|\bkip\b|nasi|bami/],
   ['pindakaas 350 g', /pindakaas/, /reep|koek|saus|chocola|cup|light|honing|kokos|biologisch|bio /],
   ['filterkoffie 500 g', /filter/, /pads|cups|bonen|oplos|capsule|decaf|cafeïnevrij|cafeinevrij|zakjes|papier/],
   ['kristalsuiker 1 kg', /kristalsuiker/, /riet|bruin|klont|stick|poeder/],
@@ -94,7 +94,7 @@ function basketCalc(){
     const a = an[it.id];
     return fresh.map(s => {
       const e = a && a.per[s]; if (!e || !e.cands.length) return null;
-      const real = e.cands.filter(c => { const n = c.name.toLowerCase(); return !c.other && c.price > 0 && it.req.test(n) && !it.not.test(n) && !/baby|peuter|kinder/.test(n); });
+      const real = e.cands.filter(c => { const n = c.name.toLowerCase(); return c.price > 0 && it.req.test(n) && !it.not.test(n) && !/baby|peuter|kinder/.test(n); });
       if (!real.length) return null;
       const top = Math.min(...real.map(c => c.score));
       let best = null;
@@ -106,15 +106,15 @@ function basketCalc(){
       return best;
     });
   });
-  /* Veel duurder of goedkoper dan elders voor dezelfde hoeveelheid: vrijwel altijd een ander product of een verkeerd gelezen
-     verpakking. Met drie of meer winkels valt alleen die ene prijs af (meer dan 2x van de middelste prijs); met twee winkels
+  /* Veel duurder dan elders voor dezelfde hoeveelheid: vrijwel altijd een ander product of een verkeerd gelezen
+     verpakking. Met drie of meer winkels valt alleen die ene prijs af (meer dan 3x de middelste prijs; een lage prijs blijft staan, die bleek vaak echt); met twee winkels
      is niet te zeggen welke van de twee afwijkt, dan telt de hele regel niet mee. */
   m.forEach((row, i) => {
     const ps = row.filter(Boolean).map(x => x.price).sort((a, b) => a - b);
     if (ps.length >= 3){
       const mid = ps.length % 2 ? ps[(ps.length - 1) / 2] : (ps[ps.length / 2 - 1] + ps[ps.length / 2]) / 2;
       m[i] = row.map(x => {
-        if (x && (x.price > 2 * mid || x.price * 2 < mid)){ if (process.env.SEO_DEBUG) console.error('uitschieter', items[i].q, x.c.name, x.price, 'midden', mid); return null; }
+        if (x && x.price > 3 * mid){ if (process.env.SEO_DEBUG) console.error('uitschieter', items[i].q, x.c.name, x.price, 'midden', mid); return null; }
         return x;
       });
     } else if (ps.length === 2 && ps[1] > 3 * ps[0]){
@@ -198,10 +198,10 @@ function dealsSection(){
     for (let j = 0; j < st.n.length - st.r; j++){
       if (!C.promoActive(st, j)) continue;
       n++;
-      const i = st.r + j, now = st.p[i], was = st.po[j];
+      const i = st.r + j, now = st.p[i], was = st.po[j], multi = st.pm[j] > 1 ? st.pl[j] || 'meerdere stuks' : '';
       if (was > now && now >= 50){
         const pct = Math.round(100 * (1 - now / was));
-        if (pct >= 25 && pct < 70) top.push({s, name: st.n[i], now, was, pct, until: st.pv[j]});
+        if (pct >= 25 && pct < 70) top.push({s, name: st.n[i], now, was, pct, until: st.pv[j], multi});
       }
     }
     if (n) per.push([st.c, n]);
@@ -216,7 +216,7 @@ function dealsSection(){
     '<div class="tablewrap"><table class="rank"><caption>Aantal lopende aanbiedingen per supermarkt</caption><thead><tr><th scope="col">Supermarkt</th><th scope="col">Aanbiedingen</th></tr></thead><tbody>' +
     per.map(([c, n]) => '<tr><th scope="row">' + esc(c) + '</th><td>' + n.toLocaleString('nl-NL') + '</td></tr>').join('') + '</tbody></table></div>' +
     '<h3>Grote kortingen van deze week</h3><ul class="deals">' + pick.map(d => '<li><span class="pct">−' + d.pct + '%</span> <strong>' + esc(d.name) + '</strong> bij ' + esc(data.stores[d.s].c) +
-      ': ' + euro(d.now) + ' <s>' + euro(d.was) + '</s>' + esc(until(d.until)) + '</li>').join('') + '</ul>' +
+      ': ' + euro(d.now) + ' <s>' + euro(d.was) + '</s>' + (d.multi ? ' per stuk bij ' + esc(d.multi) : '') + esc(until(d.until)) + '</li>').join('') + '</ul>' +
     '<p class="small">De van-prijs en de korting zijn zoals de supermarkt of onze bron ze noemt; wij controleren niet of die prijs eerder echt gold. Kortingen boven 70% laten we weg: dat is vrijwel altijd een fout in de bron. Controleer de prijs altijd in de folder of bij de winkel.</p>';
 }
 

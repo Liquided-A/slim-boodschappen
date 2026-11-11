@@ -132,7 +132,7 @@
 /* ---------- basis ---------- */
 const KEY = 'slim-boodschappen-v4';
 let NOW = new Date();
-const STALE_DAYS = 92;
+const STALE_DAYS = 14;   /* gewone prijzen ouder dan 14 dagen heten niet meer actueel (zelfde grens als de website) */
 /* telt deze winkel alleen met aanbiedingen mee? */
 const onlyPromos = st => !st.r || (!S.oldReg && !regFresh(st));
 const DEFAULT_ON = new Set(['ah','jumbo','lidl','plus','aldi','dirk','coop','spar','poiesz','dekamarkt','hoogvliet','vomar','nettorama']);

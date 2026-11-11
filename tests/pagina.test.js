@@ -195,3 +195,12 @@ test('affiliate telt nooit mee in zoeken, totalen of volgorde', () => {
   assert.strictEqual((body.match(/shopUrl\(/g) || []).length, 2, 'shopUrl alleen gedefinieerd en gebruikt in outLink');
   assert.ok(!/rel="noopener">Bekijk (bij|↗)/.test(body), 'geen productlink buiten outA om');
 });
+test('gewone prijzen ouder dan 14 dagen heten niet actueel', () => {
+  assert.strictEqual(Number(body.match(/^const STALE_DAYS = (\d+);/m)[1]), 14);
+  const c = {NOW: new Date(2026, 10, 11, 12, 0), STALE_DAYS: 14};
+  vm.createContext(c);
+  vm.runInContext(grab('regFresh') + '\nglobalThis.regFresh = regFresh;', c);
+  assert.ok(c.regFresh({f: '2026-11-01'}), '10 dagen oud: actueel');
+  assert.ok(!c.regFresh({f: '2026-10-20'}), '22 dagen oud: verouderd');
+  assert.ok(!c.regFresh({f: '2026-08-25'}), 'Lidl van augustus: verouderd');
+});

@@ -23,7 +23,8 @@ const grab = name => {
   if (!m) throw new Error('functie ' + name + ' niet gevonden in body.html');
   return m[0];
 };
-const ctx = {NOW, STORES: data.stores, STALE_DAYS: 92, S: {oldReg: false}};
+const ctx = {NOW, STORES: data.stores, STALE_DAYS: Number((body.match(/^const STALE_DAYS = (\d+);/m) || [])[1]), S: {oldReg: false}};
+if (!(ctx.STALE_DAYS > 0)) throw new Error('STALE_DAYS niet gevonden in body.html');
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'web', 'engine.js'), 'utf8') + '\n' +
   ['mmddToDate', 'promoActive', 'regFresh', 'keep'].map(grab).join('\n') +
@@ -76,7 +77,7 @@ const OWN = new Set(data.stores.map(st => st.k).filter(k => {
 let BASKETMEMO = null;
 function basketSection(){ return BASKETMEMO || (BASKETMEMO = basketCalc()); }
 function basketCalc(){
-  /* De app toont gewone prijzen tot 92 dagen oud (met waarschuwing). Een openbare uitspraak "X is het goedkoopst" vraagt
+  /* De app noemt gewone prijzen tot STALE_DAYS dagen oud actueel. Een openbare uitspraak "X is het goedkoopst" vraagt
      meer: alleen winkels waarvan de gewone prijzen in de laatste BASKET_DAYS dagen zijn bijgewerkt doen mee. */
   const recent = st => st.r > 0 && C.regFresh(st) && st.f && (NOW - new Date(st.f + 'T12:00:00')) / 864e5 <= BASKET_DAYS;
   const fresh = data.stores.map((st, s) => s).filter(s => recent(data.stores[s]));

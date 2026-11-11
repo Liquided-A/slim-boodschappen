@@ -162,3 +162,36 @@ test('na toevoegen wordt de knop min, aantal en plus op dezelfde plek; geen apar
   assert.ok(/data-d="-1"/.test(m) && /data-d="1"/.test(m) && /class="stepin"[^>]*value="3"/.test(m), 'min, aantal 3 en plus');
   assert.ok(/data-d="1"[^>]*disabled/.test(c.addCtl('brood', 'card')), 'niet boven 99');
 });
+
+/* affiliate: centrale link, gewone pagina als terugval, en nooit invloed op de vergelijking */
+test('affiliate: zonder programma de gewone productpagina; met programma een sponsored link', () => {
+  const c = {URL, esc: s => String(s).replace(/[&<>"']/g, ch => '&#' + ch.charCodeAt(0) + ';')};
+  vm.createContext(c);
+  const aff = body.match(/^const AFFILIATE = .*$/m)[0];
+  vm.runInContext(['safeHttp', 'shopUrl', 'outLink', 'outA'].map(grab).join('\n') + '\n' + aff.replace('const AFFILIATE', 'globalThis.AFFILIATE') +
+    '\nObject.assign(globalThis, {outLink, outA});', c);
+  const st = {k: 'ah', b: 'https://www.ah.nl/producten/product/', l: ['wi1/melk']};
+  assert.deepStrictEqual(Object.keys(c.AFFILIATE), [], 'nu staat nog geen enkel programma aan');
+  assert.strictEqual(c.outLink(st, 0).href, 'https://www.ah.nl/producten/product/wi1/melk');
+  assert.strictEqual(c.outLink(st, 0).ad, false);
+  assert.ok(/rel="noopener"/.test(c.outA(c.outLink(st, 0), 'x', 'Bekijk')));
+  c.AFFILIATE.ah = {on: true, tpl: 'https://net.example/c?u={url}'};
+  const o = c.outLink(st, 0);
+  assert.strictEqual(o.href, 'https://net.example/c?u=' + encodeURIComponent('https://www.ah.nl/producten/product/wi1/melk'));
+  assert.ok(/rel="sponsored noopener"/.test(c.outA(o, 'x', 'Bekijk')) && /advertentie/.test(c.outA(o, 'x', 'Bekijk')));
+  c.AFFILIATE.ah = {on: true, tpl: 'javascript:alert(1)//{url}'};
+  assert.strictEqual(c.outLink(st, 0).ad, false, 'onveilige link: terug naar de gewone pagina');
+  c.AFFILIATE.ah = {on: false, tpl: 'https://net.example/c?u={url}'};
+  assert.strictEqual(c.outLink(st, 0).ad, false, 'uitgezet = gewone pagina');
+});
+test('affiliate telt nooit mee in zoeken, totalen of volgorde', () => {
+  const uses = (body.match(/AFFILIATE/g) || []).length;
+  const inOut = (grab('outLink').match(/AFFILIATE/g) || []).length;
+  const decl = (body.match(/^const AFFILIATE = .*$/m)[0].match(/AFFILIATE/g) || []).length;
+  const comments = (body.match(/\/\*[\s\S]*?\*\//g) || []).join('').match(/AFFILIATE/g) || [];
+  assert.strictEqual(uses, inOut + decl + comments.length, 'AFFILIATE alleen in outLink');
+  const eng = fs.readFileSync(path.join(__dirname, '..', 'web', 'engine.js'), 'utf8');
+  assert.ok(!/AFFILIATE|outLink|sponsored/.test(eng), 'de rekenkern kent geen affiliate');
+  assert.strictEqual((body.match(/shopUrl\(/g) || []).length, 2, 'shopUrl alleen gedefinieerd en gebruikt in outLink');
+  assert.ok(!/rel="noopener">Bekijk (bij|↗)/.test(body), 'geen productlink buiten outA om');
+});

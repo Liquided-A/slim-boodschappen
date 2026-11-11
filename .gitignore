@@ -19,3 +19,4 @@ OPENSTAANDE_PUNTEN.md
 *.pem
 *.key
 __pycache__/
+AUDIT_*.md

@@ -104,7 +104,6 @@ jobs:
           mkdir -p _site/img
           cp data/data.b64 _site/
           cp data/img/s*.jpg _site/img/
-          mkdir -p _site/logos && cp web/logos/* _site/logos/
           python3 -I web/assemble.py --wrap web/style.html web/body.html web/engine.js data/data.b64 _site/app.html
           # pagina's met de prijzen van vandaag (goedkoopste supermarkt, aanbiedingen), sitemap en robots.txt.
           # Eigen domein: zet bij Settings > Variables de variabele SITE_URL, bijvoorbeeld https://www.bespaaropjeboodschap.nl/

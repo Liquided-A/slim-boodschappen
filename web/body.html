@@ -175,8 +175,9 @@ function mmddToDate(mmdd, start){
 }
 /* herkenbaar winkelteken: korte namen voluit (AH, SPAR), anders de hoofdletters (DekaMarkt -> DM) of de eerste letter */
 function storeMark(c){ const n = String(c); if (n.replace(/[^A-Za-z]/g, '').length <= 4) return n.replace(/[^A-Za-z]/g, '').toUpperCase(); const caps = n.match(/[A-Z]/g) || []; return (caps.length > 1 ? caps.slice(0, 2).join('') : n[0]).toUpperCase(); }
-/* logo's van de winkels (web/logos, meegeleverd met website en app); zonder logo het winkelteken */
-const LOGOS = Object.assign(Object.create(null), {aldi:'aldi.png', amazing_oriental:'amazing_oriental.png', boni:'boni.png', boons_markt:'boons_markt.png', dekamarkt:'dekamarkt.svg', dirk:'dirk.png', hoogvliet:'hoogvliet.png', lidl:'lidl.svg', mcd:'mcd.png', nettorama:'nettorama.png', plus:'plus.ico', poiesz:'poiesz.png', spar:'spar.png', vomar:'vomar.png'});
+/* geen officiele logo's: merkrecht en auteursrecht zijn niet duidelijk genoeg geregeld; altijd het winkelteken (tekst).
+   Komt er schriftelijke toestemming van een winkel, zet dan hier het bestand: {dirk:'dirk.png'} (map web/logos). */
+const LOGOS = Object.assign(Object.create(null), {});
 function storeLogo(k, mark){
   const f = LOGOS[k];
   return f ? '<span class="tlogo has" aria-hidden="true"><img class="slogo" src="logos/' + f + '" alt="" data-m="' + esc(mark) + '"></span>' : '<span class="tlogo" aria-hidden="true">' + esc(mark) + '</span>';
@@ -196,6 +197,32 @@ function usesOldPrices(s){ const st = STORES[s]; return S.oldReg && st.r && !reg
 /* alleen http(s): een javascript:-link uit de brondata wordt zo geen knop */
 function safeHttp(u){ try{ const x = new URL(u); return x.protocol === 'https:' || x.protocol === 'http:' ? x.href : ''; }catch(e){ return ''; } }
 function shopUrl(st, i){ const l = st.l[i]; if (!l) return ''; return safeHttp(/^https?:\/\//.test(l) ? l : (st.b ? st.b + l : '')); }
+/* ===== Uitgaande links naar de winkel, voorbereid op affiliate =====
+   Commercie staat los van de vergelijking: AFFILIATE wordt alleen hier gebruikt, nooit in zoeken, totalen of de
+   volgorde van winkels (een test bewaakt dat). Staat er niets aan, dan gaat de link naar de gewone productpagina.
+   Per winkel aanzetten zodra er een contract is:
+     ah: {on: true, net: 'awin', tpl: 'https://<deeplink van het netwerk>?...&url={url}'}
+   {url} wordt de gewone productpagina (gecodeerd). Netwerk naar keuze: awin, tradetracker, daisycon, partnerize.
+   perProduct: {'<productlink>': 'https://...'} voor een eigen link per product; die gaat voor tpl. */
+const AFFILIATE = Object.assign(Object.create(null), {});
+function outLink(st, i){
+  const url = shopUrl(st, i); if (!url) return null;
+  const a = AFFILIATE[st.k];
+  if (a && a.on === true){
+    const own = a.perProduct && Object.prototype.hasOwnProperty.call(a.perProduct, st.l[i]) ? a.perProduct[st.l[i]] : '';
+    const aff = safeHttp(own || (typeof a.tpl === 'string' && a.tpl.includes('{url}') ? a.tpl.split('{url}').join(encodeURIComponent(url)) : ''));
+    if (aff) return {href: aff, ad: true, s: st.k};
+  }
+  return {href: url, ad: false, s: st.k};
+}
+/* link met de juiste rel: een affiliate-link is 'sponsored' en krijgt zichtbaar 'advertentie' (eerlijk voor de gebruiker) */
+function outA(o, cls, text){
+  return '<a class="' + cls + '" href="' + esc(o.href) + '" target="_blank" rel="' + (o.ad ? 'sponsored noopener' : 'noopener') + '" data-out="' + (o.ad ? 'ad' : 'shop') + '" data-s="' + esc(o.s) + '">' + text + (o.ad ? ' <small class="adlbl">advertentie</small>' : '') + '</a>';
+}
+/* klikken naar winkels tellen: bewust nog uit. Pas aanzetten na een besluit over statistieken (privacyverklaring en
+   cookiebanner eerst bijwerken). Dit is de enige plek waar dat moet gebeuren. */
+function trackOut(kind, store){ /* nog niets */ }
+document.addEventListener('click', e => { const a = e.target && e.target.closest && e.target.closest('a[data-out]'); if (a) trackOut(a.dataset.out, a.dataset.s || ''); }, true);
 /* foto van een product: eerst de foto van de supermarkt zelf, anders Open Food Facts, anders een plaatje bij het soort product */
 function imgRef(st, i){
   let u = st.im && st.im[i] ? (st.im[i][0] === '!' ? st.im[i].slice(1) : (st.ib || '') + st.im[i]) : '';
@@ -463,7 +490,7 @@ function detailHtml(s, i){
   const st = STORES[s], j = i - st.r, isDeal = i >= st.r;
   const d = DEALS.find(x => x.s === s && x.i === i);
   const q = cleanName(st.n[i]) + (st.u[i] && st.q[i] ? ' ' + fmtQty(st.u[i], st.q[i]) : '');
-  const ref = imgRef(st, i), url = shopUrl(st, i), size = st.u[i] && st.q[i] ? fmtQty(st.u[i], st.q[i]) : '';
+  const ref = imgRef(st, i), url = outLink(st, i), size = st.u[i] && st.q[i] ? fmtQty(st.u[i], st.q[i]) : '';
   const on = new Set(enabledStores()), sz = st.u[i] && st.q[i] ? ' ' + fmtQty(st.u[i], st.q[i]) : '';
   const rowsFor = qq => { const an = ENG.analyze(qq, 6); return an.per.map((e, k) => e && on.has(k) ? {k, c: e.cands[0]} : null).filter(Boolean).filter(r => r.c.score <= 2.5); };
   /* eerst precies dit product; vindt dat weinig, dan het soort product (pindakaas, halfvolle melk) */
@@ -484,7 +511,7 @@ function detailHtml(s, i){
       (isDeal && st.pl[j] ? '<span class="mech">' + esc(st.pl[j]) + '</span>' : '') +
       (d && d.until ? '<p class="small muted">Geldig t/m ' + esc(dayFmt.format(d.until)) + '</p>' : (!isDeal ? '<p class="small muted">Gewone prijs' + (regFresh(st) ? '' : ', ' + esc(regLabel(st))) + '</p>' : '')) + '</div></div>' +
     '<div class="dbtns">' + addCtl(q, 'detail') + '' +
-      (url ? '<a class="btn ghost" href="' + esc(url) + '" target="_blank" rel="noopener">Bekijk bij ' + esc(st.c) + ' ↗</a>' : '') + '</div>' +
+      (url ? outA(url, 'btn ghost', 'Bekijk bij ' + esc(st.c) + ' ↗') : '') + '</div>' +
     (rows.length > 1 ? '<div class="setrow"><h3>' + esc(cmpLabel) + '</h3><div class="dcmp">' + rows.map(r => {
       const S2 = STORES[r.k], c = r.c;
       return '<div class="drow' + (c.eff === min ? ' best' : '') + '"><span class="thumb">' + imgHtml(imgRef(S2, c.i), '') + '</span><div><b>' + esc(S2.c) + '</b><span class="small muted">' + esc(c.name) + (c.q && !norm(c.name).includes(' ' + String(fmtQty(c.u, c.q)).split(' ')[0].replace(',', ' ')) ? ' · ' + esc(fmtQty(c.u, c.q)) : '') + '</span></div>' +
@@ -553,7 +580,7 @@ function unitPrice(cents, u, q){
   return money(Math.round(cents * 1000 / q)) + (u === 1 ? '/kg' : '/l');
 }
 function cardHtml(d){
-  const st = STORES[d.s], on = hasItem(d.q), url = shopUrl(st, d.i);
+  const st = STORES[d.s], on = hasItem(d.q), url = outLink(st, d.i);
   const size = st.u[d.i] && st.q[d.i] ? fmtQty(st.u[d.i], st.q[d.i]) : '';
   return '<article class="card"><div class="pic" data-act="detail" data-s="' + d.s + '" data-i="' + d.i + '" role="button" tabindex="0" aria-label="Meer over ' + esc(d.name) + '">' + imgHtml(d.img, CATLABEL[d.cat] || '') +
     '<span class="store">' + esc(st.c) + '</span>' + (d.pct > 0 ? '<span class="disc">−' + d.pct + '%</span>' : '') +
@@ -565,7 +592,7 @@ function cardHtml(d){
     (d.multi ? '<span class="per">per stuk</span>' : '') + '</div>' +
     (d.until && !d.upcoming ? '<span class="valid">Geldig t/m ' + esc(dayFmt.format(d.until)) + '</span>' : '') +
     addCtl(d.q, 'card') + '' +
-    (url ? '<a class="shoplink" href="' + esc(url) + '" target="_blank" rel="noopener">Bekijk bij ' + esc(st.c) + ' ↗</a>' : '') + '</div></article>';
+    (url ? outA(url, 'shoplink', 'Bekijk bij ' + esc(st.c) + ' ↗') : '') + '</div></article>';
 }
 /* gewoon product: dezelfde kaart, zonder actie */
 function regCardHtml(d){
@@ -806,7 +833,7 @@ function renderBasket(){
       lastAfd = ak;
       const it = S.items[i], cell = m[i][pos], c = cell.c, a = S.an[it.id];
       const opts = a.per[s].cands.map((x, j) => '<option value="' + j + '"' + (j === cell.j ? ' selected' : '') + '>' + esc(x.name) + (x.q ? ' · ' + fmtQty(x.u, x.q) : '') + ' · ' + money(x.price) + (unitText(x) ? ' (' + unitText(x) + ')' : '') + (x.usual ? ' (actie)' : '') + '</option>').join('');
-      const nt = noteFor(c, a, it.qty), url = shopUrl(st, c.i);
+      const nt = noteFor(c, a, it.qty), url = outLink(st, c.i);
       /* tip: groter pak of ander product in deze winkel dat per kilo/liter voordeliger is */
       const bv = betterValue(a.per[s].cands, cell.j), bvU = bv && unitText(bv);
       const ce = muchCheaperElsewhere(m[i], pos);
@@ -817,7 +844,7 @@ function renderBasket(){
       return head + '<div class="line' + (dn ? ' done' : '') + '"><button type="button" class="tick" data-act="tick" data-id="' + it.id + '" role="checkbox" aria-checked="' + dn + '" aria-label="' + esc(it.q) + ' in mijn mandje"></button><span class="thumb">' + imgHtml(imgRef(st, c.i), '') + '</span><div><div class="row"><span class="pn">' + bonName(it, c) + '</span><span class="pp">' + (estimated(cell) ? '~' : '') + money(cell.price) + '</span></div>' +
         '<div class="meta">' + deal + oldTag(st, c) + (unitText(c) ? '<span class="small muted">' + unitText(c) + '</span>' : '') + '</div>' + (nt ? '<span class="note">' + esc(nt) + '</span>' : '') + warnx + tip +
         '<div class="meta"><details class="swap"><summary>Ander product</summary><select data-act="pin" data-id="' + it.id + '" data-s="' + s + '" aria-label="Kies product voor ' + esc(it.q) + '">' + opts + '</select></details>' +
-        (url ? '<a class="shoplink" href="' + esc(url) + '" target="_blank" rel="noopener">Bekijk ↗</a>' : '') + '</div></div></div>';
+        (url ? outA(url, 'shoplink', 'Bekijk ↗') : '') + '</div></div></div>';
     }).join('');
     const sub = (by[s] || []).reduce((t, i) => t + m[i][pos].price, 0);
     const nOff = (by[s] || []).filter(i => m[i][pos].mode !== 'exact').length;

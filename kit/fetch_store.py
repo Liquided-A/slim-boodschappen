@@ -291,6 +291,7 @@ def opt(name, default):
 LIMIT, MAXMIN, DELAY = opt('--limit', 0), opt('--max-minutes', 300.0), opt('--delay', 1.0)
 
 class Blocked(Exception): pass
+GONE = False   # True als de laatste get() een 404/410 kreeg (pagina bestaat niet meer)
 
 class HttpsOnly(urllib.request.HTTPRedirectHandler):
     """alleen doorsturen naar een https-adres; nooit naar http of een ander soort adres"""
@@ -302,7 +303,8 @@ MAXBYTES = 30_000_000   # grootste toegestane pagina of productlijst
 
 def get(url):
     """pagina ophalen; None bij 404; Blocked bij 403; wacht en probeert opnieuw bij 429/503 of een netwerkfout"""
-    global DELAY
+    global DELAY, GONE
+    GONE = False
     url = urllib.parse.quote(url, safe=':/?=&%#+,;~@!$*()\'')   # adressen met bijvoorbeeld een ë
     for attempt in range(4):
         try:
@@ -310,7 +312,7 @@ def get(url):
             with OPENER.open(req, timeout=30) as r:
                 return r.read(MAXBYTES).decode('utf-8', 'replace')
         except urllib.error.HTTPError as e:
-            if e.code in (404, 410): return None
+            if e.code in (404, 410): GONE = True; return None
             if e.code == 403: raise Blocked(url)
             if e.code in (429, 503):
                 DELAY = min(DELAY * 2, 10)
@@ -349,24 +351,32 @@ def main():
     if os.path.exists(out):
         try: old = {p['l']: p for p in json.load(open(out, encoding='utf-8'))['d']}
         except (ValueError, KeyError, TypeError): old = {}
-    # nooit gezien eerst, dan de oudste; zo is een lange lijst in een paar nachten helemaal bijgewerkt
-    allowed.sort(key=lambda i: old[i]['t'] if i in old else '')
+    # bekende producten eerst (oudste eerst), daarna de nieuwe: in een sitemap staan soms duizenden verdwenen
+    # adressen (404) en die mogen het bijwerken van de bekende prijzen niet ophouden
+    allowed.sort(key=lambda i: (0, old[i]['t']) if i in old else (1, ''))
     if LIMIT: allowed = allowed[:LIMIT]
 
-    new, fails, streak = {}, 0, 0
+    new, fails, streak, gone, gstreak = {}, 0, 0, 0, 0
     for k, i in enumerate(allowed):
         if (time.time() - started) / 60 > MAXMIN:   # ook na lang wachten op de winkel
             print(f'tijdslimiet bereikt na {k} pagina\'s', file=sys.stderr); break
         try: html = get(CFG['url'].format(i))
         except Blocked:
             print(f'{KEY} weigert ons (403); gestopt zonder iets te omzeilen', file=sys.stderr); break
+        if html is None and GONE:
+            # de winkel zegt zelf 'bestaat niet meer' (404/410): een verouderde regel in de sitemap, geen storing.
+            # Telt niet mee voor de stopregel hieronder; wel een eigen, ruime grens.
+            gone += 1; gstreak += 1
+            if gstreak >= 1000: print('1000 verdwenen pagina\'s achter elkaar; gestopt', file=sys.stderr); break
+            time.sleep(DELAY); continue
+        gstreak = 0
         p = CFG['parse'](html) if html else None
         if p:
             p['t'] = today; new[p['l']] = p; streak = 0
         else:
             fails += 1; streak += 1
             if streak >= CFG.get('streak', 30): print(f'{streak} keer achter elkaar niets bruikbaars; gestopt', file=sys.stderr); break
-        if k % 500 == 0: print(f'{k}/{len(allowed)} opgehaald, {len(new)} prijzen, {fails} zonder prijs', file=sys.stderr)
+        if k % 500 == 0: print(f'{k}/{len(allowed)} opgehaald, {len(new)} prijzen, {fails} zonder prijs, {gone} verdwenen', file=sys.stderr)
         time.sleep(DELAY)
     save(old, new, fails, started, today)
 

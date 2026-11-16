@@ -823,9 +823,11 @@ function renderBasket(){
   const nEst = p => p.assign.filter(([i, s]) => estimated(m[i][sel.indexOf(s)])).length;
   const estText = n => n ? 'waarvan ' + n + ' geschat' : '';
   const opts = pl.result.map((r, i) => {
-    const p = r || pl.partial[i];
+    const p = r || pl.partial[i], prev = i ? pl.result[i - 1] : null;
+    /* een extra winkel die niets goedkoper maakt: zeg dat er eerlijk bij, anders lijkt het een gelijkwaardige keuze */
+    const noGain = r && prev && r.total >= prev.total;
     return '<button class="kopt" type="button" role="radio" data-act="k" data-k="' + (i+1) + '" aria-checked="' + (i === ci) + '"><span class="dot"></span>' +
-      '<span class="kn">' + (i+1) + ' winkel' + (i ? 's' : '') + (i === adv ? ' <span class="tag good">Advies</span>' : '') + '<span class="ks">' + esc(names(p.combo)) + (r ? '' : ' · ' + ofAll(p.assign.length)) + (nEst(p) ? ' · ' + estText(nEst(p)) : '') + '</span></span>' +
+      '<span class="kn">' + (i+1) + ' winkel' + (i ? 's' : '') + (i === adv ? ' <span class="tag good">Advies</span>' : '') + '<span class="ks">' + esc(names(p.combo)) + (r ? '' : ' · ' + ofAll(p.assign.length)) + (nEst(p) ? ' · ' + estText(nEst(p)) : '') + (noGain ? ' · geen extra voordeel' : '') + '</span></span>' +
       (r ? '<span class="kt">' + money(r.total) + '</span>' : '<span class="kt part">onvolledig</span>') + '</button>';
   }).join('');
   sumEl.innerHTML = '<div class="sumcard has"><div class="sleft"><h2>' + (whole ? 'Zo betaal je het minst' : 'Niet alles bij deze keuze') + '</h2>' +

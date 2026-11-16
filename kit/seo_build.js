@@ -27,8 +27,10 @@ const ctx = {NOW, STORES: data.stores, STALE_DAYS: Number((body.match(/^const ST
 if (!(ctx.STALE_DAYS > 0)) throw new Error('STALE_DAYS niet gevonden in body.html');
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'web', 'engine.js'), 'utf8') + '\n' +
-  ['mmddToDate', 'promoActive', 'regFresh', 'keep'].map(grab).join('\n') +
-  '\nObject.assign(globalThis, {Engine, priceMatrix, storeTotals, sortStoreTotals, plan, priced, comparable, regFresh, keep, promoActive, mmddToDate});', ctx);
+  ['mmddToDate', 'promoActive', 'regFresh', 'keep'].map(grab).join('\n') + '\n' +
+  /* afdelingsnamen en -volgorde, zoals de app ze toont */
+  (body.match(/^const CATLABEL = \{[\s\S]*?\};/m) || ['const CATLABEL = {};'])[0] + '\n' + (body.match(/^const CATORDER = \[[\s\S]*?\];/m) || ['const CATORDER = [];'])[0] +
+  '\nObject.assign(globalThis, {Engine, priceMatrix, storeTotals, sortStoreTotals, plan, priced, comparable, regFresh, keep, promoActive, mmddToDate, CATLABEL, CATORDER});', ctx);
 const C = ctx;
 const eng = new C.Engine(data.stores);
 eng.setMask(C.keep);
@@ -75,6 +77,7 @@ const OWN = new Set(data.stores.map(st => st.k).filter(k => {
   catch (e) { return false; }
 }));
 let BASKETMEMO = null;
+const BASKETRANK = {};   /* per winkel de plaats in het mandje van vandaag, voor de winkelpagina's */
 function basketSection(){ return BASKETMEMO || (BASKETMEMO = basketCalc()); }
 function basketCalc(){
   /* De app noemt gewone prijzen tot STALE_DAYS dagen oud actueel. Een openbare uitspraak "X is het goedkoopst" vraagt
@@ -147,6 +150,7 @@ function basketCalc(){
   const sumCommon = t => common.reduce((a, i) => a + m[i][fresh.indexOf(t.store)].price, 0);
   const byCommon = ranked.slice().sort((a, b) => sumCommon(a) - sumCommon(b));
   const cheapest = byCommon[0], dearest = byCommon[byCommon.length - 1];
+  if (byCommon.length > 1) byCommon.forEach((t, k) => { BASKETRANK[t.store] = {pos: k + 1, of: byCommon.length}; });
 
   SUMMARY = byCommon.length > 1 ? 'Op ' + esc(DATUM) + ' was <strong>' + esc(data.stores[cheapest.store].c) + '</strong> het goedkoopst voor ons vaste mandje van ' + common.length +
     ' producten, ' + euro(sumCommon(dearest) - sumCommon(cheapest)) + ' goedkoper dan ' + esc(data.stores[dearest.store].c) + '.' : '';
@@ -192,12 +196,97 @@ function basketShort(){
   return SUMMARY ? '<p class="lead">' + SUMMARY + '</p><p><a href="goedkoopste-supermarkt.html">Bekijk de hele vergelijking per product</a></p>'
     : '<p><a href="goedkoopste-supermarkt.html">Bekijk welke supermarkt het goedkoopst is</a></p>';
 }
+/* ---------- pagina per supermarkt: "<winkel> aanbiedingen", elke dag uit de echte acties ---------- */
+const MIN_STORE_DEALS = 20;   /* minder acties: geen eigen pagina, die zou te dun zijn */
+const slug = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const storePage = st => 'aanbiedingen-' + slug(st.k || st.c) + '.html';
+/* actietekst rustig: "2+3 GRATIS" wordt "2+3 gratis" (zelfde regel als de app) */
+const mech = t => String(t || '').replace(/\b[A-ZÀ-Ý]{4,}\b/g, w => w.toLowerCase()).replace(/\s+/g, ' ').trim();
+const catLabel = k => (C.CATLABEL && C.CATLABEL[k]) || 'Overig';
+function activeDeals(st){
+  const out = [];
+  for (let j = 0; j < st.n.length - st.r; j++){
+    if (!C.promoActive(st, j)) continue;
+    const i = st.r + j, now = st.p[i], was = st.po[j];
+    const pct = was > now ? Math.round(100 * (1 - now / was)) : 0;
+    out.push({name: st.n[i], now, was: pct > 0 && pct < 70 ? was : 0, pct: pct < 70 ? pct : 0, until: st.pv[j], label: mech(st.pl[j]), multi: st.pm[j] > 1,
+      cat: data.cats ? data.cats[st.pc[j]] : ''});
+  }
+  return out;
+}
+const storePages = data.stores.filter(st => activeDeals(st).length >= MIN_STORE_DEALS);
+const shortDate = v => { const d = v ? C.mmddToDate(v) : null; return d ? new Intl.DateTimeFormat('nl-NL', {day: 'numeric', month: 'short'}).format(d) : ''; };
+function dealLi(d){
+  return '<li>' + (d.pct ? '<span class="pct">−' + d.pct + '%</span> ' : '') + '<strong>' + esc(d.name) + '</strong>: ' + euro(d.now) + (d.was ? ' <s>' + euro(d.was) + '</s>' : '') +
+    (d.label ? ' <span class="small">· ' + esc(d.label) + '</span>' : '') + (shortDate(d.until) ? ' <span class="small">· t/m ' + esc(shortDate(d.until)) + '</span>' : '') + '</li>';
+}
+/* afwisseling: hooguit 2 producten van hetzelfde merk (eerste woord), geen dubbele namen; de rest schuift door */
+function diverse(list, max, seen){
+  const names = seen || new Set(), brands = {}, out = [];
+  for (const d of list){
+    const k = d.name.toLowerCase(), b = k.split(/\s+/)[0];
+    if (names.has(k) || (brands[b] || 0) >= 2) continue;
+    names.add(k); brands[b] = (brands[b] || 0) + 1; out.push(d);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+function storePageHtml(st, s){
+  const deals = activeDeals(st), n = deals.length, name = esc(st.c), file = storePage(st);
+  const top = deals.filter(d => d.pct >= 25 && d.now >= 50).sort((a, b) => b.pct - a.pct || a.now - b.now);
+  const seen = new Set(), best = diverse(top, 12, seen);
+  /* per afdeling de beste acties, in de volgorde van de winkel */
+  const byCat = {};
+  deals.forEach(d => { (byCat[d.cat || 'overig'] = byCat[d.cat || 'overig'] || []).push(d); });
+  const order = (C.CATORDER || []).filter(k => byCat[k]).concat(Object.keys(byCat).filter(k => !(C.CATORDER || []).includes(k)));
+  const cats = order.map(k => {
+    const list = diverse(byCat[k].slice().sort((a, b) => b.pct - a.pct || a.now - b.now).filter(d => !seen.has(d.name.toLowerCase())), 8);
+    return list.length ? '<h3>' + esc(catLabel(k)) + ' <span class="small">(' + byCat[k].length + ')</span></h3><ul class="deals">' + list.map(dealLi).join('') + '</ul>' : '';
+  }).join('');
+  const fresh = st.r > 0 && C.regFresh(st);
+  const rank = BASKETRANK[s];
+  const regText = fresh
+    ? 'Van ' + name + ' vergelijken we ook de gewone prijzen (bijgewerkt op ' + esc(dayFmt.format(new Date(st.f + 'T12:00:00'))) + '). Zo zie je in de app niet alleen de aanbiedingen, maar ook wat de rest van je lijstje bij ' + name + ' kost.' +
+      (rank ? ' In ons vaste mandje van vandaag staat ' + name + ' op plaats ' + rank.pos + ' van ' + rank.of + '. <a href="goedkoopste-supermarkt.html">Bekijk de hele vergelijking</a>.' : '')
+    : st.r > 0 ? 'De gewone prijzen van ' + name + ' die we hebben, zijn niet actueel genoeg. In de app tellen daarom alleen de aanbiedingen van ' + name + ' mee; dat staat er steeds duidelijk bij.'
+    : 'Van ' + name + ' hebben we op dit moment alleen de aanbiedingen, nog geen gewone prijzen. In de app zie je die aanbiedingen naast de prijzen van andere supermarkten.';
+  /* maximaal 160 tekens zoals Google het toont; de lange variant alleen als die past (ook na het coderen van tekens als ') */
+  const descLong = st.c + ' aanbiedingen van deze week: ' + n + ' acties, met de grootste kortingen per afdeling. Elke ochtend bijgewerkt en te vergelijken met andere supermarkten.';
+  const desc = esc(descLong).length <= 160 ? descLong : st.c + ' aanbiedingen van deze week: ' + n + ' acties, de grootste kortingen per afdeling. Elke ochtend bijgewerkt.';
+  const others = storePages.filter(o => o !== st).map(o => '<a href="' + storePage(o) + '">' + esc(o.c) + '</a>').join(' · ');
+  return '<!doctype html>\n<html lang="nl">\n<head>\n<meta charset="utf-8">\n' +
+    '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src \'self\'; style-src \'unsafe-inline\'; base-uri \'none\'; form-action \'none\'">\n' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n<meta name="theme-color" content="#0E6278">\n' +
+    '<title>' + name + ' aanbiedingen deze week | Bespaar op je boodschap</title>\n<meta name="description" content="' + esc(desc) + '">\n' +
+    '<link rel="canonical" href="' + SITE + file + '">\n<meta property="og:type" content="website">\n<meta property="og:locale" content="nl_NL">\n<meta property="og:site_name" content="Bespaar op je boodschap">\n' +
+    '<meta property="og:title" content="' + name + ' aanbiedingen van deze week">\n<meta property="og:description" content="' + esc(desc) + '">\n<meta property="og:url" content="' + SITE + file + '">\n<meta property="og:image" content="' + SITE + 'icon.png">\n<link rel="icon" href="icon.png">\n' +
+    '<script type="application/ld+json">' + JSON.stringify({'@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+      {'@type': 'ListItem', position: 1, name: 'Home', item: SITE},
+      {'@type': 'ListItem', position: 2, name: 'Supermarkt aanbiedingen', item: SITE + 'supermarkt-aanbiedingen.html'},
+      {'@type': 'ListItem', position: 3, name: String(st.c).replace(/[{}<>&"]/g, '') + ' aanbiedingen', item: SITE + file}]}).replace(/</g, '\\u003c') + '</script>\n' +
+    PARTS['{{STIJL}}'] + '\n</head>\n<body>\n' + PARTS['{{KOP}}'] + '\n<header class="hero">\n  <p class="crumbs"><a href="./">Home</a> › <a href="supermarkt-aanbiedingen.html">Aanbiedingen</a> › ' + name + '</p>\n' +
+    '  <h1>' + name + ' aanbiedingen van deze week</h1>\n  <p>' + n.toLocaleString('nl-NL') + ' acties bij ' + name + ', bijgewerkt op ' + esc(DATUM) + '. Met de grootste kortingen en alles per afdeling.</p>\n' +
+    '  <div class="btns"><a class="big" href="app.html">Vergelijk met andere supermarkten</a></div>\n</header>\n<main>\n' +
+    (best.length ? '<section class="card" aria-labelledby="top"><h2 id="top">Grootste kortingen bij ' + name + '</h2><ul class="deals">' + best.map(dealLi).join('') + '</ul></section>\n' : '') +
+    '<section class="card" aria-labelledby="afd"><h2 id="afd">Alle ' + name + ' acties per afdeling</h2><p class="small">Per afdeling de acties met de meeste korting. Alle ' + n + ' acties zoek je in de app.</p>' + cats +
+    '<a class="cta" href="app.html">Zoek in alle ' + name + ' aanbiedingen</a></section>\n' +
+    '<section class="card" aria-labelledby="reg"><h2 id="reg">Is ' + name + ' goedkoop?</h2><p>' + regText + '</p>' +
+    '<p>Een aanbieding is niet altijd de goedkoopste keuze: hetzelfde product kan bij een andere supermarkt zonder actie goedkoper zijn. Zet je boodschappen in de app en zie per supermarkt wat je hele lijstje kost.</p></section>\n' +
+    '<section class="card" aria-labelledby="andere"><h2 id="andere">Aanbiedingen van andere supermarkten</h2><p>' + others + '</p>' +
+    '<p class="small">De acties komen van PrijsProfeet en worden elke ochtend bijgewerkt. Kortingen van 70% of meer laten we weg, omdat dat vrijwel altijd een fout in de bron is. Controleer de prijs altijd in de folder of bij ' + name + '. Bespaar op je boodschap heeft geen band met ' + name + '.</p></section>\n' +
+    '</main>\n' + PARTS['{{VOET}}'] + '\n</body>\n</html>\n';
+}
+function storeLinks(){
+  return '<p>' + storePages.map(st => '<a href="' + storePage(st) + '">' + esc(st.c) + ' aanbiedingen</a>').join(' · ') + '</p>';
+}
+
 /* welke winkels doen mee, en met wat: zo weet een bezoeker meteen wat hij kan verwachten */
 function storesSection(){
   const rows = data.stores.map(st => {
     let n = 0; for (let j = 0; j < st.n.length - st.r; j++) if (C.promoActive(st, j)) n++;
     const reg = !st.r ? 'alleen aanbiedingen' : C.regFresh(st) ? 'gewone prijzen en aanbiedingen' : 'aanbiedingen (gewone prijzen nog niet actueel)';
-    return '<tr><th scope="row">' + esc(st.c) + '</th><td>' + reg + '</td><td>' + n.toLocaleString('nl-NL') + '</td></tr>';
+    const label = storePages.includes(st) ? '<a href="' + storePage(st) + '">' + esc(st.c) + '</a>' : esc(st.c);
+    return '<tr><th scope="row">' + label + '</th><td>' + reg + '</td><td>' + n.toLocaleString('nl-NL') + '</td></tr>';
   });
   return '<div class="tablewrap"><table><caption>Stand van ' + esc(DATUM) + '</caption><thead><tr><th scope="col">Supermarkt</th><th scope="col">Wat we vergelijken</th><th scope="col">Lopende acties</th></tr></thead><tbody>' +
     rows.join('') + '</tbody></table></div>';
@@ -235,7 +324,7 @@ function dealsSection(){
 
 /* ---------- pagina's schrijven ---------- */
 fs.mkdirSync(outDir, {recursive: true});
-const gen = {mandje: basketSection, mandjekort: basketShort, winkels: storesSection, acties: dealsSection};
+const gen = {mandje: basketSection, mandjekort: basketShort, winkels: storesSection, acties: dealsSection, winkellinks: storeLinks};
 /* gedeelde stukken: site/_stijl.css, _kop.html, _voet.html (worden zelf niet gepubliceerd) */
 const part = f => fs.existsSync(path.join(srcDir, f)) ? fs.readFileSync(path.join(srcDir, f), 'utf8').trim() : '';
 const PARTS = {'{{STIJL}}': '<style>\n' + part('_stijl.css') + '\n</style>', '{{KOP}}': part('_kop.html'), '{{VOET}}': part('_voet.html')};
@@ -256,6 +345,13 @@ for (const f of fs.readdirSync(srcDir)){
     if (!/<meta name="robots" content="noindex/.test(h)) pages.push(f);
   } else if (f !== 'sitemap.xml' && f !== 'robots.txt') fs.copyFileSync(src, path.join(outDir, f));
 }
+/* een pagina per supermarkt (na het mandje, zodat de plaats in het mandje bekend is) */
+basketSection();
+storePages.forEach(st => {
+  const f = storePage(st);
+  fs.writeFileSync(path.join(outDir, f), storePageHtml(st, data.stores.indexOf(st)));
+  pages.push(f);
+});
 /* de app zelf (gemaakt door web/assemble.py): vaste link en deelgegevens erbij, één keer */
 const appFile = path.join(outDir, 'app.html');
 if (fs.existsSync(appFile)){
@@ -268,7 +364,7 @@ if (fs.existsSync(appFile)){
   }
 }
 const today = NOW.toISOString().slice(0, 10);
-const prio = f => f === 'index.html' ? '1.0' : /goedkoopste|vergelijken|aanbiedingen|besparen/.test(f) ? '0.8' : '0.4';
+const prio = f => f === 'index.html' ? '1.0' : /^aanbiedingen-/.test(f) ? '0.7' : /goedkoopste|vergelijken|aanbiedingen|besparen/.test(f) ? '0.8' : '0.4';
 const urls = pages.concat(['app.html']).map(f => '  <url><loc>' + SITE + (f === 'index.html' ? '' : f) + '</loc><lastmod>' + today + '</lastmod><priority>' + prio(f) + '</priority></url>');
 fs.writeFileSync(path.join(outDir, 'sitemap.xml'), '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls.join('\n') + '\n</urlset>\n');
 /* robots.txt werkt alleen in de hoofdmap van een domein; met een eigen domein wordt dit bestand gebruikt */

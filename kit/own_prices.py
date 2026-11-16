@@ -2,7 +2,7 @@
 
 Gebruik: python3 -I own_prices.py supermarkets.json fresh.json winkel=bestand.json [winkel=bestand.json ...]
 Past supermarkets.json en fresh.json ter plekke aan. Prijzen ouder dan 14 dagen tellen niet mee;
-zijn er dan minder dan 1000 over, dan blijven de prijzen van Checkjebon staan.
+zijn er dan te weinig over (1000, of minder als Checkjebon zelf weinig heeft, minimaal 300), dan blijven de prijzen van Checkjebon staan.
 """
 import json, sys, datetime
 
@@ -18,12 +18,15 @@ for pair in pairs:
         print(f'{k}: eigen prijzen niet te lezen ({e}); Checkjebon blijft', file=sys.stderr); continue
     rows = [{'n': p['n'], 'l': p['l'], 'p': p['p'], 's': p.get('s', '')} for p in own.get('d', [])
             if isinstance(p, dict) and isinstance(p.get('t'), str) and p['t'] >= cut and isinstance(p.get('p'), (int, float)) and p.get('n')]
-    if len(rows) < 1000:
-        print(f'{k}: maar {len(rows)} recente eigen prijzen; Checkjebon blijft', file=sys.stderr); continue
     st = next((s for s in cjb if s.get('n') == k), None)
     if st is None:
         print(f'{k}: winkel niet in Checkjebon; overgeslagen', file=sys.stderr); continue
     before = len(st.get('d') or [])
+    # De grens beschermt goede Checkjebon-data tegen een half mislukte eigen run. Heeft Checkjebon weinig of niets
+    # (ALDI, Ekoplaza: 0), dan is een kleiner aantal eigen prijzen al een verbetering; nooit minder dan 300.
+    need = min(1000, max(300, before // 2))
+    if len(rows) < need:
+        print(f'{k}: maar {len(rows)} recente eigen prijzen (minimaal {need}); Checkjebon blijft', file=sys.stderr); continue
     st['d'] = rows
     if isinstance(own.get('base'), str) and own['base'].startswith('https://'): st['u'] = own['base']   # links naar de eigen productpagina
     newest = max(p['t'] for p in own['d'] if isinstance(p, dict) and isinstance(p.get('t'), str) and p['t'] >= cut)

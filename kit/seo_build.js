@@ -73,7 +73,7 @@ const BASKET_DAYS = 14;
 /* zelf opgehaald: er staat een data/<winkel>.json van de laatste 14 dagen (own_prices.py gebruikt die dan) */
 const OWN = new Set(data.stores.map(st => st.k).filter(k => {
   try { const o = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', k + '.json'), 'utf8'));
-        return o.d && o.d.length >= 1000 && (NOW - new Date(o.fetched + 'T12:00:00')) / 864e5 <= BASKET_DAYS; }
+        return o.d && o.d.length >= 300 &&(NOW - new Date(o.fetched + 'T12:00:00')) / 864e5 <= BASKET_DAYS; }
   catch (e) { return false; }
 }));
 let BASKETMEMO = null;

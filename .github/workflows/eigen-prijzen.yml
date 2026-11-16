@@ -1,7 +1,7 @@
 name: Gewone prijzen zelf ophalen
 
-# Elke nacht de gewone prijzen van Dirk, DekaMarkt en Hoogvliet van hun eigen website ophalen
-# (in Checkjebon staan ze al maanden stil). Per winkel een eigen taak, naast elkaar; per website
+# Elke nacht de gewone prijzen van Dirk, DekaMarkt, Hoogvliet, ALDI, Ekoplaza en Vomar van hun eigen website ophalen
+# (in Checkjebon staan ze stil of ontbreken ze). Per winkel een eigen taak, naast elkaar; per website
 # rustig: één pagina per seconde, eerlijke User-Agent, robots.txt wordt gevolgd, stopt bij een blokkade.
 # Klaar voor de ochtendupdate (dagelijks.yml), die de prijzen in de app zet. Wat niet af komt, komt de nacht erna eerst.
 on:
@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        winkel: [dirk, dekamarkt, hoogvliet]
+        winkel: [dirk, dekamarkt, hoogvliet, aldi, ekoplaza, vomar]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:

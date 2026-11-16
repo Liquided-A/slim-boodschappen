@@ -290,6 +290,8 @@ function imgHtml(ref, fallback){
   if (ref.u) return '<img class="img pimg" src="' + esc(ref.u) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-t="' + (+ref.t || 0) + '" data-n="' + esc(ref.n || '') + '">';
   return spriteHtml(ref.t);
 }
+/* foto geladen: rustig infaden in plaats van een leeg wit vlak dat ineens gevuld wordt */
+document.addEventListener('load', e => { const t = e.target; if (t && t.tagName === 'IMG' && t.classList.contains('pimg')) t.classList.add('ok'); }, true);
 /* foto niet te laden (of geblokkeerd): val terug op de reservefoto of het plaatje */
 document.addEventListener('error', e => {
   const t = e.target;
@@ -469,11 +471,23 @@ function renderChips(){
   $('chips').innerHTML = c.map(([k, l]) => '<span class="chip">' + esc(l) + '<button type="button" data-act="unchip" data-k="' + k + '" aria-label="Filter ' + esc(l) + ' weghalen">×</button></span>').join('') +
     (c.length > 1 ? '<button type="button" class="chip clear" data-act="clearfilters">Alles wissen</button>' : '');
 }
+/* "Uitgelicht": gewone boodschappen met een flinke korting en een echte besparing in euro's eerst,
+   niet de goedkoopste zakjes noedels of zout. Alleen de volgorde van de aanbiedingen, de rekenkern doet hier niet aan mee. */
+const FEAT_FOOD = new Set(['groente-fruit','vlees','vis','vega','zuivel-eieren','kaas','brood-bakkerij','ontbijt','pasta-rijst-wereldkeuken',
+  'soepen-conserven-sauzen','maaltijden','diepvries','koffie-thee']);
+const FEAT_TREAT = new Set(['snoep-koek-chips','frisdrank','bier','wijn','bier-wijn-sterke-drank']);
+function featuredScore(d){
+  const save = d.usual > d.price ? d.usual - d.price : 0;
+  return 0.6 * Math.min(d.pct || 0, 50) + (FEAT_FOOD.has(d.cat) ? 15 : FEAT_TREAT.has(d.cat) ? 5 : -8) + Math.min(save / 25, 12) - (save < 50 ? 10 : 0);
+}
 function sortedDeals(){
   let list = baseFiltered();
   const found = rankMap();
   if (S.sort === 'top' && found) list.sort((a, b) => (a.upcoming - b.upcoming) || found.get(a) - found.get(b) || a.price - b.price);
-  else if (S.sort === 'top') list.sort((a, b) => (a.upcoming - b.upcoming) || ((!b.img.none) - (!a.img.none)) || (Math.min(b.pct, 50) - Math.min(a.pct, 50)) || a.price - b.price);
+  else if (S.sort === 'top'){
+    const sc = new Map(list.map(d => [d, featuredScore(d)]));
+    list.sort((a, b) => (a.upcoming - b.upcoming) || ((!b.img.none) - (!a.img.none)) || sc.get(b) - sc.get(a) || a.price - b.price);
+  }
   else if (S.sort === 'pct') list.sort((a, b) => (a.upcoming - b.upcoming) || b.pct - a.pct || (!b.img.none) - (!a.img.none) || a.price - b.price);
   else if (S.sort === 'price') list.sort((a, b) => a.price - b.price);
   else if (S.sort === 'end') list.sort((a, b) => (a.until ? a.until.getTime() : 9e15) - (b.until ? b.until.getTime() : 9e15) || b.pct - a.pct);
@@ -508,7 +522,7 @@ function detailHtml(s, i){
   return '<div class="dtop"><span class="dpic">' + imgHtml(ref, '') + '</span><div><span class="tag">' + esc(st.c) + '</span><h2>' + esc(st.n[i]) + '</h2>' +
       (size ? '<p class="muted">' + esc(size) + (unitPrice(st.p[i], st.u[i], st.q[i]) ? ' · ' + unitPrice(st.p[i], st.u[i], st.q[i]) : '') + '</p>' : '') +
       '<div class="prow">' + (isDeal && st.po[j] ? '<span class="old">' + money(st.po[j]) + '</span>' : '') + '<span class="now">' + money(st.p[i]) + '</span></div>' +
-      (isDeal && st.pl[j] ? '<span class="mech">' + esc(st.pl[j]) + '</span>' : '') +
+      (isDeal && st.pl[j] ? '<span class="mech">' + esc(mechText(st.pl[j])) + '</span>' : '') +
       (d && d.until ? '<p class="small muted">Geldig t/m ' + esc(dayFmt.format(d.until)) + '</p>' : (!isDeal ? '<p class="small muted">Gewone prijs' + (regFresh(st) ? '' : ', ' + esc(regLabel(st))) + '</p>' : '')) + '</div></div>' +
     '<div class="dbtns">' + addCtl(q, 'detail') + '' +
       (url ? outA(url, 'btn ghost', 'Bekijk bij ' + esc(st.c) + ' ↗') : '') + '</div>' +
@@ -574,6 +588,8 @@ function mealHtml(id){
     '<button type="button" class="btn ghost" data-act="closesheet" style="justify-content:center">Annuleren</button>';
 }
 
+/* actietekst rustig weergeven: "2+3 GRATIS" wordt "2+3 gratis"; afkortingen als "AH" of "XL" blijven staan */
+function mechText(t){ return String(t).replace(/\b[A-ZÀ-Ý]{4,}\b/g, w => w.toLowerCase()).replace(/\s+/g, ' ').trim(); }
 /* prijs per kilo of liter, zoals op het schapkaartje */
 function unitPrice(cents, u, q){
   if (!q || (u !== 1 && u !== 2) || q < 20) return '';
@@ -587,7 +603,7 @@ function cardHtml(d){
     (d.upcoming ? '<span class="soon">Vanaf ' + esc(dayFmt.format(d.from)) + '</span>' : '') + '</div>' +
     '<div class="cbody"><div class="cname" data-act="detail" data-s="' + d.s + '" data-i="' + d.i + '" title="' + esc(d.name) + '">' + esc(d.name) + '</div>' +
     (size ? '<div class="csize">' + esc(size) + (unitPrice(d.price, st.u[d.i], st.q[d.i]) ? ' · ' + unitPrice(d.price, st.u[d.i], st.q[d.i]) : '') + '</div>' : '') +
-    (d.label ? '<span class="mech">' + esc(d.label) + '</span>' : '') +
+    (d.label ? '<span class="mech">' + esc(mechText(d.label)) + '</span>' : '') +
     '<div class="prow">' + (d.usual ? '<span class="old">' + money(d.usual) + '</span>' : '') + '<span class="now">' + money(d.price) + '</span>' +
     (d.multi ? '<span class="per">per stuk</span>' : '') + '</div>' +
     (d.until && !d.upcoming ? '<span class="valid">Geldig t/m ' + esc(dayFmt.format(d.until)) + '</span>' : '') +

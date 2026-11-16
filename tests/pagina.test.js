@@ -204,3 +204,26 @@ test('gewone prijzen ouder dan 14 dagen heten niet actueel', () => {
   assert.ok(!c.regFresh({f: '2026-10-20'}), '22 dagen oud: verouderd');
   assert.ok(!c.regFresh({f: '2026-08-25'}), 'Lidl van augustus: verouderd');
 });
+
+test('actietekst: hoofdletters rustig, afkortingen blijven', () => {
+  const c = {}; vm.createContext(c);
+  vm.runInContext(grab('mechText') + '\nglobalThis.mechText = mechText;', c);
+  assert.strictEqual(c.mechText('2+3 GRATIS'), '2+3 gratis');
+  assert.strictEqual(c.mechText('1 + 1 gratis'), '1 + 1 gratis');
+  assert.strictEqual(c.mechText('AH XL  2e HALVE PRIJS'), 'AH XL 2e halve prijs');
+  assert.strictEqual(c.mechText('2 voor 0.89 · alleen in de winkel'), '2 voor 0.89 · alleen in de winkel');
+});
+test('uitgelicht: gewone boodschappen met echte besparing boven zout en shampoo', () => {
+  const c = {}; vm.createContext(c);
+  const decl = body.match(/^const FEAT_FOOD = [\s\S]*?\]\);\r?\nconst FEAT_TREAT = .*$/m)[0];
+  vm.runInContext(decl + '\n' + grab('featuredScore') + '\nglobalThis.featuredScore = featuredScore;', c);
+  const zout = {pct: 51, cat: 'soepen-conserven-sauzen', usual: 59, price: 29};
+  const shampoo = {pct: 50, cat: 'haarverzorging', usual: 100, price: 50};
+  const kip = {pct: 40, cat: 'vlees', usual: 899, price: 539};
+  const chips = {pct: 50, cat: 'snoep-koek-chips', usual: 259, price: 129};
+  const s = c.featuredScore;
+  assert.ok(s(kip) > s(zout), 'kip met 3,60 korting boven zout met 30 cent');
+  assert.ok(s(kip) > s(shampoo), 'boodschappen boven verzorging');
+  assert.ok(s(chips) > s(shampoo), 'snoep boven verzorging');
+  assert.strictEqual(s({pct: 0, cat: 'vlees', usual: 0, price: 100}) < s(kip), true, 'zonder korting onderaan');
+});

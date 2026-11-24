@@ -276,7 +276,7 @@ STORES = {
                  'keep': r'^https://www\.ekoplaza\.nl/nl/producten/product/([a-z0-9-]+-\d{10})$',
                  'url': 'https://www.ekoplaza.nl/nl/producten/product/{}',
                  'base': 'https://www.ekoplaza.nl/nl/producten/product/', 'parse': ld_ekoplaza},
-    # reserve: alleen inschakelen als Checkjebon stopt met SPAR; zelfde productnummers als Checkjebon (met / aan het eind)
+    # ingeschakeld op 24 nov 2026, omdat Checkjebon sinds 20 nov stilstond; zelfde productnummers als Checkjebon (met / aan het eind)
     'spar': {'robots': 'https://www.spar.nl/robots.txt', 'sitemap': 'https://www.spar.nl/sitemap/products.xml',
              'keep': r'^https://www\.spar\.nl/([a-z0-9-]+-\d{5,}/)$', 'url': 'https://www.spar.nl/{}',
              'base': 'https://www.spar.nl/', 'parse': ld_spar},

@@ -3,6 +3,8 @@ name: Prijzen bijwerken en website publiceren
 on:
   schedule:
     - cron: '20 5 * * *'      # elke ochtend rond 06:20 (winter) / 07:20 (zomer), na de nachtelijke update van PrijsProfeet
+    - cron: '20 9 * * *'      # herkansingen: doen alleen iets als de update van vandaag nog niet op de website staat
+    - cron: '20 13 * * *'
   push:
     branches: [main]
     paths: ['web/**', 'site/**', 'kit/**', '.github/workflows/dagelijks.yml']
@@ -18,7 +20,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  nodig:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      ja: ${{ steps.kijk.outputs.ja }}
+    steps:
+      - id: kijk
+        env:
+          CRON: ${{ github.event.schedule }}
+        run: |
+          JA=true
+          if [ "$CRON" = '20 9 * * *' ] || [ "$CRON" = '20 13 * * *' ]; then
+            OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+            # website niet te lezen: voor de zekerheid wel bijwerken
+            DAG=$(curl -fsSL "https://$OWNER.github.io/${GITHUB_REPOSITORY#*/}/data.b64" | base64 -d | gunzip | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["promoFetched"][:10])' || true)
+            if [ "$DAG" = "$(date -u +%F)" ]; then JA=false; fi
+            echo "website: $DAG, bijwerken: $JA"
+          fi
+          echo "ja=$JA" >> "$GITHUB_OUTPUT"
+
   bijwerken:
+    needs: nodig
+    if: needs.nodig.outputs.ja == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     environment:

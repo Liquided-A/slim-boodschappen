@@ -227,3 +227,7 @@ test('uitgelicht: gewone boodschappen met echte besparing boven zout en shampoo'
   assert.ok(s(chips) > s(shampoo), 'snoep boven verzorging');
   assert.strictEqual(s({pct: 0, cat: 'vlees', usual: 0, price: 100}) < s(kip), true, 'zonder korting onderaan');
 });
+test('mijn lijstje: eerst de boodschappen, dan de winkelkeuze, dan wat je waar haalt', () => {
+  const at = id => body.indexOf('id="' + id + '"');
+  assert.ok(at('view-list') < at('items') && at('items') < at('summary') && at('summary') < at('bons') && at('bons') < at('storebox'));
+});

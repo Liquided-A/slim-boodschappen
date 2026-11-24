@@ -231,3 +231,19 @@ test('mijn lijstje: eerst de boodschappen, dan de winkelkeuze, dan wat je waar h
   const at = id => body.indexOf('id="' + id + '"');
   assert.ok(at('view-list') < at('items') && at('items') < at('summary') && at('summary') < at('bons') && at('bons') < at('storebox'));
 });
+test('de app toont alleen de tien gekozen winkels, en een oude winkelkeuze laat niemand met niets zitten', () => {
+  const c = {}; vm.createContext(c);
+  vm.runInContext(body.match(/^const APP_STORES = .*$/m)[0] + '\n' + grab('appStores') + '\n' + grab('fixOff') + '\nObject.assign(globalThis, {APP_STORES, appStores, fixOff});', c);
+  assert.strictEqual(c.APP_STORES.size, 10);
+  const all = ['ah', 'poiesz', 'dirk', 'boni'].map(k => ({k}));
+  assert.strictEqual(c.appStores(all).map(s => s.k).join(), 'ah,dirk');
+  assert.strictEqual(c.fixOff(new Set(['ah', 'dirk']), all).size, 0, 'alleen Poiesz en Boni aan: alles weer aan');
+  assert.strictEqual(c.fixOff(new Set(['ah', 'boni']), all).size, 2, 'eigen keuze blijft');
+  assert.strictEqual(c.fixOff(new Set(['ah', 'dirk', 'poiesz', 'boni']), all).size, 4, 'bewust alles uit blijft uit');
+});
+test('oude winkelkeuze wordt maar één keer omgezet', () => {
+  const migr = v => { const c = app(JSON.stringify({items: [], off: ['ah'], v})); assert.ok(c.load()); return c.S.migr; };
+  assert.strictEqual(migr(3), true);
+  assert.strictEqual(migr(undefined), true);
+  assert.strictEqual(migr(4), false, 'nieuw bewaard: de keuze blijft precies zoals hij is');
+});

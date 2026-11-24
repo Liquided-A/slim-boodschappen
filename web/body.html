@@ -20,7 +20,7 @@
   <section class="view inner" id="view-shop" aria-labelledby="h-shop">
     <div class="storebar" id="storebar" role="group" aria-label="Mijn winkels"></div>
     <div class="crumbs">
-      <div><h1 class="h1like" id="h-shop">Aanbiedingen van deze week</h1><p class="muted small" id="shopsub">Folderacties van alle supermarkten.</p></div>
+      <div><h1 class="h1like" id="h-shop">Aanbiedingen van deze week</h1><p class="muted small" id="shopsub">Folderacties van je supermarkten.</p></div>
     </div>
     <section class="scan" id="scan" aria-labelledby="h-scan" hidden>
       <div class="scanintro">
@@ -136,7 +136,11 @@ let NOW = new Date();
 const STALE_DAYS = 14;   /* gewone prijzen ouder dan 14 dagen heten niet meer actueel (zelfde grens als de website) */
 /* telt deze winkel alleen met aanbiedingen mee? */
 const onlyPromos = st => !st.r || (!S.oldReg && !regFresh(st));
-const DEFAULT_ON = new Set(['ah','jumbo','lidl','plus','aldi','dirk','coop','spar','poiesz','dekamarkt','hoogvliet','vomar','nettorama']);
+/* de winkels die de app toont, zo blijft het menu overzichtelijk. De prijsdata bevat er meer; winkel erbij = sleutel erbij */
+const APP_STORES = new Set(['ah','jumbo','lidl','plus','aldi','dirk','hoogvliet','spar','dekamarkt','vomar']);
+function appStores(list){ return list.filter(s => APP_STORES.has(s.k)); }
+/* had iemand alleen winkels aan die niet meer in de app staan, dan zou alles leeg zijn: zet dan alle winkels weer aan */
+function fixOff(off, all){ return all.some(s => !off.has(s.k)) && !all.some(s => APP_STORES.has(s.k) && !off.has(s.k)) ? new Set() : off; }
 const CATLABEL = {'zuivel-eieren':'Zuivel & eieren','groente-fruit':'Groente & fruit','vlees':'Vlees','vis':'Vis','vega':'Vega','kaas':'Kaas',
   'brood-bakkerij':'Brood','ontbijt':'Ontbijt','pasta-rijst-wereldkeuken':'Pasta & rijst','soepen-conserven-sauzen':'Soep & sauzen','maaltijden':'Maaltijden',
   'diepvries':'Diepvries','snoep-koek-chips':'Snoep & chips','koffie-thee':'Koffie & thee','frisdrank':'Frisdrank','bier':'Bier','wijn':'Wijn',
@@ -303,7 +307,7 @@ document.addEventListener('error', e => {
 
 /* ---------- opslaan ---------- */
 function save(){
-  try{ localStorage.setItem(KEY, JSON.stringify({items:S.items.map(i => [i.q, i.qty]), off:[...S.off], demo:S.demo, oldReg:S.oldReg, v:3, done:[...S.done], hist:S.hist, saved:S.saved, onb:S.onb, persons:S.persons, tpl:S.tpl})); }catch(e){}
+  try{ localStorage.setItem(KEY, JSON.stringify({items:S.items.map(i => [i.q, i.qty]), off:[...S.off], demo:S.demo, oldReg:S.oldReg, v:4, done:[...S.done], hist:S.hist, saved:S.saved, onb:S.onb, persons:S.persons, tpl:S.tpl})); }catch(e){}
 }
 function load(){
   try{
@@ -312,7 +316,7 @@ function load(){
     const d = JSON.parse(raw); if (!d || !Array.isArray(d.items)) return false;
     const texts = a => Array.isArray(a) ? a.filter(x => typeof x === 'string') : [];
     S.items = cleanList(d.items, 200).map(([q, qty]) => ({id:S.nextId++, q, qty}));
-    S.off = new Set(texts(d.off)); S.demo = !!d.demo; S.oldReg = d.v >= 3 ? !!d.oldReg : false;   /* v3: oude gewone prijzen staan voortaan standaard uit */
+    S.off = new Set(texts(d.off)); S.demo = !!d.demo; S.oldReg = d.v >= 3 ? !!d.oldReg : false; S.migr = !(d.v >= 4);   /* v3: oude gewone prijzen staan voortaan standaard uit */
     S.done = new Set(texts(d.done)); S.hist = cleanCounts(d.hist);
     S.saved = d.saved && Number.isFinite(d.saved.c) ? {y:String(d.saved.y), c:d.saved.c, n:+d.saved.n || 0} : null;
     S.onb = d.onb !== false; S.persons = Math.max(1, Math.min(12, +d.persons || 4));
@@ -1461,7 +1465,7 @@ async function cachedData(){
 }
 function applyData(D){
   NOW = new Date();
-  STORES = D.stores; CATS = D.cats; PFETCH = new Date(D.promoFetched); PHOTOS = null; ASSORT = null; WARM = null;
+  STORES = appStores(D.stores); CATS = D.cats; PFETCH = new Date(D.promoFetched); PHOTOS = null; ASSORT = null; WARM = null;
   ENG = new Engine(STORES); HASIMG = false; S.fstores = new Set();
   ENG.setMask(keep); reanalyze(); buildDeals(); renderFresh(); warmSearch();
   $('pfdate').textContent = dayFmt.format(PFETCH);
@@ -1497,10 +1501,10 @@ document.addEventListener('keydown', e => {
     let D = await decodeData($('prijsdata').textContent);
     const C = CFG ? await cachedData() : null;
     if (C && new Date(C.promoFetched) > new Date(D.promoFetched)) D = C;
-    STORES = D.stores;
+    STORES = appStores(D.stores);
     const fresh = !load();
     /* alleen bij een echte eerste keer: een leeg lijstje en je winkelkeuze blijven gewoon staan */
-    if (fresh){ useDemo(); S.off = new Set(STORES.filter(s => !DEFAULT_ON.has(s.k)).map(s => s.k)); }
+    if (fresh){ useDemo(); S.off = new Set(); } else if (S.migr) S.off = fixOff(S.off, D.stores);   /* eenmalig: lijstjes van vóór de tien winkels */
     /* gaat het met het bewaarde lijstje toch mis, dan zonder dat lijstje verder: de app moet altijd openen */
     let broken = false;
     try{ applyData(D); }catch(err){ broken = true; S.items = []; S.an = {}; S.pins = {}; S.done.clear(); S.tpl = []; S.hist = Object.create(null); S.k = null; applyData(D); }

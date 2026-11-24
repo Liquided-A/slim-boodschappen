@@ -72,9 +72,8 @@
 
   <section class="view inner" id="view-list" aria-labelledby="h-list" hidden>
     <div class="crumbs">
-      <div><h1 id="h-list">Mijn lijstje</h1><p class="muted small">Hier zie je wat je boodschappen kosten, wat je waar haalt en of het loont om meer winkels te combineren.</p></div>
+      <div><h1 id="h-list">Mijn lijstje</h1><p class="muted small">Eerst je boodschappen, daaronder wat ze kosten en bij welke 1, 2, 3 of 4 winkels je het minst betaalt.</p></div>
     </div>
-    <aside class="summary" id="summary" aria-live="polite"></aside>
     <div class="basket">
       <div class="col">
         <section class="panel" aria-label="Producten">
@@ -85,6 +84,9 @@
           <div class="notice" id="demonote" hidden>Dit is een voorbeeldlijstje. Voeg je eigen producten toe of wis het.</div>
           <ul class="items" id="items"></ul>
         </section>
+        <!-- eerst het lijstje zelf, daarna pas 1 tot 4 winkels en waar je het haalt -->
+        <aside class="summary" id="summary" aria-live="polite"></aside>
+        <div id="bons"></div>
         <section class="panel">
           <details class="storebox" id="storebox">
             <summary><span>Mijn winkels <span class="muted small" id="storecount"></span></span></summary>
@@ -94,7 +96,6 @@
           </details>
         </section>
         <section class="panel meals" aria-labelledby="h-meals"><header><div><h2 id="h-meals">Wat eten we?</h2><p class="small muted">Kies een gerecht, dan komen de boodschappen op je lijstje.</p></div></header><div class="hscroll mealrow" id="meals"></div></section>
-        <div id="bons"></div>
       </div>
     </div>
   </section>
